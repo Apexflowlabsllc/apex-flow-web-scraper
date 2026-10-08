@@ -120,3 +120,7 @@ The commercial Geode marketing design is not part of this repository or license.
 Read the [documentation](https://webscraper.apexflowlabs.com/docs.html),
 [reference library](https://webscraper.apexflowlabs.com/encyclopedia/) and
 [current limitations](https://webscraper.apexflowlabs.com/facts.html).
+
+## Roadmap
+
+See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged plan for measured extraction quality, customer-owned login sessions, human challenge handling, recipe drift, proxy controls and team hosting.
