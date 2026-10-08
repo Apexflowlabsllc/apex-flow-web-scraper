@@ -1,6 +1,7 @@
 import asyncio
 import gzip
 import json
+import socket
 import sqlite3
 import time
 from pathlib import Path
@@ -18,6 +19,51 @@ from rainbo_scrape.service import Service
 @pytest.fixture
 def settings(tmp_path):
     return Settings(data_dir=tmp_path, host_delay=0, allow_test_loopback=True)
+
+
+@pytest.mark.parametrize("proxy", [
+    "http://proxy.example:3128",
+    "http://operator:secret@proxy.example:3128",
+])
+def test_proxy_configuration_accepts_http_endpoints(tmp_path, proxy):
+    configured = Settings(data_dir=tmp_path, proxy_url=proxy)
+    configured.validate_proxy()
+    assert configured.proxy_url == proxy
+
+
+@pytest.mark.parametrize("proxy", [
+    "https://proxy.example:3128",
+    "socks5://proxy.example:1080",
+    "http://proxy.example",
+    "http://proxy.example:70000",
+    "http://proxy.example:3128/path",
+    "http://proxy.example:3128?route=other",
+    "http://operator@proxy.example:3128",
+])
+def test_proxy_configuration_rejects_unsupported_or_ambiguous_urls(tmp_path, proxy):
+    configured = Settings(data_dir=tmp_path, proxy_url=proxy)
+    with pytest.raises(ValueError, match="RAINBO_SCRAPE_PROXY_URL"):
+        configured.validate_proxy()
+
+
+async def test_proxy_destination_preflight_rejects_private_dns(monkeypatch, settings):
+    async def private_dns(*args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443))]
+
+    monkeypatch.setattr(asyncio, "get_running_loop", lambda: type("Loop", (), {"getaddrinfo": private_dns})())
+    settings.allow_test_loopback = False
+    fetcher = Fetcher(settings)
+    with pytest.raises(ScrapeError, match="public internet"):
+        await fetcher._validate_public_target("https://example.com/")
+
+
+async def test_proxy_destination_preflight_accepts_public_dns(monkeypatch, settings):
+    async def public_dns(*args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
+
+    monkeypatch.setattr(asyncio, "get_running_loop", lambda: type("Loop", (), {"getaddrinfo": public_dns})())
+    fetcher = Fetcher(settings)
+    await fetcher._validate_public_target("https://example.com/")
 
 
 @pytest.fixture
