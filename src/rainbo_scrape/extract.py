@@ -158,10 +158,13 @@ def extract(body, url, content_type="text/html", recipe=None):
     main = max(candidates, key=lambda n: len(_text(n)), default=soup.body or soup)
     text = main.get_text("\n", strip=True)[:500000]
     markdown = markdownify(str(main), heading_style="ATX", strip=["img"])[:500000]
-    challenge = any(x in (title+" "+text[:1000]).lower() for x in (
-        "verify you are human", "just a moment...", "checking your browser", "access denied", "captcha verification"))
+    challenge_markers = (
+        "verify you are human", "just a moment...", "checking your browser", "access denied",
+        "captcha verification", "complete the security check", "unusual traffic", "security challenge",
+        "enable javascript and cookies to continue", "robot or human", "are you a robot")
+    challenge = any(x in (title+" "+text[:2000]).lower() for x in challenge_markers)
     if challenge and len(text) < 3000:
-        raise ScrapeError("access_challenge", "Site returned an access challenge instead of page content")
+        raise ScrapeError("access_challenge", "access challenge detected; extraction paused. An authorized account owner must resolve it in the target service.")
     if len(text) < 80:
         common["warnings"].append("Low text yield; page may need browser rendering")
     if errors:

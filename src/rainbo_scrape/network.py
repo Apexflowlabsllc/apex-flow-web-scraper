@@ -1,11 +1,12 @@
 import asyncio
 from email.utils import parsedate_to_datetime
 import hashlib
+import socket
 import time
 from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
 import aiohttp
-from .policy import PublicResolver, ScrapeError, check_url
+from .policy import PublicResolver, ScrapeError, check_address, check_url
 
 
 def retry_delay(value):
@@ -27,6 +28,7 @@ class Fetcher:
         self.charge = None
 
     async def __aenter__(self):
+        self.settings.validate_proxy()
         connector = aiohttp.TCPConnector(resolver=PublicResolver(self.settings.allow_test_loopback),
                                         ttl_dns_cache=0, limit=8)
         self.session = aiohttp.ClientSession(connector=connector, trust_env=False,
@@ -91,7 +93,14 @@ class Fetcher:
             for attempt in range(3):
                 await self._throttle(url)
                 try:
-                    async with self.session.get(url, headers=headers, allow_redirects=False) as res:
+                    # Resolve and validate each target directly before routing it
+                    # through an optional proxy. This prevents a proxy from
+                    # becoming an SSRF path to private or link-local services.
+                    await self._validate_public_target(url)
+                    request_options = {"headers": headers, "allow_redirects": False}
+                    if self.settings.proxy_url:
+                        request_options["proxy"] = self.settings.proxy_url
+                    async with self.session.get(url, **request_options) as res:
                         self.requests += 1
                         safe_headers = {k.lower(): v for k, v in res.headers.items() if k.lower() in {
                             "content-type", "etag", "last-modified", "cache-control", "location", "retry-after"}}
@@ -134,3 +143,29 @@ class Fetcher:
             else:
                 raise ScrapeError("fetch_failed", "Request retries exhausted")
         raise ScrapeError("redirect_limit", "Too many redirects")
+
+    async def _validate_public_target(self, url):
+        parsed = urlsplit(url)
+        host = parsed.hostname
+        if not host:
+            raise ScrapeError("invalid_url", "A valid public http(s) URL is required")
+        import ipaddress
+        try:
+            ipaddress.ip_address(host)
+            # check_url already validates literal addresses.
+            return
+        except ValueError:
+            pass
+        try:
+            # The proxy must not be allowed to resolve a destination that the
+            # local policy has not independently checked.
+            results = await asyncio.get_running_loop().getaddrinfo(
+                host, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)
+            if not results:
+                raise ScrapeError("dns_failed", "Host has no usable public addresses")
+            for result in results:
+                check_address(result[4][0], self.settings.allow_test_loopback)
+        except ScrapeError:
+            raise
+        except Exception as exc:
+            raise ScrapeError("dns_failed", "Host has no usable public addresses") from exc

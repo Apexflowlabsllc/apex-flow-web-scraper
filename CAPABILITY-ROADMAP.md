@@ -17,12 +17,35 @@ local corpus search and nine MCP tools. The worker and local website are
 single-installation tools; the workspace is not a public multi-user service.
 
 It does not yet support customer login profiles, CAPTCHA solving or
-user-assisted challenge continuation, customer proxy pools, visual workflow
+user-assisted challenge continuation, managed proxy pools, visual workflow
 recording, OCR, shared cloud accounts, global datasets, or a contractual
-extraction SLA. The 33 existing tests and one successful server smoke scrape
+extraction SLA. An operator may configure one customer-controlled HTTP proxy
+with `RAINBO_SCRAPE_PROXY_URL`; the engine validates destinations
+against public-address policy before forwarding and exposes only a boolean
+health indicator. This is proxy routing, not a proxy network or geographic
+coverage promise. The 44 current tests and one successful server smoke scrape
 are not comparative accuracy, coverage or uptime evidence.
 
 ## Capability map
+
+### What the four products document about access
+
+This is a review of public product documentation, not a claim about hidden
+implementation details. Firecrawl documents a basic-to-enhanced proxy retry for
+401/403/429 responses. Apify documents managed proxy groups and persistent
+sessions that retain IP/cookie state, and markets a separate Unblocker product
+for anti-bot and anti-CAPTCHA handling. Playwright documents browser/context
+proxy configuration and isolated contexts; it is an automation library, not an
+IP network. Crawl4AI documents block/challenge detection, retries, configured
+proxy escalation and an external-fetch fallback hook. Our defensible target is
+transparent first-party egress, per-job route policy and customer-visible
+challenge control. CAPTCHA solving and guaranteed access are outside the plan.
+
+Sources: [Firecrawl Enhanced Mode](https://docs.firecrawl.dev/features/enhanced-mode),
+[Apify Proxy and Unblocker](https://docs.apify.com/proxy),
+[Playwright network proxy](https://playwright.dev/python/docs/network) and
+[browser-context isolation](https://playwright.dev/docs/browser-contexts),
+[Crawl4AI anti-bot detection and fallback](https://docs.crawl4ai.com/advanced/anti-bot-and-fallback/).
 
 | Capability customers compare | Current Apex position | Build path | Proof required before marketing it as ready |
 |---|---|---|---|
@@ -32,8 +55,8 @@ are not comparative accuracy, coverage or uptime evidence.
 | Layout change detection | Compare saved results | Detect selector drift, unexpected empty fields, types and page-template changes; generate repair proposals for review | Versioned-change benchmark; show detection and false-alarm rates, keep human approval before replacing a recipe |
 | JavaScript sites | Isolated local Brave render | Bounded actions, explicit waits, pagination and screenshots; configurable resource policy | Repeatable same-page HTTP/browser comparison and memory/latency limits |
 | Signed-in customer accounts | Not supported | A local, isolated browser profile that the account owner signs into directly; domain-limited reusable sessions; explicit expiration and revocation | Security review, profile isolation tests, no password capture, no main-browser cookie import, no credentials in jobs/logs/repository |
-| CAPTCHA and access challenges | Challenge pages are detected and reported | Preserve a clear “waiting for account owner” job state; let the user continue in the isolated owned profile when the destination permits; save a short-lived resumed session | Demonstrate user-directed completion, challenge detection and safe resume without automation impersonating a human or selling CAPTCHA bypass |
-| Proxy and geographic access | Direct network only | First support an optional customer-owned proxy, with an OS credential store, strict destination rules, cost caps and health checks. A first-party global IP network is a separate capital and compliance project | Network ownership and sourcing evidence, per-region availability, spend cap and independent route tests; no proxy-rotation or ban-evasion guarantee |
+| CAPTCHA and access challenges | Challenge pages are detected with a dedicated access-challenge error and stopped as failures; no bypass or human-resume flow | Add a visible challenge pause for an isolated, owner-authorized profile. Let the account owner complete a permitted step themselves, then resume only if the site allows it; preserve event evidence and revoke state on demand | Demonstrate owner-directed completion, challenge detection and safe resume without automation impersonating a human or selling CAPTCHA bypass |
+| Proxy and geographic access | Optional operator-configured customer-owned HTTP proxy; destination DNS is separately checked against the public-address policy; no managed pool or geography claim | Build an Apex-operated outbound proxy fleet on infrastructure owned or contracted directly by Apex, then add per-tenant egress policy, explicit region selection, pinned sessions, health checks, quotas, spend caps, source/ownership records, and abuse response. Residential egress is out of scope unless every endpoint has documented, informed opt-in and revocation | Network ownership and sourcing evidence, per-region availability, spend cap and independent route tests; no proxy-rotation or ban-evasion guarantee |
 | Multiple customers and teams | Single trusted installation | Add separate accounts, encrypted tenant storage, project roles, quotas, audit log, deletion and backup/restore | Tenant-isolation tests, external security assessment, recovery exercise and published operational ownership |
 | Hosted managed service | Not implemented | Only after the multi-tenant security model: account isolation, durable regional workers, public API, queues, billing, observability and support operations | Production load test, independent security review, incident runbook, tested backups and an honestly scoped service commitment |
 | API and assistant access | Nine MCP tools in source | Finish connection in each client; then versioned REST API, OpenAPI contract, SDK examples and webhook events | Per-client integration test and public API uptime/error measurements |

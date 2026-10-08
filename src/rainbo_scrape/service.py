@@ -24,9 +24,10 @@ class Service:
         return {"product": "Apex Flow Web Scraper", "version": "0.1.0", "database": "ready",
                 "brave_available": bool(brave_path()), "worker_heartbeat_age_seconds": age,
                 "worker_alive": age is not None and age < 10, "hosted_scraping_services": False,
+                "proxy_configured": bool(self.settings.proxy_url),
                 "formats": ["HTML", "Markdown", "JSON", "CSV export", "RSS/Atom", "sitemap", "text PDF"],
                 "limits": {"pages_per_job": 1000, "concurrency": 4, "renderers": 1},
-                "not_supported": ["CAPTCHA bypass", "private accounts", "OCR", "residential proxy network", "global search index"]}
+                "not_supported": ["CAPTCHA bypass", "private accounts", "OCR", "first-party residential proxy network", "global search index"]}
 
     def compare(self, before, after):
         def rows(ident):
