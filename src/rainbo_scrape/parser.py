@@ -38,7 +38,7 @@ def main():
         resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
     from .extract import extract
     try:
-        data = json.loads(sys.stdin.buffer.read(8*1024*1024))
+        data = json.loads(sys.stdin.buffer.read(20*1024*1024))
         result = extract(base64.b64decode(data["body"]), data["url"], data["content_type"], data["recipe"])
         encoded = json.dumps(result, ensure_ascii=False)
         if len(encoded.encode()) > 12*1024*1024:

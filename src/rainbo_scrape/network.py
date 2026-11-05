@@ -2,10 +2,12 @@ import asyncio
 from email.utils import parsedate_to_datetime
 import hashlib
 import socket
+import ssl
 import time
 from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
 import aiohttp
+import certifi
 from .policy import PublicResolver, ScrapeError, check_address, check_url
 
 
@@ -30,8 +32,10 @@ class Fetcher:
 
     async def __aenter__(self):
         self.settings.validate_proxy()
+        # Mozilla roots via certifi: the Windows store lacks many roots until a browser touches them.
+        context = ssl.create_default_context(cafile=certifi.where())
         connector = aiohttp.TCPConnector(resolver=PublicResolver(self.settings.allow_test_loopback),
-                                        ttl_dns_cache=0, limit=8)
+                                        ttl_dns_cache=0, limit=8, ssl=context)
         self.session = aiohttp.ClientSession(connector=connector, trust_env=False,
             timeout=aiohttp.ClientTimeout(total=self.settings.timeout),
             cookie_jar=aiohttp.DummyCookieJar(), headers={"User-Agent": self.settings.user_agent},
