@@ -276,3 +276,13 @@ def test_cli_scrape_prints_parseable_job_id_first(monkeypatch, capsys):
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == "job_id=0123456789abcdef"
     assert json.loads("\n".join(lines[1:]))["id"] == "0123456789abcdef"
+
+
+async def test_unthrottled_requests_skip_the_host_delay(site, settings):
+    base, _, _ = site
+    settings.host_delay = 1.0
+    async with Fetcher(settings, None) as fetcher:
+        await fetcher.get(base + "/x", robots=False)
+        started = time.monotonic()
+        await fetcher.get(base + "/y", robots=False, throttle=False)
+        assert time.monotonic() - started < 0.5

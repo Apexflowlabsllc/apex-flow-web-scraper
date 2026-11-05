@@ -65,7 +65,7 @@ async def render(fetcher, url, wait_selector=None, scrolls=0, screenshot=False):
                 return
             try:
                 check_url(request.url, fetcher.settings.allow_test_loopback)
-                response = await fetcher.get(request.url)
+                response = await fetcher.get(request.url, throttle=request.is_navigation_request())
                 transferred += len(response["body"])
                 if transferred > fetcher.settings.max_browser_bytes:
                     raise ScrapeError("resource_budget", "Browser response budget reached")

@@ -84,7 +84,7 @@ class Fetcher:
             if not self.robots[origin].can_fetch("RAINBO-Scrape", url):
                 raise ScrapeError("robots_denied", "Site robots.txt disallows this URL")
 
-    async def get(self, url, *, robots=True, cache=True, max_age=None):
+    async def get(self, url, *, robots=True, cache=True, max_age=None, throttle=True):
         """max_age is in milliseconds like Firecrawl maxAge: None uses the default TTL, 0 always revalidates/fetches."""
         started = time.monotonic()
         url = check_url(url, self.settings.allow_test_loopback)
@@ -106,7 +106,8 @@ class Fetcher:
                 if cached["headers"].get("last-modified"):
                     headers["If-Modified-Since"] = cached["headers"]["last-modified"]
             for attempt in range(3):
-                await self._throttle(url, mark=robots)
+                if throttle:
+                    await self._throttle(url, mark=robots)
                 try:
                     # Resolve and validate each target directly before routing it
                     # through an optional proxy. This prevents a proxy from
