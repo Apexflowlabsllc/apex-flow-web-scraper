@@ -14,10 +14,37 @@ def apex_scrape_health() -> dict:
 @mcp.tool()
 def apex_scrape_submit(urls: list[str], max_pages: int = 20, max_depth: int = 1,
                       render: str = "auto", recipe: dict | None = None, max_seconds: int = 300,
-                      cache: bool = True) -> dict:
+                      cache: bool = True, max_age: int | None = None, extract: dict | None = None,
+                      change_tracking: bool = False, screenshot: bool = False) -> dict:
     """Start a durable scrape/crawl. Returns immediately with job ID; use status/results. For one page set max_pages=1,max_depth=0. No subscription or third-party scraping calls."""
-    return service.submit({"urls": urls, "max_pages": max_pages, "max_depth": max_depth,
-                           "render": render, "recipe": recipe, "max_seconds": max_seconds, "cache": cache})
+    request = {"urls": urls, "max_pages": max_pages, "max_depth": max_depth, "render": render,
+               "recipe": recipe, "max_seconds": max_seconds, "cache": cache,
+               "change_tracking": change_tracking, "screenshot": screenshot}
+    if max_age is not None:
+        request["max_age"] = max_age  # milliseconds; 0 = always fresh
+    if extract:
+        request["extract"] = extract  # {"schema": JSON Schema, "prompt": optional}; needs DEEPSEEK_API_KEY or OPENROUTER_API_KEY
+    return service.submit(request)
+
+
+@mcp.tool()
+def apex_scrape_fetch(url: str, render: str = "auto", max_age: int | None = None, max_chars: int = 20000) -> dict:
+    """Scrape ONE page right now and return its Markdown (no job, no waiting). Use apex_scrape_submit for crawls."""
+    from .client import scrape
+    options = {"render": render}
+    if max_age is not None:
+        options["max_age"] = max_age
+    page = scrape(url, **options)
+    return {"url": page.url, "title": page.title, "status": page.status, "rendered": page.rendered,
+            "elapsed_ms": page.elapsed_ms, "markdown": (page.markdown or page.text)[:max(1000, min(100000, max_chars))],
+            "headings": page.headings[:50] if page.headings else [], "links": (page.links or [])[:50]}
+
+
+@mcp.tool()
+def apex_scrape_map(url: str, limit: int = 500, search: str | None = None) -> dict:
+    """Discover a site's URLs from robots.txt, sitemap indexes (gzip aware) and page links; optional keyword ranking."""
+    from .client import map_site
+    return map_site(url, limit=max(1, min(5000, limit)), search=search)
 
 
 @mcp.tool()

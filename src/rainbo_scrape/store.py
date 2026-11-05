@@ -117,6 +117,22 @@ class Store:
             db.execute("UPDATE jobs SET updated=? WHERE id=?", (time.time(), ident))
             self._event(db, ident, ("Failed: " if error else "Extracted: ") + url[:500])
 
+    def change_against_previous(self, url, ident, result):
+        """Content-hash change tracking against the newest earlier successful scrape of the same URL."""
+        import difflib
+        with self.db() as db:
+            row = db.execute("SELECT job,result FROM pages WHERE url=? AND job!=? AND state='done' "
+                             "ORDER BY updated DESC LIMIT 1", (url, ident)).fetchone()
+        if not row:
+            return {"status": "new", "previous_job": None}
+        before = json.loads(row["result"])
+        if before.get("content_sha256") == result["content_sha256"]:
+            return {"status": "same", "previous_job": row["job"], "previous_sha256": before.get("content_sha256")}
+        diff = list(difflib.unified_diff(before.get("markdown", "").splitlines(), result.get("markdown", "").splitlines(),
+                                         "previous", "current", n=1, lineterm=""))
+        return {"status": "changed", "previous_job": row["job"], "previous_sha256": before.get("content_sha256"),
+                "diff": "\n".join(diff[:200])[:20000]}
+
     def charge(self, ident, size, maximum):
         from .policy import ScrapeError
         with self.db() as db:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rainbo-scrape"
-version = "0.1.0"
+version = "0.2.0"
 description = "Owned, API-key-free web extraction and durable crawl jobs for RAINBO"
 requires-python = ">=3.11"
 dependencies = ["aiohttp>=3.12,<4", "beautifulsoup4>=4.13,<5", "lxml>=5,<7", "markdownify>=1,<2", "pypdf>=6,<7", "playwright>=1.55,<2", "mcp>=1.20,<2", "jsonschema>=4.23,<5", "defusedxml>=0.7,<1"]

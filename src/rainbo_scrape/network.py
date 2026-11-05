@@ -26,6 +26,7 @@ class Fetcher:
         self.robots, self.locks, self.last, self.delays = {}, {}, {}, {}
         self.requests = self.transferred = self.cache_hits = 0
         self.charge = None
+        self._browser = self._playwright = None
 
     async def __aenter__(self):
         self.settings.validate_proxy()
@@ -33,19 +34,27 @@ class Fetcher:
                                         ttl_dns_cache=0, limit=8)
         self.session = aiohttp.ClientSession(connector=connector, trust_env=False,
             timeout=aiohttp.ClientTimeout(total=self.settings.timeout),
-            cookie_jar=aiohttp.DummyCookieJar(), headers={"User-Agent": self.settings.user_agent})
+            cookie_jar=aiohttp.DummyCookieJar(), headers={"User-Agent": self.settings.user_agent},
+            max_line_size=65536, max_field_size=65536)
         return self
 
     async def __aexit__(self, *args):
-        await self.session.close()
+        from .browser import close_browser
+        try:
+            await close_browser(self)
+        finally:
+            await self.session.close()
 
-    async def _throttle(self, url):
+    async def _throttle(self, url, mark=True):
+        # The robots.txt request itself does not start a Crawl-delay window:
+        # the delay separates page fetches, so the first page is not held back.
         host = urlsplit(url).netloc
         lock = self.locks.setdefault(host, asyncio.Lock())
         async with lock:
             delay = max(self.settings.host_delay, self.delays.get(host, 0))
             await asyncio.sleep(max(0, self.last.get(host, 0)+delay-time.monotonic()))
-            self.last[host] = time.monotonic()
+            if mark:
+                self.last[host] = time.monotonic()
 
     async def allowed(self, url):
         p = urlsplit(url)
@@ -71,7 +80,8 @@ class Fetcher:
             if not self.robots[origin].can_fetch("RAINBO-Scrape", url):
                 raise ScrapeError("robots_denied", "Site robots.txt disallows this URL")
 
-    async def get(self, url, *, robots=True, cache=True):
+    async def get(self, url, *, robots=True, cache=True, max_age=None):
+        """max_age is in milliseconds like Firecrawl maxAge: None uses the default TTL, 0 always revalidates/fetches."""
         started = time.monotonic()
         url = check_url(url, self.settings.allow_test_loopback)
         original = url
@@ -81,7 +91,8 @@ class Fetcher:
                 await self.allowed(url)
             key = hashlib.sha256(url.encode()).hexdigest()
             cached = self.store.cache_get(key) if cache and self.store else None
-            if cached and time.time()-cached["ts"] < self.settings.cache_ttl:
+            ttl = self.settings.cache_ttl if max_age is None else max_age/1000
+            if cached and ttl > 0 and time.time()-cached["ts"] < ttl:
                 self.cache_hits += 1
                 return {**cached, "cache": "hit", "elapsed_ms": round((time.monotonic()-started)*1000, 2)}
             headers = {}
@@ -91,7 +102,7 @@ class Fetcher:
                 if cached["headers"].get("last-modified"):
                     headers["If-Modified-Since"] = cached["headers"]["last-modified"]
             for attempt in range(3):
-                await self._throttle(url)
+                await self._throttle(url, mark=robots)
                 try:
                     # Resolve and validate each target directly before routing it
                     # through an optional proxy. This prevents a proxy from

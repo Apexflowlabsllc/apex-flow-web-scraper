@@ -21,11 +21,11 @@ class Service:
     def health(self):
         heartbeat = self.settings.data_dir / "worker-heartbeat.json"
         age = round(time.time()-heartbeat.stat().st_mtime, 2) if heartbeat.exists() else None
-        return {"product": "Apex Flow Web Scraper", "version": "0.1.0", "database": "ready",
+        return {"product": "Apex Flow Web Scraper", "version": "0.2.0", "database": "ready",
                 "brave_available": bool(brave_path()), "worker_heartbeat_age_seconds": age,
                 "worker_alive": age is not None and age < 10, "hosted_scraping_services": False,
                 "proxy_configured": bool(self.settings.proxy_url),
-                "formats": ["HTML", "Markdown", "JSON", "CSV export", "RSS/Atom", "sitemap", "text PDF"],
+                "formats": ["HTML", "Markdown", "JSON", "CSV export", "RSS/Atom", "sitemap", "text PDF", "DOCX", "screenshot PNG", "schema JSON (model key required)"],
                 "limits": {"pages_per_job": 1000, "concurrency": 4, "renderers": 1},
                 "not_supported": ["CAPTCHA bypass", "private accounts", "OCR", "first-party residential proxy network", "global search index"]}
 

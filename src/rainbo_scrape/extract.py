@@ -8,7 +8,8 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from defusedxml import ElementTree
 from jsonschema import Draft202012Validator
-from markdownify import markdownify
+from .docx import docx_to_markdown, is_docx
+from .markdown import html_to_markdown, lead_h1, pick_main, strip_chrome
 from pypdf import PdfReader
 import soupsieve
 from .policy import ScrapeError, canonical_url
@@ -112,6 +113,10 @@ def extract(body, url, content_type="text/html", recipe=None):
         return {**common, "kind": "pdf", "title": str((reader.metadata or {}).get("/Title", "")),
                 "text": text, "markdown": text, "pages": pages, "links": [], "data": {}, "evidence": {},
                 "quality": {"text_chars": len(text), "needs_ocr": not bool(text.strip())}}
+    if is_docx(body, content_type, url):
+        doc = docx_to_markdown(body)
+        return {**common, "kind": "docx", **doc, "links": [], "data": {}, "evidence": {"method": "docx"},
+                "quality": {"text_chars": len(doc["text"])}}
     decoded = body.decode("utf-8", errors="replace")
     if "json" in content_type:
         data = json.loads(decoded)
@@ -149,15 +154,22 @@ def extract(body, url, content_type="text/html", recipe=None):
             structured.append(json.loads(node.string or node.get_text()))
         except (ValueError, RecursionError):
             common["warnings"].append("Malformed JSON-LD block omitted")
+    scripts = soup.find_all("script")
+    shell = bool(soup.select_one("#root, #app, #__next, #__nuxt, #react-root, [data-reactroot]"))
+    inline_js = " ".join((x.string or "")[:4000] for x in scripts if not x.get("src"))[:60000].lower()
+    js_hint = any(k in inline_js for k in ("fetch(", "$.ajax", "xmlhttprequest", "axios", "$.getjson", "$.get("))
+    strip_chrome(soup)
+    main = pick_main(soup)
     tables = [[[cell.get_text(" ", strip=True) for cell in row.select("th,td")]
-               for row in table.select("tr")[:1000]] for table in soup.select("table")[:50]]
-    headings = [{"level": int(h.name[1]), "text": _text(h)} for h in soup.select("h1,h2,h3,h4,h5,h6")[:500]]
-    for node in soup.select("script,style,noscript,template,svg,nav,footer,header,aside,form"):
-        node.decompose()
-    candidates = soup.select("article, main, [role=main]")
-    main = max(candidates, key=lambda n: len(_text(n)), default=soup.body or soup)
+               for row in table.select("tr")[:1000]] for table in main.select("table")[:50]]
+    headings = [{"level": int(h.name[1]), "text": _text(h)} for h in main.select("h1,h2,h3,h4,h5,h6")[:500]
+                if _text(h)]
     text = main.get_text("\n", strip=True)[:500000]
-    markdown = markdownify(str(main), heading_style="ATX", strip=["img"])[:500000]
+    lead = lead_h1(soup, main)
+    if lead is not None:
+        headings.insert(0, {"level": 1, "text": _text(lead)})
+        text = (_text(lead) + chr(10) + text)[:500000]
+    markdown = html_to_markdown(main, url, soup=soup)[:500000]
     challenge_markers = (
         "verify you are human", "just a moment...", "checking your browser", "access denied",
         "captcha verification", "complete the security check", "unusual traffic", "security challenge",
@@ -165,6 +177,11 @@ def extract(body, url, content_type="text/html", recipe=None):
     challenge = any(x in (title+" "+text[:2000]).lower() for x in challenge_markers)
     if challenge and len(text) < 3000:
         raise ScrapeError("access_challenge", "access challenge detected; extraction paused. An authorized account owner must resolve it in the target service.")
+    lowered = text[:3000].lower()
+    needs_render = (len(text) < 80 or any(p in lowered for p in (
+        "enable javascript", "requires javascript", "javascript is required", "turn on javascript"))
+        or (shell and len(text) < 300 and len(scripts) >= 2)
+        or (js_hint and len(text) < 700 and len(scripts) >= 3 and not tables))
     if len(text) < 80:
         common["warnings"].append("Low text yield; page may need browser rendering")
     if errors:
@@ -172,4 +189,5 @@ def extract(body, url, content_type="text/html", recipe=None):
     return {**common, "kind": "html", "title": title, "text": text, "markdown": markdown,
             "metadata": metadata, "links": links, "headings": headings, "tables": tables,
             "structured_data": structured, "data": data, "evidence": evidence, "validation_errors": errors,
-            "quality": {"text_chars": len(text), "field_count": len(data), "validation_passed": not errors}}
+            "quality": {"text_chars": len(text), "field_count": len(data), "validation_passed": not errors,
+                        "needs_render": needs_render}}

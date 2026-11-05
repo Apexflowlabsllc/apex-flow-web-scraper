@@ -8,3 +8,5 @@ dist/
 data/
 *.sqlite3*
 .env*
+tests/benchmark/out/
+.bench-data/

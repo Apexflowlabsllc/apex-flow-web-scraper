@@ -15,7 +15,8 @@ def validate_request(request, settings):
     if not isinstance(request, dict):
         raise ValueError("Job must be a JSON object")
     allowed = {"urls", "max_pages", "max_depth", "max_seconds", "max_bytes", "concurrency",
-               "render", "recipe", "wait_selector", "scrolls", "include_paths", "exclude_paths", "cache"}
+               "render", "recipe", "wait_selector", "scrolls", "include_paths", "exclude_paths", "cache",
+               "max_age", "screenshot", "extract", "change_tracking"}
     if set(request)-allowed:
         raise ValueError("Unknown job options: "+", ".join(set(request)-allowed))
     urls = request.get("urls")
@@ -38,6 +39,15 @@ def validate_request(request, settings):
     result.setdefault("cache", True)
     if not isinstance(result["cache"], bool):
         raise ValueError("cache must be boolean")
+    max_age = result.get("max_age")
+    if max_age is not None and (isinstance(max_age, bool) or not isinstance(max_age, int) or not 0 <= max_age <= 31536000000):
+        raise ValueError("max_age must be milliseconds from 0 to 31536000000")
+    for key in ("screenshot", "change_tracking"):
+        if not isinstance(result.setdefault(key, False), bool):
+            raise ValueError(key + " must be boolean")
+    if result.get("extract"):
+        from .llm import validate_extract_spec
+        validate_extract_spec(result["extract"])
     if result.get("recipe"):
         validate_recipe(result["recipe"])
     selector = result.get("wait_selector")
@@ -52,22 +62,34 @@ def validate_request(request, settings):
 
 async def scrape(fetcher, url, options):
     started = time.monotonic()
-    response = await fetcher.get(url, cache=options.get("cache", True))
+    response = await fetcher.get(url, cache=options.get("cache", True), max_age=options.get("max_age"))
     if response["status"] >= 400:
         raise ScrapeError("http_error", f"Site returned HTTP {response['status']}")
     result = await parse(response["body"], response["url"],
                                     response["headers"].get("content-type", "text/html"), options.get("recipe"))
     mode = options.get("render", "auto")
     rendered = False
-    if result["kind"] == "html" and (mode == "always" or (mode == "auto" and len(result["text"]) < 80)):
-        response = await render(fetcher, response["url"], options.get("wait_selector"), options.get("scrolls", 0))
+    shot = None
+    if result["kind"] == "html" and (mode == "always" or options.get("screenshot") or (mode == "auto" and result.get("quality", {}).get("needs_render"))):
+        response = await render(fetcher, response["url"], options.get("wait_selector"), options.get("scrolls", 0),
+                                screenshot=bool(options.get("screenshot")))
+        shot = response.pop("screenshot", None)
         result = await parse(response["body"], response["url"], "text/html", options.get("recipe"))
         result["browser"] = response["browser"]
         rendered = True
     result.update(url=response["url"], status=response["status"], cache=response["cache"], rendered=rendered,
-                  elapsed_ms=round((time.monotonic()-started)*1000, 2), engine="Apex Flow Web Scraper 0.1",
+                  elapsed_ms=round((time.monotonic()-started)*1000, 2), engine="Apex Flow Web Scraper 0.2",
                   content_sha256=hashlib.sha256(result["text"].encode()).hexdigest(),
                   hosted_scraping_calls=0)
+    if shot:
+        import base64
+        result["screenshot_png_base64"] = base64.b64encode(shot).decode()
+    if options.get("extract") and result["kind"] in {"html", "pdf", "docx", "text"}:
+        from .llm import extract_json
+        try:
+            result["extracted"] = await extract_json(result.get("markdown") or result["text"], options["extract"])
+        except ScrapeError as exc:
+            result["extracted"] = {"data": None, "valid": False, "errors": [str(exc)], "error_code": exc.code}
     return result
 
 
@@ -97,6 +119,8 @@ async def run_job(store, ident, options):
                     result["duplicate_of"] = duplicate
                 else:
                     seen_hashes[digest] = url
+                if options.get("change_tracking"):
+                    result["change"] = store.change_against_previous(url, ident, result)
                 store.save_page(ident, url, result=result)
                 if depth < options["max_depth"] and not duplicate:
                     links = []
