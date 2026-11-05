@@ -30,10 +30,25 @@ Memory is the Python process only; the parser subprocess and Brave are not inclu
 - spa-4 (scrapingcourse JS page) keeps the text "Enable JavaScript to see products"; page-2 keeps a "Login" link. 2 of 94 checks fail.
 - Rendered pages cost 5 to 6.7 s (Brave start plus network-quiet wait).
 
-## Firecrawl comparison: NOT measured
+## Firecrawl spot check: 5 of 30 URLs, hand-scored (partial, not the full comparison)
 
-A one-time Firecrawl free-tier baseline was attempted. Its MCP returns Markdown inline only and cannot be
-saved to disk without retyping, so only 2 of 30 pages could be scored and those copies were unreliable. They
-were discarded. No Firecrawl number appears in this file, and no win over Firecrawl is claimed. Firecrawl's
-open issues (see COMPETITOR-TEARDOWN) are the only evidence we cite. Closing this needs the same 30 URLs run
-by a script against Firecrawl, which the "no outside key" rule excludes, or a manual copy by Brian.
+Firecrawl's keyless hosted scrape (markdown, maxAge 0) was called once per URL on 2026-11-05, no key, free tier.
+Its output arrives inline and cannot be saved by script, so I scored these five by reading it against the same
+reference checks. Time and memory could not be measured for Firecrawl. The other 25 URLs are not measured.
+
+| URL | rainbo-scrape 0.2.0 | Firecrawl | Result |
+|---|---|---|---|
+| shop-1 books.toscrape product | 6/6 | 6/6 (duplicated description, breadcrumb leaked) | tie |
+| page-2 quotes.toscrape page 2 | 2/3 ("Login" link kept) | 2/3 (same) | tie |
+| spa-1 quotes JS page | 3/3 | 3/3 | tie |
+| spa-4 JS rendering page | 2/3 ("Enable JavaScript" text kept) | 2/3 (same) | tie |
+| table-3 datatables.net | 4/4 | 3/4 (the Tiger Nixon row exists only inside a raw-HTML code dump, not as a table row) | win |
+| Total | 17/19 | 16/19 | 1 win, 4 ties, 0 losses |
+
+Firecrawl's datatables output also carried a roughly 14,000-character raw-HTML dump and about 150 sidebar links.
+Five pages is too few to claim leadership; it shows we are level on these and ahead on one.
+
+## Still not measured
+
+The remaining 25 URLs for Firecrawl, any Firecrawl or Tavily latency, Tavily search quality (we have no web
+search), and Firecrawl's behaviour on the four bot-wall URLs.
