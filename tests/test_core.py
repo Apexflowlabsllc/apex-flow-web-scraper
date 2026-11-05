@@ -234,6 +234,19 @@ def test_literal_search(settings):
     store = Store(settings)
     req = validate_request({"urls":["https://example.com"]},settings)
     ident = store.create(req)["id"]
-    store.save_page(ident,req["urls"][0],{"title":"A","text":"100% useful","content_sha256":"a"})
+    store.save_page(ident,req["urls"][0],{"kind":"html","title":"A","text":"100% useful","content_sha256":"a"})
     assert len(store.search("100%")) == 1
     assert store.search("' OR 1=1 --") == []
+
+
+def test_ranked_search_stems_and_prefers_title_hits(settings):
+    store = Store(settings)
+    req = validate_request({"urls": ["https://example.com/a", "https://example.com/b"], "max_pages": 2}, settings)
+    ident = store.create(req)["id"]
+    store.save_page(ident, "https://example.com/a", {"kind": "html", "title": "Scraping guide", "text": "x", "markdown": "How to scrape pages politely.", "content_sha256": "a"})
+    store.save_page(ident, "https://example.com/b", {"kind": "html", "title": "Cooking", "text": "x", "markdown": "Scrapes of bread and scraping tools.", "content_sha256": "b"})
+    hits = store.search("scrape tools")
+    assert [h["url"] for h in hits][0] in {"https://example.com/a", "https://example.com/b"}
+    assert len(hits) == 2 and hits[0]["score"] >= hits[1]["score"] and "[" in hits[0]["content"]
+    store.save_page(ident, "https://example.com/a", {"kind": "html", "title": "Scraping guide", "text": "x", "markdown": "Totally different words.", "content_sha256": "c"})
+    assert all(h["url"] != "https://example.com/a" for h in store.search("politely"))

@@ -19,7 +19,7 @@ def main(argv=None):
     _utf8()
     parser = argparse.ArgumentParser(prog="rainbo-scrape")
     parser.add_argument("command", choices=["health", "scrape", "fetch", "map", "status", "results", "jobs",
-                                            "cancel", "worker", "web", "mcp"])
+                                            "cancel", "worker", "web", "mcp", "search", "index"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--render", choices=["auto", "never", "always"], default="auto")
     parser.add_argument("--pages", type=int, default=1)
@@ -61,6 +61,20 @@ def main(argv=None):
         return
     from .service import Service
     s = Service()
+    if args.command == "index":
+        # Grow the owned search index: discover a site's URLs (sitemaps + links), then crawl them in one job.
+        from .client import map_site
+        found = map_site(args.value, limit=min(args.pages if args.pages > 1 else 100, 100))
+        job = s.submit({"urls": [u["url"] for u in found["urls"]], "max_pages": max(len(found["urls"]), 1),
+                        "max_depth": 0, "render": args.render})
+        print("job_id=" + job["id"], flush=True)
+        while s.store.status(job["id"])["state"] in {"queued", "running"}:
+            time.sleep(0.5)
+        print(json.dumps(s.store.status(job["id"])["counts"]))
+        return
+    if args.command == "search":
+        print(json.dumps(s.store.search(args.value, args.limit if args.limit != 5000 else 10), indent=2, ensure_ascii=False))
+        return
     if args.command == "health":
         result = s.health()
     elif args.command == "scrape":

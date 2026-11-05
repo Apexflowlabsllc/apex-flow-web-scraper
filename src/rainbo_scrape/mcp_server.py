@@ -81,8 +81,8 @@ def apex_scrape_recipes(name: str | None = None, recipe: dict | None = None) -> 
 
 @mcp.tool()
 def apex_scrape_search(query: str, limit: int = 10) -> dict:
-    """Search already collected data. This is your saved corpus, not a global web search engine."""
-    return {"scope": "saved scrape results", "results": service.store.search(query, limit)}
+    """Ranked full-text (BM25) search over every page this installation has scraped: our own index, no outside search API. Grow it with apex_scrape_submit crawls."""
+    return {"scope": "owned index of scraped pages", "results": service.store.search(query, limit)}
 
 
 @mcp.tool()

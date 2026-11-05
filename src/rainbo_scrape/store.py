@@ -29,6 +29,7 @@ class Store:
             CREATE INDEX IF NOT EXISTS events_job ON events(job,id);
             CREATE TABLE IF NOT EXISTS cache (
               key TEXT PRIMARY KEY, ts REAL, headers TEXT, body BLOB, url TEXT, status INTEGER);
+            CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5(url UNINDEXED, job UNINDEXED, title, body, tokenize="porter unicode61");
             CREATE TABLE IF NOT EXISTS recipes (name TEXT PRIMARY KEY, updated REAL, recipe TEXT);
             """)
         if os.name != "nt":
@@ -114,6 +115,10 @@ class Store:
             db.execute("UPDATE pages SET state=?,result=?,error=?,updated=? WHERE job=? AND url=?",
                        ("failed" if error else "done", json.dumps(result) if result else None,
                         json.dumps(error) if error else None, time.time(), ident, url))
+            if result and result.get("kind") in {"html", "pdf", "docx", "text", "feed"}:
+                db.execute("DELETE FROM docs WHERE url=?", (url,))
+                db.execute("INSERT INTO docs(url,job,title,body) VALUES(?,?,?,?)",
+                           (url, ident, result.get("title") or "", (result.get("markdown") or result.get("text") or "")[:200000]))
             db.execute("UPDATE jobs SET updated=? WHERE id=?", (time.time(), ident))
             self._event(db, ident, ("Failed: " if error else "Extracted: ") + url[:500])
 
@@ -224,6 +229,22 @@ class Store:
         return {"name": name, "saved": True}
 
     def search(self, query, limit=10):
+        """Ranked full-text search (SQLite FTS5, BM25, stemming) over every page this installation has scraped."""
+        import re
+        if not isinstance(query, str) or not 1 <= len(query) <= 200:
+            raise ValueError("Query must contain 1–200 characters")
+        words = re.findall(r"\w+", query.lower())[:12]
+        if not words:
+            raise ValueError("Query needs at least one word")
+        expression = " OR ".join('"' + w + '"' for w in words)
+        with self.db() as db:
+            rows = db.execute("SELECT url,job,title,snippet(docs,3,'[',']','…',40) AS content, bm25(docs,0,0,5,1) AS rank "
+                              "FROM docs WHERE docs MATCH ? ORDER BY rank LIMIT ?",
+                              (expression, min(50, max(1, limit)))).fetchall()
+        return [{"title": r["title"], "url": r["url"], "job": r["job"], "content": r["content"],
+                 "score": round(-r["rank"], 4)} for r in rows]
+
+    def search_literal(self, query, limit=10):
         # Literal search over owned results, not an external search-engine claim.
         if not isinstance(query, str) or not 1 <= len(query) <= 200:
             raise ValueError("Query must contain 1–200 characters")
