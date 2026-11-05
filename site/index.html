@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apex Scrape — the web, read cleanly. Owned. Measured.</title>
+<meta name="description" content="Apex Scrape turns any page, PDF or DOCX into clean Markdown. Self-hosted, no API key, no credits, with a public benchmark you can re-run.">
+<style>
+:root{--bg:#0a0b0f;--ink:#f3f1ea;--mute:#9a9aa3;--line:#23252e;--card:#12141b;--acc:#c6ff3d;--acc2:#7cf0d4;color-scheme:dark}
+@media (prefers-color-scheme:light){:root{--bg:#f6f4ee;--ink:#10110f;--mute:#5d5f66;--line:#d9d6cb;--card:#fffdf8;--acc:#1a5c00;--acc2:#006b57;color-scheme:light}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+.skip{position:absolute;left:-999px}.skip:focus{left:12px;top:12px;background:var(--acc);color:#000;padding:8px 12px;z-index:9}
+nav{display:flex;justify-content:space-between;align-items:center;padding:20px 0}
+.logo{font-weight:800;letter-spacing:.02em;text-decoration:none}.logo b{color:var(--acc)}
+nav a.btn{font-size:14px}
+.btn{display:inline-block;background:var(--acc);color:#07090a;font-weight:700;padding:12px 20px;border-radius:999px;text-decoration:none;transition:transform .15s}
+.btn:hover{transform:translateY(-2px)}.btn:focus-visible,a:focus-visible,button:focus-visible{outline:3px solid var(--acc2);outline-offset:3px}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+header.hero{padding:72px 0 40px}
+.eyebrow{font:600 13px/1 ui-monospace,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--acc)}
+h1{font-size:clamp(40px,8vw,92px);line-height:.98;letter-spacing:-.035em;margin:18px 0 22px;max-width:14ch}
+h1 em{font-style:normal;background:linear-gradient(100deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lede{font-size:clamp(18px,2.4vw,22px);color:var(--mute);max-width:46ch}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin:48px 0}
+.stat{background:var(--card);padding:26px}.stat b{display:block;font-size:clamp(34px,5vw,54px);letter-spacing:-.03em;line-height:1}
+.stat span{color:var(--mute);font-size:14px}
+section{padding:56px 0;border-top:1px solid var(--line)}
+h2{font-size:clamp(28px,4.5vw,46px);letter-spacing:-.025em;line-height:1.05;margin:10px 0 18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px}
+.card h3{margin:0 0 8px;font-size:19px}.card p{margin:0;color:var(--mute);font-size:15.5px}
+pre{background:#05060a;color:#e9f5d8;border:1px solid var(--line);border-radius:14px;padding:20px;overflow:auto;font:14.5px/1.6 ui-monospace,Consolas,monospace}
+pre .c{color:#7d8794}pre .k{color:var(--acc)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:15px}
+th,td{padding:13px 16px;text-align:left;border-bottom:1px solid var(--line)}th{color:var(--mute);font-weight:600;background:var(--card)}
+td.win{color:var(--acc);font-weight:700}tr:last-child td{border-bottom:0}
+.note{color:var(--mute);font-size:14px;max-width:70ch}
+.honest{border-left:3px solid var(--acc);padding-left:16px}
+footer{padding:48px 0 64px;color:var(--mute);font-size:14px;border-top:1px solid var(--line)}
+.reveal{animation:up .7s both}@keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<nav aria-label="Primary"><a class="logo" href="#">APEX<b>/</b>SCRAPE</a><a class="btn ghost" href="#bench">See the numbers</a></nav>
+<header class="hero reveal">
+<p class="eyebrow">Self-hosted · No API key · No credits</p>
+<h1>The web, read <em>cleanly.</em></h1>
+<p class="lede">Any page, PDF or Word file becomes structured Markdown you can trust. Runs on your machine, obeys robots.txt, and ships with a benchmark anyone can re-run.</p>
+<div class="cta"><a class="btn" href="#start">Start in one line</a><a class="btn ghost" href="#honest">What we do not claim</a></div>
+</header>
+<main id="main">
+<div class="stats" role="list" aria-label="Measured results, 5 November 2026">
+<div class="stat" role="listitem"><b>97.9%</b><span>Markdown fidelity checks passed (92 of 94)</span></div>
+<div class="stat" role="listitem"><b>1.45 s</b><span>Median time per URL, 30-URL benchmark</span></div>
+<div class="stat" role="listitem"><b>31 s → 1.2 s</b><span>Hacker News after our Crawl-delay fix</span></div>
+<div class="stat" role="listitem"><b>$0</b><span>Per page. No key, no meter, no vendor.</span></div>
+</div>
+
+<section id="start"><p class="eyebrow">Start</p><h2>One line. No account.</h2>
+<pre><span class="c"># Python</span>
+<span class="k">from</span> rainbo_scrape <span class="k">import</span> scrape, map_site
+page = scrape(<span class="k">"https://docs.python.org/3/"</span>, max_age=3600000)
+print(page.markdown)           <span class="c"># headings, GFM tables, fenced code with language</span>
+urls = map_site(<span class="k">"https://example.com"</span>)[<span class="k">"urls"</span>]   <span class="c"># sitemaps (indexes, gzip) + links</span>
+
+<span class="c"># Command line</span>
+rainbo-scrape fetch https://example.com
+rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span class="k">"pricing"</span></pre></section>
+
+<section><p class="eyebrow">What you get</p><h2>Everything a scraper should do, owned.</h2>
+<div class="grid">
+<div class="card"><h3>Markdown that keeps its shape</h3><p>Headings stay headings, tables become real tables, code keeps its language, cookie banners and navigation are removed.</p></div>
+<div class="card"><h3>JS pages, rendered safely</h3><p>Warm isolated browser with every request routed through our guarded fetcher. Hidden elements stripped. Screenshots on request.</p></div>
+<div class="card"><h3>PDF, DOCX, feeds, JSON</h3><p>One call for every document type, with unpack limits that stop zip bombs.</p></div>
+<div class="card"><h3>Site map and crawl</h3><p>Reads robots.txt, nested and gzip sitemaps, then page links. Durable jobs survive restarts.</p></div>
+<div class="card"><h3>Owned search</h3><p>Every page you scrape is indexed in SQLite FTS5 with BM25 ranking and highlighted snippets. No search vendor.</p></div>
+<div class="card"><h3>Schema extraction</h3><p>JSON Schema in, validated JSON out, using DeepSeek first and OpenRouter second. Your key, your data.</p></div>
+<div class="card"><h3>Change tracking</h3><p>Content-hash comparison against the last scrape, with a readable diff.</p></div>
+<div class="card"><h3>Agent ready</h3><p>MCP tools for fetch, map, crawl, search and compare. Page text is treated as untrusted data.</p></div>
+<div class="card"><h3>Polite by default</h3><p>robots.txt, Crawl-delay, per-host pacing, retry with Retry-After, public-address-only fetching.</p></div>
+</div></section>
+
+<section id="bench"><p class="eyebrow">Benchmark · 5 Nov 2026</p><h2>Measured, not claimed.</h2>
+<p class="note">30 public URLs, 94 hand-chosen reference checks, fresh process per URL, cache off. Re-run it yourself: <code>python tests/benchmark/run_benchmark.py</code>.</p>
+<div class="tablewrap"><table>
+<caption class="skip">Version 0.1.0 versus 0.2.0</caption>
+<thead><tr><th>Metric</th><th>Before (0.1.0)</th><th>Now (0.2.0)</th></tr></thead>
+<tbody>
+<tr><td>URLs fetched</td><td>25 / 30</td><td class="win">26 / 30</td></tr>
+<tr><td>Fidelity checks passed</td><td>89 / 94</td><td class="win">92 / 94</td></tr>
+<tr><td>Median time per URL</td><td>2,062 ms</td><td class="win">1,454 ms</td></tr>
+<tr><td>Mean time per URL</td><td>4,602 ms</td><td class="win">2,170 ms</td></tr>
+<tr><td>Process memory (median)</td><td>56.1 MB</td><td>56.4 MB</td></tr>
+</tbody></table></div>
+<h3 style="margin-top:36px">Head to head with Firecrawl (5 of 30 URLs, hand-scored)</h3>
+<div class="tablewrap"><table>
+<thead><tr><th>Page</th><th>Apex Scrape</th><th>Firecrawl</th></tr></thead>
+<tbody>
+<tr><td>Product page (books.toscrape)</td><td>6 / 6</td><td>6 / 6</td></tr>
+<tr><td>Paginated quotes</td><td>2 / 3</td><td>2 / 3</td></tr>
+<tr><td>JS quotes page</td><td>3 / 3</td><td>3 / 3</td></tr>
+<tr><td>JS rendering challenge</td><td>2 / 3</td><td>2 / 3</td></tr>
+<tr><td>DataTables table page</td><td class="win">4 / 4</td><td>3 / 4</td></tr>
+</tbody></table></div>
+<p class="note">Five pages is a spot check, not a verdict. The other 25 are not yet measured against Firecrawl, and speed was not comparable.</p></section>
+
+<section id="honest"><p class="eyebrow">Straight talk</p><h2>What we do not claim.</h2>
+<div class="honest note"><p>We do not solve CAPTCHAs or evade bot walls: zillow.com and glassdoor.com still block us, and robots.txt-disallowed pages stay unread. Our search covers the sites you index, not the whole web. Rendered pages take 4 to 5 seconds. Schema extraction is tested against a mock model and not yet measured live. There is no Node SDK yet. Every number on this page comes from <code>BENCHMARK-2026-11-05.md</code>.</p></div></section>
+</main>
+<footer><div>Apex Flow Labs · Owned infrastructure, no hosted scraping calls. Self-hosted v0.2.0.</div></footer>
+</div>
+</body>
+</html>
