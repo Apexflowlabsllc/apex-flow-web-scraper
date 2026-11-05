@@ -16,7 +16,7 @@ def validate_request(request, settings):
         raise ValueError("Job must be a JSON object")
     allowed = {"urls", "max_pages", "max_depth", "max_seconds", "max_bytes", "concurrency",
                "render", "recipe", "wait_selector", "scrolls", "include_paths", "exclude_paths", "cache",
-               "max_age", "screenshot", "extract", "change_tracking"}
+               "max_age", "screenshot", "extract", "change_tracking", "follow_external"}
     if set(request)-allowed:
         raise ValueError("Unknown job options: "+", ".join(set(request)-allowed))
     urls = request.get("urls")
@@ -39,6 +39,8 @@ def validate_request(request, settings):
     result.setdefault("cache", True)
     if not isinstance(result["cache"], bool):
         raise ValueError("cache must be boolean")
+    if not isinstance(result.setdefault("follow_external", False), bool):
+        raise ValueError("follow_external must be boolean")
     max_age = result.get("max_age")
     if max_age is not None and (isinstance(max_age, bool) or not isinstance(max_age, int) or not 0 <= max_age <= 31536000000):
         raise ValueError("max_age must be milliseconds from 0 to 31536000000")
@@ -126,7 +128,7 @@ async def run_job(store, ident, options):
                     links = []
                     for link in result.get("links", []):
                         p = urlsplit(link["url"])
-                        if p.netloc not in origins:
+                        if p.netloc not in origins and not options.get("follow_external"):
                             continue
                         if options["include_paths"] and not any(p.path.startswith(x) for x in options["include_paths"]):
                             continue

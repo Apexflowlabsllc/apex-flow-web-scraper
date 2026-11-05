@@ -286,3 +286,11 @@ async def test_unthrottled_requests_skip_the_host_delay(site, settings):
         started = time.monotonic()
         await fetcher.get(base + "/y", robots=False, throttle=False)
         assert time.monotonic() - started < 0.5
+
+
+def test_follow_external_is_a_validated_boolean(settings):
+    options = validate_request({"urls": ["https://example.com/"], "follow_external": True}, settings)
+    assert options["follow_external"] is True
+    assert validate_request({"urls": ["https://example.com/"]}, settings)["follow_external"] is False
+    with pytest.raises(ValueError):
+        validate_request({"urls": ["https://example.com/"], "follow_external": "yes"}, settings)

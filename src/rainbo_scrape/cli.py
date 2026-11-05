@@ -19,7 +19,7 @@ def main(argv=None):
     _utf8()
     parser = argparse.ArgumentParser(prog="rainbo-scrape")
     parser.add_argument("command", choices=["health", "scrape", "fetch", "map", "status", "results", "jobs",
-                                            "cancel", "worker", "web", "mcp", "search", "index"])
+                                            "cancel", "worker", "web", "mcp", "search", "index", "crawl-web"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--render", choices=["auto", "never", "always"], default="auto")
     parser.add_argument("--pages", type=int, default=1)
@@ -61,6 +61,13 @@ def main(argv=None):
         return
     from .service import Service
     s = Service()
+    if args.command == "crawl-web":
+        # Open-web crawl: start from a seed URL, follow links to any public site (robots.txt and per-host
+        # pacing still apply), and index every page. Bounded by --pages (max 1000 per job); run repeatedly to grow.
+        job = s.submit({"urls": [args.value], "max_pages": min(max(args.pages, 2), 1000), "max_depth": max(args.depth, 2),
+                        "render": "never", "follow_external": True, "concurrency": 4, "max_seconds": 3600})
+        print("job_id=" + job["id"], flush=True)
+        return
     if args.command == "index":
         # Grow the owned search index: discover a site's URLs (sitemaps + links), then crawl them in one job.
         from .client import map_site
