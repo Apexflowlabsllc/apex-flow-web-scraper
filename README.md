@@ -4,7 +4,7 @@ An owned web extraction engine from [Apex Flow Labs](https://www.apexflowlabs.co
 Collect public pages, keep extraction evidence, and work with durable jobs from
 a CLI, a private local workspace or a compatible MCP assistant.
 
-**Early release: 0.1.0.** No hosted scraping API or model key is required.
+**Release 0.2.0.** No hosted scraping API or model key is required.
 Software is MIT licensed; compute, bandwidth, storage and maintenance are not free.
 
 ## Quick start
@@ -138,3 +138,19 @@ Read the [documentation](https://webscraper.apexflowlabs.com/docs.html),
 ## Roadmap
 
 See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged capability plan and [ACCESS-PLATFORM-PLAN.md](ACCESS-PLATFORM-PLAN.md) for the proxy infrastructure and owner-controlled challenge-handling design.
+
+
+## Measured (0.2.0, 30-URL benchmark, 5 Nov 2026)
+
+26/30 URLs fetched, 92/94 Markdown-fidelity checks passed (97.9%), median 1.45 s per URL, about 56 MB process memory.
+Details, failures and what is NOT measured (no Firecrawl comparison): `BENCHMARK-2026-11-05.md`.
+
+```python
+from rainbo_scrape import scrape, map_site
+page = scrape("https://example.com", max_age=3600000)   # .markdown .text .links .headings
+urls = map_site("https://docs.python.org/3/")["urls"]
+```
+
+CLI: `rainbo-scrape fetch URL`, `map URL`, `scrape URL --wait` (first line is `job_id=...`).
+Schema extraction needs `DEEPSEEK_API_KEY` (first) or `OPENROUTER_API_KEY`; mocked in tests, not live-measured.
+Not built: web search, Node SDK, public landing page.
