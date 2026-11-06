@@ -25,8 +25,7 @@ def test_compose_requires_pages():
 
 
 def test_titles_are_flattened_and_duplicates_listed_once():
-    pages = [{"url": "https://ex.com/", "title": "A
-   B", "markdown": "x one.", "content_sha256": "h"},
+    pages = [{"url": "https://ex.com/", "title": "A\n   B", "markdown": "x one.", "content_sha256": "h"},
              {"url": "https://ex.com/index.html", "title": "A B", "markdown": "x one.", "content_sha256": "h"}]
     out = compose("https://ex.com/", pages)
     assert out.count("](https://ex.com") == 1 and "[A B]" in out
