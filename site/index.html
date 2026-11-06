@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Apex Flow Web Scraper — web scraper API, URL to clean Markdown</title>
 <meta name="description" content="Apex Flow Web Scraper turns any web page, PDF or DOCX into clean Markdown for AI and data teams. Self-hosted, no API key, cheaper than Firecrawl, with a public benchmark you can re-run.">
-<meta name="theme-color" content="#07060f"><meta property="og:title" content="Apex Flow Web Scraper"><meta property="og:description" content="Web scraper API that turns any page, PDF or DOCX into clean Markdown. Measured benchmark, cheaper than Firecrawl."><meta property="og:type" content="website"><script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Apex Flow Web Scraper","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","description":"Web scraper that converts web pages, PDFs and DOCX files to clean Markdown.","publisher":{"@type":"Organization","name":"Apex Flow Labs"}}</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cdefs%3E%3ClinearGradient id=%27g%27 x1=%270%27 y1=%270%27 x2=%271%27 y2=%271%27%3E%3Cstop offset=%270%27 stop-color=%27%238b5cff%27/%3E%3Cstop offset=%271%27 stop-color=%27%23ff3df2%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2732%27 height=%2732%27 rx=%179%27 fill=%27url(%23g)%27/%3E%3C/svg%3E"><script>document.documentElement.className="js"</script><meta name="theme-color" content="#07060f"><meta property="og:title" content="Apex Flow Web Scraper"><meta property="og:description" content="Web scraper API that turns any page, PDF or DOCX into clean Markdown. Measured benchmark, cheaper than Firecrawl."><meta property="og:type" content="website"><script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Apex Flow Web Scraper","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","description":"Web scraper that converts web pages, PDFs and DOCX files to clean Markdown.","publisher":{"@type":"Organization","name":"Apex Flow Labs"}}</script>
 <style>
-:root{--bg:#07060f;--bg2:#0d0b1a;--card:#110e22;--line:#241f3d;--ink:#f4f1ff;--mute:#9d97bd;--v:#8b5cff;--p:#ff3df2;--o:#ffb23d;color-scheme:dark}
+:root{--bg:#07060f;--bg2:#0d0b1a;--card:#110e22;--line:#241f3d;--ink:#f4f1ff;--mute:#9d97bd;--v:#7a45ff;--p:#ff3df2;--o:#ffb23d;color-scheme:dark}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
 body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
@@ -40,7 +40,7 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--v) 10%,var(--p) 
 .raw .junk{animation:kill 9s infinite both}
 .raw .keep{color:#b9b2e6}
 .beam{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--p),var(--v),transparent);box-shadow:0 0 18px 3px rgba(255,61,242,.65);top:34px;animation:sweep 9s infinite both}
-.out .l{color:var(--ink);opacity:0;animation:show 9s infinite both;animation-delay:calc(var(--i)*.35s)}
+.out .l{color:var(--ink);opacity:1;animation:show 9s infinite both;animation-delay:calc(var(--i)*.35s)}
 .out .h{color:var(--p);font-weight:700}.out .t{color:var(--o)}
 @keyframes sweep{0%{top:34px;opacity:0}5%{opacity:1}62%{top:92%;opacity:1}68%,100%{top:92%;opacity:0}}
 @keyframes kill{0%,12%{opacity:1;text-decoration:none}30%,92%{opacity:.18;text-decoration:line-through}100%{opacity:1;text-decoration:none}}
@@ -69,9 +69,9 @@ pre .c{color:#6f6a93}pre .k{color:var(--p)}pre .s{color:var(--o)}
 .bars{display:grid;gap:22px;margin-top:10px}
 .row .lab{display:flex;justify-content:space-between;font-size:15px;margin-bottom:8px}.row .lab span{color:var(--mute)}
 .track{height:14px;border-radius:99px;background:#17132b;overflow:hidden;margin-bottom:6px}
-.fill{height:100%;width:0;border-radius:99px;transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
+.fill{height:100%;width:var(--w);border-radius:99px;transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
 .fill.old{background:#4b4672}.fill.new{background:linear-gradient(90deg,var(--v),var(--p))}
-.in .fill{width:var(--w)}
+.js .fill{width:0}.js .out .l{opacity:0}.js .in .fill{width:var(--w)}
 .note{color:var(--mute);font-size:14px;max-width:72ch}
 .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;margin-top:18px}
 table{border-collapse:collapse;width:100%;min-width:560px;font-size:15px}
@@ -90,8 +90,8 @@ tr:last-child td{border-bottom:0}td.win{color:var(--p);font-weight:700}
 .versus b{color:var(--ink)}
 .honest{border-left:3px solid var(--o);padding:6px 0 6px 20px;color:var(--mute);max-width:78ch}
 footer{margin-top:80px;padding:40px 0 64px;color:var(--mute);font-size:14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.rv{opacity:0;transform:translateY(18px);transition:opacity .7s,transform .7s}.rv.in{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none}.fill{width:var(--w)}.out .l{opacity:1}}
+.js .rv{opacity:0;transform:translateY(18px);transition:opacity .7s,transform .7s}.js .rv.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.js .rv{opacity:1;transform:none}.js .fill{width:var(--w)}.js .out .l{opacity:1}}
 #net{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 #prog{position:fixed;left:0;top:0;height:3px;width:100%;transform-origin:0 50%;transform:scaleX(0);background:linear-gradient(90deg,var(--v),var(--p),var(--o));z-index:60}
 #glow{position:fixed;left:0;top:0;width:360px;height:360px;margin:-180px 0 0 -180px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,255,.22),transparent 65%);pointer-events:none;z-index:0;will-change:transform;opacity:0;transition:opacity .4s}
