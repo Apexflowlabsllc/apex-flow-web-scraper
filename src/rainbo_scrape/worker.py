@@ -62,6 +62,7 @@ async def serve(settings=None, once=False):
     store = Store(settings)
     with worker_lock(settings) as locked:
         if not locked:
+            print("rainbo-scrape worker: another worker already holds the lock and is serving jobs", file=sys.stderr)
             return
         store.recover()
         async def heartbeat():

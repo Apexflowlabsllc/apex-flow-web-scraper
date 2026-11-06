@@ -11,10 +11,10 @@ class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.environ.get(
         "RAINBO_SCRAPE_DATA", str(Path.home() / ".local/share/rainbo-scrape"))))
     timeout: float = 25
-    max_body: int = 5 * 1024 * 1024
+    max_body: int = 12 * 1024 * 1024
     cache_bytes: int = 256 * 1024 * 1024
     cache_ttl: int = 3600
-    user_agent: str = "RAINBO-Scrape/0.1 (+self-hosted; respects robots.txt)"
+    user_agent: str = "RAINBO-Scrape/0.2 (+self-hosted; respects robots.txt)"
     # Optional proxy controlled by the operator. Keep credentials in the process
     # environment; never pass this value through a job, API response or log.
     proxy_url: str = field(default_factory=lambda: os.environ.get("RAINBO_SCRAPE_PROXY_URL", "").strip())

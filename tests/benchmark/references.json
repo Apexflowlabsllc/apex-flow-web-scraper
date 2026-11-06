@@ -1,0 +1,463 @@
+{
+ "news-2": [
+  {
+   "type": "heading",
+   "text": "Russell Brand found guilty of rape and sexual assault by UK court"
+  },
+  {
+   "type": "phrase",
+   "text": "Healthcare not bombs"
+  },
+  {
+   "type": "noise",
+   "text": "Skip to Content"
+  }
+ ],
+ "news-3": [
+  {
+   "type": "phrase",
+   "text": "Hacker News"
+  },
+  {
+   "type": "phrase",
+   "text": "points by"
+  },
+  {
+   "type": "phrase",
+   "text": "comments"
+  }
+ ],
+ "docs-1": [
+  {
+   "type": "heading",
+   "text": "Coroutines and tasks"
+  },
+  {
+   "type": "heading",
+   "text": "Creating Tasks"
+  },
+  {
+   "type": "code",
+   "text": "async def main():"
+  },
+  {
+   "type": "code",
+   "text": "await asyncio.sleep(1)"
+  },
+  {
+   "type": "phrase",
+   "text": "asyncio.TaskGroup"
+  },
+  {
+   "type": "noise",
+   "text": "Link to this heading"
+  },
+  {
+   "type": "noise",
+   "text": "Navigation"
+  }
+ ],
+ "docs-2": [
+  {
+   "type": "heading",
+   "text": "Array.prototype.map()"
+  },
+  {
+   "type": "heading",
+   "text": "Syntax"
+  },
+  {
+   "type": "heading",
+   "text": "Parameters"
+  },
+  {
+   "type": "heading",
+   "text": "Return value"
+  },
+  {
+   "type": "code",
+   "text": "map(callbackFn, thisArg)"
+  },
+  {
+   "type": "code",
+   "text": "const mapped = array.map((x) => x * 2);"
+  },
+  {
+   "type": "phrase",
+   "text": "creates a new array populated with the results"
+  },
+  {
+   "type": "noise",
+   "text": "Skip to main content"
+  }
+ ],
+ "docs-3": [
+  {
+   "type": "heading",
+   "text": "Scraping a URL with Firecrawl"
+  },
+  {
+   "type": "heading",
+   "text": "Installation"
+  },
+  {
+   "type": "phrase",
+   "text": "formats"
+  },
+  {
+   "type": "phrase",
+   "text": "maxAge"
+  },
+  {
+   "type": "code",
+   "text": "firecrawl.scrape"
+  }
+ ],
+ "docs-4": [
+  {
+   "type": "heading",
+   "text": "Quick Start"
+  },
+  {
+   "type": "heading",
+   "text": "Creating and nesting components"
+  },
+  {
+   "type": "heading",
+   "text": "Writing markup with JSX"
+  },
+  {
+   "type": "heading",
+   "text": "Adding styles"
+  },
+  {
+   "type": "code",
+   "text": "function MyButton()"
+  },
+  {
+   "type": "phrase",
+   "text": "React components are JavaScript functions that return markup"
+  }
+ ],
+ "shop-1": [
+  {
+   "type": "heading",
+   "text": "A Light in the Attic"
+  },
+  {
+   "type": "phrase",
+   "text": "\u00a351.77"
+  },
+  {
+   "type": "heading",
+   "text": "Product Description"
+  },
+  {
+   "type": "phrase",
+   "text": "Shel Silverstein"
+  },
+  {
+   "type": "table",
+   "cells": [
+    "UPC",
+    "a897fe39b1053632"
+   ]
+  },
+  {
+   "type": "table",
+   "cells": [
+    "Availability",
+    "In stock (22 available)"
+   ]
+  }
+ ],
+ "shop-2": [
+  {
+   "type": "heading",
+   "text": "E-commerce training site"
+  },
+  {
+   "type": "phrase",
+   "text": "Welcome to WebScraper e-commerce site"
+  },
+  {
+   "type": "phrase",
+   "text": "reviews"
+  }
+ ],
+ "shop-3": [
+  {
+   "type": "phrase",
+   "text": "Abominable Hoodie"
+  },
+  {
+   "type": "phrase",
+   "text": "$69.00"
+  },
+  {
+   "type": "phrase",
+   "text": "Adrienne Trek Jacket"
+  },
+  {
+   "type": "heading",
+   "text": "Abominable Hoodie"
+  }
+ ],
+ "spa-1": [
+  {
+   "type": "phrase",
+   "text": "The world as we have created it is a process of our thinking"
+  },
+  {
+   "type": "phrase",
+   "text": "Albert Einstein"
+  },
+  {
+   "type": "phrase",
+   "text": "deep-thoughts"
+  }
+ ],
+ "spa-2": [
+  {
+   "type": "phrase",
+   "text": "The world as we have created it is a process of our thinking"
+  },
+  {
+   "type": "phrase",
+   "text": "J.K. Rowling"
+  }
+ ],
+ "spa-3": [
+  {
+   "type": "heading",
+   "text": "E-commerce training site"
+  },
+  {
+   "type": "phrase",
+   "text": "Top items being scraped right now"
+  },
+  {
+   "type": "phrase",
+   "text": "$"
+  }
+ ],
+ "spa-4": [
+  {
+   "type": "heading",
+   "text": "JS Rendering"
+  },
+  {
+   "type": "phrase",
+   "text": "Chaz Kangeroo Hoodie"
+  },
+  {
+   "type": "noise",
+   "text": "Enable JavaScript to see products"
+  }
+ ],
+ "pdf-1": [
+  {
+   "type": "phrase",
+   "text": "Attention Is All You Need"
+  },
+  {
+   "type": "phrase",
+   "text": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks"
+  },
+  {
+   "type": "phrase",
+   "text": "Scaled Dot-Product Attention"
+  },
+  {
+   "type": "phrase",
+   "text": "Multi-Head Attention"
+  },
+  {
+   "type": "phrase",
+   "text": "Ashish Vaswani"
+  }
+ ],
+ "pdf-2": [
+  {
+   "type": "phrase",
+   "text": "Request for Taxpayer"
+  },
+  {
+   "type": "phrase",
+   "text": "Identification Number and Certification"
+  },
+  {
+   "type": "phrase",
+   "text": "Department of the Treasury"
+  }
+ ],
+ "pdf-3": [
+  {
+   "type": "phrase",
+   "text": "Dummy PDF file"
+  }
+ ],
+ "page-1": [
+  {
+   "type": "heading",
+   "text": "America's Cradle of Quarterbacks"
+  },
+  {
+   "type": "phrase",
+   "text": "\u00a322.50"
+  },
+  {
+   "type": "phrase",
+   "text": "In stock"
+  }
+ ],
+ "page-2": [
+  {
+   "type": "phrase",
+   "text": "This life is what you make it"
+  },
+  {
+   "type": "phrase",
+   "text": "Top Ten tags"
+  },
+  {
+   "type": "noise",
+   "text": "Login"
+  }
+ ],
+ "page-3": [
+  {
+   "type": "heading",
+   "text": "Computers / Laptops"
+  },
+  {
+   "type": "phrase",
+   "text": "reviews"
+  }
+ ],
+ "table-1": [
+  {
+   "type": "table",
+   "cells": [
+    "World",
+    "8,021,407,192",
+    "8,091,734,930"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "See also"
+  },
+  {
+   "type": "table",
+   "cells": [
+    "India",
+    "1,425,423,212"
+   ]
+  },
+  {
+   "type": "table",
+   "cells": [
+    "China",
+    "1,425,179,569"
+   ]
+  }
+ ],
+ "table-2": [
+  {
+   "type": "heading",
+   "text": "Syntax and semantics"
+  },
+  {
+   "type": "heading",
+   "text": "Indentation"
+  },
+  {
+   "type": "heading",
+   "text": "History"
+  },
+  {
+   "type": "phrase",
+   "text": "Guido van Rossum"
+  },
+  {
+   "type": "code",
+   "text": "print("
+  },
+  {
+   "type": "phrase",
+   "text": "Python is a high-level, general-purpose programming language"
+  }
+ ],
+ "table-3": [
+  {
+   "type": "heading",
+   "text": "Zero configuration"
+  },
+  {
+   "type": "table",
+   "cells": [
+    "Name",
+    "Position",
+    "Office",
+    "Age",
+    "Start date",
+    "Salary"
+   ]
+  },
+  {
+   "type": "table",
+   "cells": [
+    "Tiger Nixon",
+    "System Architect",
+    "Edinburgh",
+    "61",
+    "2011-04-25",
+    "$320,800"
+   ]
+  },
+  {
+   "type": "table",
+   "cells": [
+    "Airi Satou",
+    "Accountant",
+    "Tokyo",
+    "33"
+   ]
+  }
+ ],
+ "consent-1": [
+  {
+   "type": "heading",
+   "text": "What can Democrats do with control of Congress? We answer your US midterms questions"
+  },
+  {
+   "type": "noise",
+   "text": "Accept all cookies"
+  },
+  {
+   "type": "noise",
+   "text": "Manage cookies"
+  }
+ ],
+ "consent-2": [
+  {
+   "type": "heading",
+   "text": "The Russell Brand verdict is a landmark victory for the understanding of consent"
+  },
+  {
+   "type": "noise",
+   "text": "Accept all"
+  },
+  {
+   "type": "noise",
+   "text": "Manage my cookies"
+  }
+ ],
+ "bot-1": [
+  {
+   "type": "phrase",
+   "text": "NOWSECURE"
+  }
+ ]
+}

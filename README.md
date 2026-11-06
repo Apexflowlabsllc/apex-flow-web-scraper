@@ -4,7 +4,7 @@ An owned web extraction engine from [Apex Flow Labs](https://www.apexflowlabs.co
 Collect public pages, keep extraction evidence, and work with durable jobs from
 a CLI, a private local workspace or a compatible MCP assistant.
 
-**Early release: 0.1.0.** No hosted scraping API or model key is required.
+**Release 0.2.0.** No hosted scraping API or model key is required.
 Software is MIT licensed; compute, bandwidth, storage and maintenance are not free.
 
 ## Quick start
@@ -138,3 +138,28 @@ Read the [documentation](https://webscraper.apexflowlabs.com/docs.html),
 ## Roadmap
 
 See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged capability plan and [ACCESS-PLATFORM-PLAN.md](ACCESS-PLATFORM-PLAN.md) for the proxy infrastructure and owner-controlled challenge-handling design.
+
+
+## Measured (0.2.0, 30-URL benchmark, 5 Nov 2026)
+
+26/30 URLs fetched, 92/94 Markdown-fidelity checks passed (97.9%), median 1.45 s per URL, about 56 MB process memory.
+Details, failures and what is NOT measured (includes a 24-URL Firecrawl comparison: 91/93 vs 85/93 checks; Firecrawl fetched all 30 URLs, we fetched 26): `BENCHMARK-2026-11-05.md`.
+
+```python
+from rainbo_scrape import scrape, map_site
+page = scrape("https://example.com", max_age=3600000)   # .markdown .text .links .headings
+urls = map_site("https://docs.python.org/3/")["urls"]
+```
+
+CLI: `rainbo-scrape fetch URL`, `map URL`, `scrape URL --wait` (first line is `job_id=...`).
+Schema extraction needs `DEEPSEEK_API_KEY` (first) or `OPENROUTER_API_KEY`; mocked in tests, not live-measured.
+Owned search: `rainbo-scrape index https://site/` crawls a site into a local SQLite FTS5 index; `rainbo-scrape search "query"` returns BM25-ranked, stemmed hits with highlighted snippets (measured: 73 pages indexed in 59 s, relevant top hit). It searches what you have indexed, not the whole web.
+Not built: whole-web search, Node SDK, public landing page.
+
+## Also in 0.2.0
+
+- `scrape(url, chunks=800)`: heading-aware Markdown chunks for RAG, code blocks never split.
+- Every result carries a `receipt`: requested and final URL, status, fetch time, user agent, content hash, robots.txt decision.
+- `rainbo-scrape llms-txt https://your-site.com --pages 30 [--full]`: writes llms.txt / llms-full.txt for a site you operate.
+- `rainbo-scrape crawl-web <seed>`: open-web crawl, up to 1,000 pages a job, robots.txt obeyed. Built, not yet run at scale.
+- `sdk/node`: Node client for a local workspace (private, unpublished).
