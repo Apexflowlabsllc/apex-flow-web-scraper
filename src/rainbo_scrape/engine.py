@@ -16,7 +16,7 @@ def validate_request(request, settings):
         raise ValueError("Job must be a JSON object")
     allowed = {"urls", "max_pages", "max_depth", "max_seconds", "max_bytes", "concurrency",
                "render", "recipe", "wait_selector", "scrolls", "include_paths", "exclude_paths", "cache",
-               "max_age", "screenshot", "extract", "change_tracking", "follow_external"}
+               "max_age", "screenshot", "extract", "change_tracking", "follow_external", "chunks"}
     if set(request)-allowed:
         raise ValueError("Unknown job options: "+", ".join(set(request)-allowed))
     urls = request.get("urls")
@@ -44,6 +44,9 @@ def validate_request(request, settings):
     max_age = result.get("max_age")
     if max_age is not None and (isinstance(max_age, bool) or not isinstance(max_age, int) or not 0 <= max_age <= 31536000000):
         raise ValueError("max_age must be milliseconds from 0 to 31536000000")
+    if result.get("chunks") is not None:
+        from .chunking import chunk_markdown
+        chunk_markdown("", result["chunks"])  # validates the size
     for key in ("screenshot", "change_tracking"):
         if not isinstance(result.setdefault(key, False), bool):
             raise ValueError(key + " must be boolean")
@@ -83,6 +86,13 @@ async def scrape(fetcher, url, options):
                   elapsed_ms=round((time.monotonic()-started)*1000, 2), engine="Apex Flow Web Scraper 0.2",
                   content_sha256=hashlib.sha256(result["text"].encode()).hexdigest(),
                   hosted_scraping_calls=0)
+    result["receipt"] = {"requested_url": url, "final_url": response["url"], "status": response["status"],
+                         "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "robots_txt": "allowed",
+                         "user_agent": fetcher.settings.user_agent, "rendered": rendered,
+                         "content_sha256": result["content_sha256"], "source_sha256": result.get("source_sha256")}
+    if options.get("chunks"):
+        from .chunking import chunk_markdown
+        result["chunks"] = chunk_markdown(result.get("markdown") or result["text"], options["chunks"])
     if shot:
         import base64
         result["screenshot_png_base64"] = base64.b64encode(shot).decode()
