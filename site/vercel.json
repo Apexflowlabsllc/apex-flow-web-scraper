@@ -1,5 +1,9 @@
 {
   "functions": {"api/gateway.js": {"maxDuration": 120}},
+  "redirects": [
+    {"source":"/:path*","has":[{"type":"host","value":"apex-flow-web-scraper.vercel.app"}],"destination":"https://webscraper.apexflowlabs.com/:path*","permanent":true},
+    {"source":"/:path*","has":[{"type":"host","value":"apex-flow-web-scraper-apex-flow-labs.vercel.app"}],"destination":"https://webscraper.apexflowlabs.com/:path*","permanent":true}
+  ],
   "rewrites": [
     {"source": "/v1/:path*", "destination": "https://webscraper-api.159.223.109.53.nip.io/v1/:path*"},
     {"source": "/api/:path((?!gateway).*)", "destination": "/api/gateway?route=api/:path"}

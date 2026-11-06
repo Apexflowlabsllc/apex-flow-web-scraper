@@ -40,6 +40,14 @@ try:
         assert status == 200, name
         if name == 'css-extraction':
             assert data['result']['data']['heading'], 'CSS extraction did not return the page heading'
+    before=b.remaining(account)
+    for _ in range(23):
+        status,data=request('/v1/search',{'query':'Example'})
+        assert status==200, 'Search rate allowance ended too early'
+    status,data=request('/v1/usage')
+    assert status==429, 'Credit-free endpoints did not enforce the shared API limit'
+    assert b.remaining(account)==before, 'Credit-free requests changed the balance'
+    print(json.dumps({'check':'shared-api-rate-limit','status':status,'credits_unchanged':True}),flush=True)
 finally:
     b.revoke(key)
     b.db.execute("UPDATE orders SET status='qa-complete' WHERE account=?",(account,))
