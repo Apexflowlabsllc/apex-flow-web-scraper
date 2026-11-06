@@ -19,7 +19,7 @@ def main(argv=None):
     _utf8()
     parser = argparse.ArgumentParser(prog="rainbo-scrape")
     parser.add_argument("command", choices=["health", "scrape", "fetch", "map", "status", "results", "jobs",
-                                            "cancel", "worker", "web", "mcp", "search", "index", "crawl-web"])
+                                            "cancel", "worker", "web", "mcp", "search", "index", "crawl-web", "llms-txt"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--render", choices=["auto", "never", "always"], default="auto")
     parser.add_argument("--pages", type=int, default=1)
@@ -29,6 +29,7 @@ def main(argv=None):
     parser.add_argument("--limit", type=int, default=5000)
     parser.add_argument("--wait", action="store_true", help="scrape: block until the job ends, then print the result")
     parser.add_argument("--track-changes", action="store_true")
+    parser.add_argument("--full", action="store_true", help="llms-txt: also include every page's Markdown (llms-full.txt)")
     parser.add_argument("--json", action="store_true", help="fetch: print the full result as JSON")
     args = parser.parse_args(argv)
     if args.command == "mcp":
@@ -50,6 +51,10 @@ def main(argv=None):
             options["max_age"] = args.max_age
         page = scrape(args.value, **options)
         print(json.dumps(page, indent=2, ensure_ascii=False) if args.json else page.markdown)
+        return
+    if args.command == "llms-txt":
+        from .llmstxt import build
+        print(asyncio.run(build(args.value, limit=min(max(args.pages, 2), 200) if args.pages > 1 else 30, full=args.full)), end="")
         return
     if args.command == "map":
         from .client import map_site
