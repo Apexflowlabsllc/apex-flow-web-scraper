@@ -143,7 +143,7 @@ See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged capability pla
 ## Measured (0.2.0, 30-URL benchmark, 5 Nov 2026)
 
 26/30 URLs fetched, 92/94 Markdown-fidelity checks passed (97.9%), median 1.45 s per URL, about 56 MB process memory.
-Details, failures and what is NOT measured (no Firecrawl comparison): `BENCHMARK-2026-11-05.md`.
+Details, failures and what is NOT measured (includes a 24-URL Firecrawl comparison: 91/93 vs 85/93 checks; Firecrawl fetched all 30 URLs, we fetched 26): `BENCHMARK-2026-11-05.md`.
 
 ```python
 from rainbo_scrape import scrape, map_site

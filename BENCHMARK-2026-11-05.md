@@ -30,25 +30,33 @@ Memory is the Python process only; the parser subprocess and Brave are not inclu
 - spa-4 (scrapingcourse JS page) keeps the text "Enable JavaScript to see products"; page-2 keeps a "Login" link. 2 of 94 checks fail.
 - Rendered pages cost 5 to 6.7 s (Brave start plus network-quiet wait).
 
-## Firecrawl spot check: 5 of 30 URLs, hand-scored (partial, not the full comparison)
+## Firecrawl comparison: 29 of 30 URLs, free keyless tier, scored against the same checks
 
-Firecrawl's keyless hosted scrape (markdown, maxAge 0) was called once per URL on 2026-11-05, no key, free tier.
-Its output arrives inline and cannot be saved by script, so I scored these five by reading it against the same
-reference checks. Time and memory could not be measured for Firecrawl. The other 25 URLs are not measured.
+Firecrawl's keyless hosted scrape (markdown, onlyMainContent, maxAge 0) was called once per URL on 2026-11-05: no key,
+no retries, no proxy options. Its output arrives inline, so most of it was scored by reading it against the same
+reference checks (score.py's rules); docs-1, docs-3, table-1, table-2 and consent-2 were scored with score.py itself.
+Hand-scoring is a weaker method than a script, so treat single-check differences with care. bot-1 is left out (our
+reference exists, theirs was not scored). Firecrawl time and memory were not measured.
 
-| URL | rainbo-scrape 0.2.0 | Firecrawl | Result |
-|---|---|---|---|
-| shop-1 books.toscrape product | 6/6 | 6/6 (duplicated description, breadcrumb leaked) | tie |
-| page-2 quotes.toscrape page 2 | 2/3 ("Login" link kept) | 2/3 (same) | tie |
-| spa-1 quotes JS page | 3/3 | 3/3 | tie |
-| spa-4 JS rendering page | 2/3 ("Enable JavaScript" text kept) | 2/3 (same) | tie |
-| table-3 datatables.net | 4/4 | 3/4 (the Tiger Nixon row exists only inside a raw-HTML code dump, not as a table row) | win |
-| Total | 17/19 | 16/19 | 1 win, 4 ties, 0 losses |
+| Result over the 24 URLs with reference checks (bot-1 excluded) | rainbo-scrape 0.2.0 | Firecrawl |
+|---|---|---|
+| Checks passed | 91 / 93 | 85 / 93 |
+| URLs where we score higher | 6 (news-2, docs-1, docs-2, shop-3, consent-1, table-3) | 0 |
+| URLs tied | 18 | 18 |
+| URLs where Firecrawl scores higher | 0 | |
 
-Firecrawl's datatables output also carried a roughly 14,000-character raw-HTML dump and about 150 sidebar links.
-Five pages is too few to claim leadership; it shows we are level on these and ahead on one.
+What Firecrawl missed: bold link text instead of a heading line (news-2, shop-3, consent-1), "Navigation" kept
+(docs-1), "Skip to main content" kept (docs-2), a raw-HTML dump instead of a table row (table-3).
+
+## Where Firecrawl beats us, measured
+
+- **Coverage: Firecrawl returned content for all 30 URLs; we fetched 26.** The 4 we did not fetch:
+  text.npr.org and reuters.com (robots.txt disallows us and we obey it; Firecrawl returned real content for both),
+  zillow.com and glassdoor.com (HTTP 403 to us). Firecrawl's Zillow output was almost entirely navigation and footer
+  links with no listings; its Glassdoor output was the Recruiter marketing page. So it reached the front doors, not the data.
+- Firecrawl's output is larger on several pages (docs-3: 513,362 characters against our 38,774, same 5/5 checks).
 
 ## Still not measured
 
-The remaining 25 URLs for Firecrawl, any Firecrawl or Tavily latency, Tavily search quality (we have no web
-search), and Firecrawl's behaviour on the four bot-wall URLs.
+Firecrawl and Tavily latency, memory, Tavily search quality (we have no web search), live schema extraction,
+whether either service returns the same output from other networks, and anything at crawl scale.

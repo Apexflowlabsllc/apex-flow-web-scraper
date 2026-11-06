@@ -205,18 +205,17 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
 <div class="track"><div class="fill new" style="--w:47.2%"></div></div><div class="note">0.2.0 · 2,170 ms</div></div>
 </div>
 <h3 style="margin:40px 0 0;font-size:22px">Head to head with Firecrawl</h3>
-<p class="note">5 of 30 URLs, hand-scored.</p>
+<p class="note">24 URLs with hand-checked references, Firecrawl's free keyless tier, scored with the same checks.</p>
 <div class="tablewrap"><table>
-<caption class="skip">Apex Flow Web Scraper versus Firecrawl on five pages</caption>
-<thead><tr><th>Page</th><th>Apex Flow Web Scraper</th><th>Firecrawl</th></tr></thead>
+<caption class="skip">Apex Flow Web Scraper versus Firecrawl on 24 pages</caption>
+<thead><tr><th>Measure</th><th>Apex Flow Web Scraper</th><th>Firecrawl</th></tr></thead>
 <tbody>
-<tr><td>Product page (books.toscrape)</td><td>6 / 6</td><td>6 / 6</td></tr>
-<tr><td>Paginated quotes</td><td>2 / 3</td><td>2 / 3</td></tr>
-<tr><td>JS quotes page</td><td>3 / 3</td><td>3 / 3</td></tr>
-<tr><td>JS rendering challenge</td><td>2 / 3</td><td>2 / 3</td></tr>
-<tr><td>DataTables table page</td><td class="win">4 / 4</td><td>3 / 4</td></tr>
+<tr><td>Fidelity checks passed</td><td class="win">91 / 93</td><td>85 / 93</td></tr>
+<tr><td>Pages where we score higher</td><td class="win">6</td><td>0</td></tr>
+<tr><td>Pages tied</td><td>18</td><td>18</td></tr>
+<tr><td>URLs returned of 30</td><td>26</td><td class="win">30</td></tr>
 </tbody></table></div>
-<p class="note" style="margin-top:12px">Five pages is a spot check, not a verdict. The other 25 are not yet measured against Firecrawl, and speed was not comparable.</p></section>
+<p class="note" style="margin-top:12px">Firecrawl returns content for all 30, including two pages we skip because robots.txt disallows us. Its Zillow and Glassdoor output was front-page navigation, not listings or reviews. Hand-scored, one run each, speed not measured.</p></section>
 
 <section id="pricing" class="rv"><p class="eyebrow">Pricing · planned, hosted API not yet open</p><h2>Cheaper per page than Firecrawl.</h2>
 <div class="plans">

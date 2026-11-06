@@ -15,7 +15,7 @@
 ## Measured results (30 public URLs, 94 hand-checked reference checks, 5 Nov 2026)
 - 26 of 30 URLs fetched; 92 of 94 Markdown fidelity checks passed (97.9%).
 - Median 1,454 ms per URL; median process memory 56.4 MB.
-- Versus Firecrawl on 5 of the 30 URLs (hand-scored): 17/19 vs 16/19. The other 25 are not yet compared.
+- Versus Firecrawl (free keyless tier, same checks, hand-scored) on 24 URLs with references: 91/93 vs 85/93; we score higher on 6 pages, tie on 18, lower on 0. Firecrawl returned content for all 30 URLs; we returned 26 (two blocked by robots.txt that we obey, two by bot walls).
 
 ## Not claimed
 - No CAPTCHA solving or bot-wall evasion; zillow.com and glassdoor.com block it.
