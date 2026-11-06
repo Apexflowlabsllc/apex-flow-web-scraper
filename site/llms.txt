@@ -1,0 +1,27 @@
+# Apex Flow Web Scraper
+
+> Web scraper that turns any web page, PDF or DOCX into clean Markdown. Self-hosted, no API key, no per-page fee. Built by Apex Flow Labs. Version 0.2.0 (5 November 2026).
+
+## What it does
+- Converts pages to Markdown with headings, GFM tables, fenced code with language, absolute links; removes navigation, cookie banners and hidden elements.
+- Renders JavaScript pages in an isolated Brave browser, with screenshots on request.
+- Reads PDF, DOCX, RSS/Atom feeds and JSON.
+- Maps sites (robots.txt, nested and gzip sitemaps), crawls with durable jobs, change tracking with diffs.
+- Owned full-text search (SQLite FTS5, BM25) over everything scraped.
+- JSON-Schema extraction using DeepSeek first, OpenRouter second.
+- MCP tools for agents: fetch, map, crawl, search, compare.
+- Obeys robots.txt and Crawl-delay; fetches public addresses only.
+
+## Measured results (30 public URLs, 94 hand-checked reference checks, 5 Nov 2026)
+- 26 of 30 URLs fetched; 92 of 94 Markdown fidelity checks passed (97.9%).
+- Median 1,454 ms per URL; median process memory 56.4 MB.
+- Versus Firecrawl on 5 of the 30 URLs (hand-scored): 17/19 vs 16/19. The other 25 are not yet compared.
+
+## Not claimed
+- No CAPTCHA solving or bot-wall evasion; zillow.com and glassdoor.com block it.
+- Search covers sites you have indexed, not the whole web.
+- The hosted API, accounts and billing are planned and not live. Planned pricing: Free 1,000 pages; $19 for 25,000; $79 for 150,000; $299 for 750,000.
+
+## Usage
+Python: `from rainbo_scrape import scrape; scrape("https://example.com").markdown`
+CLI: `rainbo-scrape fetch https://example.com`
