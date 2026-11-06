@@ -41,7 +41,7 @@ def parse_sitemap(body):
     return [], items
 
 
-async def site_map(fetcher, url, limit=5000, search=None, include_links=True):
+async def site_map(fetcher, url, limit=5000, search=None, include_links=True, max_sitemaps=MAX_SITEMAPS):
     start = canonical_url(url)
     parts = urlsplit(start)
     origin = f"{parts.scheme}://{parts.netloc}"
@@ -56,13 +56,13 @@ async def site_map(fetcher, url, limit=5000, search=None, include_links=True):
         notes.append("robots.txt unavailable: " + exc.code)
     queue += [origin + "/sitemap.xml", origin + "/sitemap_index.xml"]
     truncated = False
-    while queue and len(seen_maps) < MAX_SITEMAPS:
+    while queue and len(seen_maps) < max_sitemaps:
         sitemap = queue.pop(0)
         if sitemap in seen_maps or urlsplit(sitemap).netloc.split(":")[0].split(".")[-2:] != parts.hostname.split(".")[-2:]:
             continue
         seen_maps.add(sitemap)
         try:
-            response = await fetcher.get(sitemap, robots=False)
+            response = await fetcher.get(sitemap)
             if response["status"] != 200:
                 continue
             children, items = parse_sitemap(response["body"])

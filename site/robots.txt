@@ -1,2 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /v1/
+Disallow: /thanks.html
+Disallow: /dashboard.html
+Sitemap: https://webscraper.apexflowlabs.com/sitemap.xml

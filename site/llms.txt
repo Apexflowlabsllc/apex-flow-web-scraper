@@ -1,6 +1,6 @@
 # Apex Flow Web Scraper
 
-> Web scraper that turns any web page, PDF or DOCX into clean Markdown. Self-hosted, no API key, no per-page fee. Built by Apex Flow Labs. Version 0.2.0 (5 November 2026).
+> Convert accessible public web pages, PDF and DOCX documents into clean Markdown. Hosted API with prepaid credits, or open-source self-hosting. Built by Apex Flow Labs. Engine version 0.2.0; hosted launch 6 November 2026.
 
 ## What it does
 - Converts pages to Markdown with headings, GFM tables, fenced code with language, absolute links; removes navigation, cookie banners and hidden elements.
@@ -17,10 +17,16 @@
 - Median 1,454 ms per URL; median process memory 56.4 MB.
 - Versus Firecrawl (free keyless tier, same checks, hand-scored) on 24 URLs with references: 91/93 vs 85/93; we score higher on 6 pages, tie on 18, lower on 0. Firecrawl returned content for all 30 URLs; we returned 26 (two blocked by robots.txt that we obey, two by bot walls).
 
+## Hosted service and limits
+- Hosted API: https://webscraper.apexflowlabs.com/v1. Free trial: 1,000 credits once. Monthly plans: $19 for 25,000; $79 for 150,000; $299 for 750,000 credits. Plain pages cost 1, rendered pages 3. No automatic overages.
+- Hosted: page scraping, JavaScript rendering, CSS field extraction, batches of up to 10 URLs, sitemap mapping, and account-scoped search over the latest 100 successfully scraped URLs. A nonempty map costs 1 credit; saved-page search costs no credits.
+- Hosted responses: 256 KiB per scrape. Two concurrent scrapes per account, subject to shared capacity. Attempts, including failures, are capped at twice the plan's credits per period. Failed scrapes return reserved credits.
+- Hosted model extraction and bulk crawl are not included. Those features remain in the self-hosted edition. Documentation: https://webscraper.apexflowlabs.com/docs.html.
+
 ## Not claimed
 - No CAPTCHA solving or bot-wall evasion; zillow.com and glassdoor.com block it.
 - Search covers sites you have indexed, not the whole web.
-- The hosted API, accounts and billing are planned and not live. Planned pricing: Free 1,000 pages; $19 for 25,000; $79 for 150,000; $299 for 750,000.
+- We do not claim universal competitor superiority, the lowest price for every workload, or guaranteed availability on every source.
 
 ## Usage
 Python: `from rainbo_scrape import scrape; scrape("https://example.com").markdown`

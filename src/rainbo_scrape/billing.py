@@ -11,10 +11,10 @@ from pathlib import Path
 
 # Price in USD per month, included credits. One credit = one plain (non-rendered) page.
 PLANS = {
-    "free": {"price": 0, "credits": 1000},
-    "starter": {"price": 19, "credits": 25000},
-    "growth": {"price": 79, "credits": 150000},
-    "scale": {"price": 299, "credits": 750000},
+    "free": {"price": 0, "credits": 1000, "rpm": 30, "concurrency": 2},
+    "starter": {"price": 19, "credits": 25000, "rpm": 60, "concurrency": 2},
+    "growth": {"price": 79, "credits": 150000, "rpm": 60, "concurrency": 2},
+    "scale": {"price": 299, "credits": 750000, "rpm": 60, "concurrency": 2},
 }
 # Credits per request kind. Rendered pages cost our browser time; proxied pages cost real bandwidth.
 COSTS = {"page": 1, "render": 3, "proxy_page": 8, "proxy_render": 10, "extract": 2, "search": 1}
@@ -83,6 +83,10 @@ class Billing:
         plan, used = self.db.execute("SELECT plan, used FROM accounts WHERE id=?", (account,)).fetchone()
         return PLANS[plan]["credits"] - used
 
+    def limits(self, account):
+        plan = self.db.execute("SELECT plan FROM accounts WHERE id=?", (account,)).fetchone()[0]
+        return PLANS[plan]
+
     def charge(self, account, kind, count=1):
         needed = cost_of(kind, count)
         self.db.execute("BEGIN IMMEDIATE")
@@ -98,3 +102,19 @@ class Billing:
             self.db.execute("ROLLBACK")
             raise
         return left - needed
+
+    def reserve(self, account, credits):
+        """Reserve before I/O so concurrent requests cannot overspend."""
+        return self.charge(account, "page", credits)
+
+    def refund(self, account, credits):
+        if credits <= 0:
+            return
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            self.db.execute("UPDATE accounts SET used=MAX(0,used-?) WHERE id=?", (credits, account))
+            self.db.execute("INSERT INTO usage VALUES (?,?,?,?)", (time.time(), account, "refund", -credits))
+            self.db.execute("COMMIT")
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
