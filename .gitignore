@@ -10,3 +10,6 @@ data/
 .env*
 tests/benchmark/out/
 .bench-data/
+work/
+.vercel/
+*.db*
