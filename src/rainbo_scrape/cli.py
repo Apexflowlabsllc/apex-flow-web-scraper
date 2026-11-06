@@ -19,7 +19,7 @@ def main(argv=None):
     _utf8()
     parser = argparse.ArgumentParser(prog="rainbo-scrape")
     parser.add_argument("command", choices=["health", "scrape", "fetch", "map", "status", "results", "jobs",
-                                            "cancel", "worker", "web", "mcp", "search", "index", "crawl-web", "llms-txt"])
+                                            "cancel", "worker", "web", "mcp", "search", "index", "crawl-web", "llms-txt", "api", "new-key"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--render", choices=["auto", "never", "always"], default="auto")
     parser.add_argument("--pages", type=int, default=1)
@@ -29,6 +29,7 @@ def main(argv=None):
     parser.add_argument("--limit", type=int, default=5000)
     parser.add_argument("--wait", action="store_true", help="scrape: block until the job ends, then print the result")
     parser.add_argument("--track-changes", action="store_true")
+    parser.add_argument("--plan", choices=["free", "starter", "growth", "scale"], default="free", help="new-key: plan for the account")
     parser.add_argument("--full", action="store_true", help="llms-txt: also include every page's Markdown (llms-full.txt)")
     parser.add_argument("--json", action="store_true", help="fetch: print the full result as JSON")
     args = parser.parse_args(argv)
@@ -51,6 +52,18 @@ def main(argv=None):
             options["max_age"] = args.max_age
         page = scrape(args.value, **options)
         print(json.dumps(page, indent=2, ensure_ascii=False) if args.json else page.markdown)
+        return
+    if args.command == "api":
+        from .api import run as run_api
+        run_api(port=args.port if args.port != 8840 else 8850)
+        return
+    if args.command == "new-key":
+        from .billing import Billing
+        from .settings import Settings
+        billing = Billing(Settings().data_dir / "billing.db")
+        account = billing.create_account(args.value or "unnamed", args.plan)
+        print("account=" + account)
+        print("api_key=" + billing.new_key(account))  # shown once; only its hash is stored
         return
     if args.command == "llms-txt":
         from .llmstxt import build
