@@ -56,6 +56,21 @@ What Firecrawl missed: bold link text instead of a heading line (news-2, shop-3,
   links with no listings; its Glassdoor output was the Recruiter marketing page. So it reached the front doors, not the data.
 - Firecrawl's output is larger on several pages (docs-3: 513,362 characters against our 38,774, same 5/5 checks).
 
+## The 4 URLs we did not fetch: exact cause (re-checked 2026-11-05, one request each, honest user agent)
+
+| URL | Our failure | Cause, measured | Fix we will not make |
+|---|---|---|---|
+| text.npr.org | robots_denied | its robots.txt reads `User-agent: *` / `Disallow: /` (it forbids every crawler) | ignoring robots.txt |
+| reuters.com/world/ | robots_denied | its robots.txt reads `User-agent: *` / `Allow: /plus/` / `Disallow: /` | ignoring robots.txt |
+| zillow.com | http_error | the site answers HTTP 403 to our declared RAINBO-Scrape user agent | disguising the agent or evading the bot check |
+| glassdoor.com | http_error | the site answers HTTP 403 to our declared RAINBO-Scrape user agent | same |
+
+None of the four is a defect in the engine path: no render need, timeout, redirect or parsing problem. Closing them would
+mean reading pages the owners told every crawler not to read, or defeating their access checks. Coverage therefore
+stays at 26 of 30, and Firecrawl's 30 of 30 includes the two robots.txt-forbidden pages and two front pages with no
+listings or reviews. This is a deliberate policy gap, not an unfixed bug. The routes that remain open to an operator are
+their own authorised proxy or session (`RAINBO_SCRAPE_PROXY_URL`) and the sites' licensed data or official feeds.
+
 ## Still not measured
 
 Firecrawl and Tavily latency, memory, Tavily search quality (we have no web search), live schema extraction,
