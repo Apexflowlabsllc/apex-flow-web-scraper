@@ -111,6 +111,20 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
 </tbody></table></div>
 <p class="note">Five pages is a spot check, not a verdict. The other 25 are not yet measured against Firecrawl, and speed was not comparable.</p></section>
 
+<section id="pricing"><p class="eyebrow">Pricing · planned, hosted API not yet open</p><h2>Cheaper per page than Firecrawl.</h2>
+<div class="tablewrap"><table>
+<caption class="skip">Planned hosted plans</caption>
+<thead><tr><th>Plan</th><th>Per month</th><th>Included pages</th><th>Per 1,000 pages</th></tr></thead>
+<tbody>
+<tr><td>Self-hosted</td><td class="win">$0</td><td>Unlimited, your hardware</td><td class="win">$0</td></tr>
+<tr><td>Free</td><td>$0</td><td>1,000</td><td>$0</td></tr>
+<tr><td>Starter</td><td>$19</td><td>25,000</td><td class="win">$0.76</td></tr>
+<tr><td>Growth</td><td>$79</td><td>150,000</td><td class="win">$0.53</td></tr>
+<tr><td>Scale</td><td>$299</td><td>750,000</td><td class="win">$0.40</td></tr>
+<tr><td>Firecrawl Standard (for comparison)</td><td>$83</td><td>100,000</td><td>$0.83</td></tr>
+</tbody></table></div>
+<p class="note">Rendered pages count as 3 pages, extraction adds 2, and pages fetched through a managed proxy count as 8 because proxy bandwidth is a real cost. Firecrawl figure is from its public pricing page as read on 5 November 2026. These are planned prices; the hosted API, accounts and billing are not live.</p></section>
+
 <section id="honest"><p class="eyebrow">Straight talk</p><h2>What we do not claim.</h2>
 <div class="honest note"><p>We do not solve CAPTCHAs or evade bot walls: zillow.com and glassdoor.com still block us, and robots.txt-disallowed pages stay unread. Our search covers the sites you index, not the whole web. Rendered pages take 4 to 5 seconds. Schema extraction is tested against a mock model and not yet measured live. There is no Node SDK yet. Every number on this page comes from <code>BENCHMARK-2026-11-05.md</code>.</p></div></section>
 </main>
