@@ -92,9 +92,32 @@ tr:last-child td{border-bottom:0}td.win{color:var(--p);font-weight:700}
 footer{margin-top:80px;padding:40px 0 64px;color:var(--mute);font-size:14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
 .rv{opacity:0;transform:translateY(18px);transition:opacity .7s,transform .7s}.rv.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none}.fill{width:var(--w)}.out .l{opacity:1}}
+#net{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+#prog{position:fixed;left:0;top:0;height:3px;width:100%;transform-origin:0 50%;transform:scaleX(0);background:linear-gradient(90deg,var(--v),var(--p),var(--o));z-index:60}
+#glow{position:fixed;left:0;top:0;width:360px;height:360px;margin:-180px 0 0 -180px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,255,.22),transparent 65%);pointer-events:none;z-index:0;will-change:transform;opacity:0;transition:opacity .4s}
+.wrap{position:relative;z-index:1}
+h1 em{background-size:220% 100%;animation:shine 6s linear infinite}
+@keyframes shine{to{background-position:220% 0}}
+.btn{will-change:transform}
+.tilt{transform-style:preserve-3d;transition:transform .2s ease-out;will-change:transform}
+.marquee{overflow:hidden;border-block:1px solid var(--line);margin:44px 0 0;padding:16px 0;-webkit-mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.marquee .tr{display:flex;gap:44px;width:max-content;animation:run 38s linear infinite;font:600 14px ui-monospace,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.marquee .tr span::before{content:"◆";color:var(--p);margin-right:44px}
+.marquee:hover .tr{animation-play-state:paused}
+@keyframes run{to{transform:translateX(-50%)}}
+.demo{animation:float 7s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-10px)}}
+.logo i{animation:spin 9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.plan.hot{position:relative;overflow:hidden}
+.plan.hot::after{content:"";position:absolute;inset:-60%;background:conic-gradient(from 0deg,transparent 0 70%,rgba(255,61,242,.35) 85%,transparent);animation:spin 6s linear infinite;pointer-events:none}
+.plan.hot>*{position:relative;z-index:1}
+.stat{transition:border-color .3s,transform .2s ease-out}.stat:hover{border-color:rgba(255,61,242,.55)}
+@media (hover:none){#glow{display:none}}
+@media (prefers-reduced-motion:reduce){#net,#glow{display:none}.demo,.logo i,.marquee .tr,h1 em,.plan.hot::after{animation:none!important}}
 </style>
 </head>
 <body>
+<canvas id="net" aria-hidden="true"></canvas><div id="prog" aria-hidden="true"></div><div id="glow" aria-hidden="true"></div>
 <a class="skip" href="#main">Skip to content</a>
 <div class="wrap">
 <nav aria-label="Primary"><a class="logo" href="#"><i></i>APEX FLOW WEB SCRAPER</a>
@@ -134,10 +157,11 @@ footer{margin-top:80px;padding:40px 0 64px;color:var(--mute);font-size:14px;bord
 </div>
 </header>
 
+<div class="marquee" aria-hidden="true"><div class="tr"><span>Web pages</span><span>PDF</span><span>DOCX</span><span>Sitemaps</span><span>Tables</span><span>Code blocks</span><span>JS rendering</span><span>Screenshots</span><span>Change tracking</span><span>Owned search</span><span>MCP tools</span><span>robots.txt</span><span>Web pages</span><span>PDF</span><span>DOCX</span><span>Sitemaps</span><span>Tables</span><span>Code blocks</span><span>JS rendering</span><span>Screenshots</span><span>Change tracking</span><span>Owned search</span><span>MCP tools</span><span>robots.txt</span></div></div>
 <main id="main">
 <div class="stats rv">
-<div class="stat"><b>97.9%</b><span>Markdown fidelity checks passed (92 of 94)</span></div>
-<div class="stat"><b>1.45 s</b><span>Median per URL, 30-URL benchmark</span></div>
+<div class="stat tilt"><b data-to="97.9" data-dec="1" data-suf="%">97.9%</b><span>Markdown fidelity checks passed (92 of 94)</span></div>
+<div class="stat tilt"><b data-to="1.45" data-dec="2" data-suf=" s">1.45 s</b><span>Median per URL, 30-URL benchmark</span></div>
 <div class="stat"><b>31→1.2 s</b><span>Hacker News after our Crawl-delay fix</span></div>
 <div class="stat"><b>$0</b><span>Per page self-hosted. No key, no meter.</span></div>
 </div>
@@ -210,6 +234,44 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
 </div>
 <script>
 (function(){
+  var calm=matchMedia('(prefers-reduced-motion:reduce)').matches,touch=matchMedia('(hover:none)').matches;
+  var prog=document.getElementById('prog');
+  function onscroll(){var h=document.documentElement.scrollHeight-innerHeight;prog.style.transform='scaleX('+(h>0?scrollY/h:0)+')'}
+  addEventListener('scroll',onscroll,{passive:true});onscroll();
+  if(calm)return legacy();
+  var glow=document.getElementById('glow'),mx=innerWidth/2,my=innerHeight/3;
+  addEventListener('pointermove',function(e){mx=e.clientX;my=e.clientY;glow.style.opacity=1;glow.style.transform='translate('+mx+'px,'+my+'px)'},{passive:true});
+  /* living network: nodes drift, link when close, bend toward the pointer */
+  var cv=document.getElementById('net'),cx=cv.getContext('2d'),W,H,D,pts=[],raf=0;
+  function size(){D=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=W*D;cv.height=H*D;cx.setTransform(D,0,0,D,0,0);
+    var n=Math.round(Math.min(90,W*H/16000));pts=[];for(var i=0;i<n;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35})}
+  function tick(){cx.clearRect(0,0,W,H);
+    for(var i=0;i<pts.length;i++){var p=pts[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>W)p.vx*=-1;if(p.y<0||p.y>H)p.vy*=-1;
+      var dx=mx-p.x,dy=my-p.y,d=Math.hypot(dx,dy);if(d<160&&d>1){p.x+=dx/d*.6;p.y+=dy/d*.6}
+      cx.fillStyle='rgba(190,160,255,.7)';cx.beginPath();cx.arc(p.x,p.y,1.4,0,6.3);cx.fill();
+      for(var j=i+1;j<pts.length;j++){var q=pts[j],ax=p.x-q.x,ay=p.y-q.y,dd=ax*ax+ay*ay;if(dd<14400){cx.strokeStyle='rgba(139,92,255,'+(.28*(1-dd/14400))+')';cx.beginPath();cx.moveTo(p.x,p.y);cx.lineTo(q.x,q.y);cx.stroke()}}}
+    raf=requestAnimationFrame(tick)}
+  size();tick();addEventListener('resize',function(){size()});
+  document.addEventListener('visibilitychange',function(){cancelAnimationFrame(raf);if(!document.hidden)tick()});
+  /* headline scramble, once */
+  var em=document.querySelector('h1 em'),word=em.textContent,glyphs='<>/{}[]#|=_01',t0=performance.now();
+  em.setAttribute('aria-label',word);
+  (function sc(now){var k=Math.min(1,(now-t0)/900),out='';for(var i=0;i<word.length;i++)out+=(i/word.length<k||word[i]==='.')?word[i]:glyphs[Math.random()*glyphs.length|0];em.textContent=out;if(k<1)requestAnimationFrame(sc);else em.textContent=word})(t0);
+  /* count-up stats */
+  var cn=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;cn.unobserve(e.target);var el=e.target,to=+el.dataset.to,dec=+el.dataset.dec,s=performance.now();
+    (function up(n){var k=Math.min(1,(n-s)/1300),v=to*(1-Math.pow(1-k,3));el.textContent=v.toFixed(dec)+(el.dataset.suf||'');if(k<1)requestAnimationFrame(up)})(s)})},{threshold:.6});
+  document.querySelectorAll('[data-to]').forEach(function(n){cn.observe(n)});
+  if(!touch){
+    /* 3D tilt and magnetic buttons */
+    document.querySelectorAll('.tilt,.plan').forEach(function(c){
+      c.addEventListener('pointermove',function(e){var r=c.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(900px) rotateY('+x*8+'deg) rotateX('+-y*8+'deg) translateZ(0)'});
+      c.addEventListener('pointerleave',function(){c.style.transform=''})});
+    document.querySelectorAll('.btn').forEach(function(b){
+      b.addEventListener('pointermove',function(e){var r=b.getBoundingClientRect();b.style.transform='translate('+(e.clientX-r.left-r.width/2)*.18+'px,'+(e.clientY-r.top-r.height/2)*.28+'px)'});
+      b.addEventListener('pointerleave',function(){b.style.transform=''})});
+  }
+  legacy();
+  function legacy(){
   var io=null;
   if('IntersectionObserver' in window){
     io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
@@ -218,6 +280,7 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
   document.querySelectorAll('.cell').forEach(function(c){
     c.addEventListener('pointermove',function(e){var r=c.getBoundingClientRect();c.style.setProperty('--x',(e.clientX-r.left)+'px');c.style.setProperty('--y',(e.clientY-r.top)+'px')});
   });
+  }
 })();
 </script>
 </body>
