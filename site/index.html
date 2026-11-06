@@ -121,14 +121,14 @@ h1 em{background-size:220% 100%;animation:shine 6s linear infinite}
 <a class="skip" href="#main">Skip to content</a>
 <div class="wrap">
 <nav aria-label="Primary"><a class="logo" href="#"><i></i>APEX FLOW WEB SCRAPER</a>
-<div class="links"><a class="hide" href="#features">Features</a><a class="hide" href="#bench">Benchmark</a><a class="hide" href="#pricing">Pricing</a><a class="btn ghost" href="#start" style="padding:9px 16px">Start</a></div></nav>
+<div class="links"><a class="hide" href="#features">Features</a><a class="hide" href="#bench">Benchmark</a><a class="hide" href="#pricing">Pricing</a><a class="hide" href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper" rel="noopener">GitHub</a><a class="btn ghost" href="#start" style="padding:9px 16px">Start</a></div></nav>
 
 <header class="hero">
 <div>
 <p class="eyebrow">Apex Flow Web Scraper · Self-hosted · No key</p>
 <h1>The web, read <em>cleanly.</em></h1>
 <p class="lede">Any page, PDF or Word file becomes structured Markdown you can trust. Runs on your machine, obeys robots.txt, and ships a benchmark anyone can re-run.</p>
-<div class="cta"><a class="btn" href="#start">Start in one line</a><a class="btn ghost" href="#bench">See the numbers</a></div>
+<div class="cta"><a class="btn" href="#start">Install in one line</a><a class="btn ghost" href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper" rel="noopener">Star on GitHub</a><a class="btn ghost" href="#bench">See the numbers</a></div>
 </div>
 <div class="demo" role="img" aria-label="Animation: a noisy HTML page on the left is cleaned into Markdown on the right">
 <div class="bar"><b></b><b></b><b></b></div>
@@ -167,7 +167,10 @@ h1 em{background-size:220% 100%;animation:shine 6s linear infinite}
 </div>
 
 <section id="start" class="rv"><p class="eyebrow">Start</p><h2>One line. No account.</h2>
-<pre><span class="c"># Python</span>
+<pre><span class="c"># Install (Python 3.11+)</span>
+pip install <span class="s">"git+https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git"</span>
+
+<span class="c"># Python</span>
 <span class="k">from</span> rainbo_scrape <span class="k">import</span> scrape, map_site
 page = scrape(<span class="s">"https://docs.python.org/3/"</span>, max_age=3600000)
 print(page.markdown)           <span class="c"># headings, GFM tables, fenced code with language</span>
@@ -224,12 +227,16 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
 <div class="plan hot"><h3>Growth</h3><div class="pr">$79<small> /mo</small></div><ul><li>150,000 pages</li><li>Everything in Starter</li></ul><div class="per">$0.53 per 1,000</div></div>
 <div class="plan"><h3>Scale</h3><div class="pr">$299<small> /mo</small></div><ul><li>750,000 pages</li><li>Priority support</li></ul><div class="per">$0.40 per 1,000</div></div>
 </div>
+<div class="cta" style="margin:22px 0 0"><a class="btn" href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper/issues/new?title=Hosted+API+waitlist&body=I+want+early+access+to+the+hosted+Apex+Flow+Web+Scraper+API.%0A%0AUse+case%3A+%0AExpected+pages+per+month%3A+" rel="noopener">Join the hosted-API waitlist</a><a class="btn ghost" href="#start">Or self-host free today</a></div>
 <div class="versus"><b>Self-hosted is free and unlimited.</b> For comparison, Firecrawl Standard is $83 for 100,000 credits, or $0.83 per 1,000 (public pricing as read 5 Nov 2026). Rendered pages count as 3 credits, extraction adds 2, and managed-proxy pages count as 8 because proxy bandwidth is a real cost. These are planned prices; accounts, billing and the hosted API are not live.</div></section>
 
 <section id="honest" class="rv"><p class="eyebrow">Straight talk</p><h2>What we do not claim.</h2>
-<div class="honest"><p>We do not solve CAPTCHAs or evade bot walls. zillow.com and glassdoor.com still block us, and robots.txt-disallowed pages stay unread. Our search covers the sites you index, not the whole web. Rendered pages take 4 to 5 seconds. Schema extraction is tested against a mock model, not yet measured live. There is no Node SDK yet. Every number on this page comes from <code>BENCHMARK-2026-11-05.md</code>.</p></div></section>
+<div class="honest"><p>We do not solve CAPTCHAs or evade bot walls. zillow.com and glassdoor.com still block us, and robots.txt-disallowed pages stay unread. Our search covers the sites you index, not the whole web. Rendered pages take 4 to 5 seconds. Schema extraction is tested against a mock model, not yet measured live. The Node SDK exists but is not published yet. Every number on this page comes from <code>BENCHMARK-2026-11-05.md</code>.</p></div></section>
+<section id="go" class="rv" style="text-align:center;padding-bottom:40px"><h2 style="margin-inline:auto">Try it on your own pages in two minutes.</h2>
+<p class="lede" style="margin:0 auto">One install line, no account, no key. If we are wrong about a page, the benchmark shows you how to prove it.</p>
+<div class="cta" style="justify-content:center"><a class="btn" href="#start">Install in one line</a><a class="btn ghost" href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper/issues/new?title=Hosted+API+waitlist&body=I+want+early+access+to+the+hosted+Apex+Flow+Web+Scraper+API.%0A%0AUse+case%3A+%0AExpected+pages+per+month%3A+" rel="noopener">Join the hosted-API waitlist</a></div></section>
 </main>
-<footer><div>Apex Flow Web Scraper · by Apex Flow Labs · Owned infrastructure, no hosted scraping calls.</div><div>Self-hosted v0.2.0</div></footer>
+<footer><div>Apex Flow Web Scraper · by Apex Flow Labs · Owned infrastructure, no hosted scraping calls.</div><div><a href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper" rel="noopener">GitHub</a> · MIT license · Self-hosted v0.2.0</div></footer>
 </div>
 <script>
 (function(){
