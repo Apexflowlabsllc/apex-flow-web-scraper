@@ -155,3 +155,11 @@ CLI: `rainbo-scrape fetch URL`, `map URL`, `scrape URL --wait` (first line is `j
 Schema extraction needs `DEEPSEEK_API_KEY` (first) or `OPENROUTER_API_KEY`; mocked in tests, not live-measured.
 Owned search: `rainbo-scrape index https://site/` crawls a site into a local SQLite FTS5 index; `rainbo-scrape search "query"` returns BM25-ranked, stemmed hits with highlighted snippets (measured: 73 pages indexed in 59 s, relevant top hit). It searches what you have indexed, not the whole web.
 Not built: whole-web search, Node SDK, public landing page.
+
+## Also in 0.2.0
+
+- `scrape(url, chunks=800)`: heading-aware Markdown chunks for RAG, code blocks never split.
+- Every result carries a `receipt`: requested and final URL, status, fetch time, user agent, content hash, robots.txt decision.
+- `rainbo-scrape llms-txt https://your-site.com --pages 30 [--full]`: writes llms.txt / llms-full.txt for a site you operate.
+- `rainbo-scrape crawl-web <seed>`: open-web crawl, up to 1,000 pages a job, robots.txt obeyed. Built, not yet run at scale.
+- `sdk/node`: Node client for a local workspace (private, unpublished).
