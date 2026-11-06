@@ -205,3 +205,16 @@ async def test_batch_keeps_completed_results_when_attempt_limit_is_hit(hosted):
     d=await r.json()
     assert r.status==200 and [x['status'] for x in d['results']]==[200,429]
     assert h.billing.remaining(account)==24999
+
+
+async def test_free_search_and_usage_share_api_rate_limit_without_charging(hosted):
+    h,c,s,_,nonce,_=hosted
+    await h.fulfill(s["id"])
+    key=h.key_for(s["id"],_hash(nonce)); account=h.billing.account_for(key)
+    headers={"Authorization":"Bearer "+key}
+    for _ in range(60):
+        response=await c.post('/v1/search',json={"query":"example"},headers=headers)
+        assert response.status==200
+    response=await c.get('/v1/usage',headers=headers)
+    assert response.status==429 and response.headers['Retry-After']=='60'
+    assert h.billing.remaining(account)==25000

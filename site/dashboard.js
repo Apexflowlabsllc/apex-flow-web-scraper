@@ -13,3 +13,25 @@ async function tool(form,path,body){const b=form.querySelector('button');b.disab
 $('map-form').onsubmit=e=>{e.preventDefault();tool(e.currentTarget,'/v1/map',{url:$('map-url').value,limit:1000});};
 $('search-form').onsubmit=e=>{e.preventDefault();tool(e.currentTarget,'/v1/search',{query:$('query').value});};
 $('batch-form').onsubmit=e=>{e.preventDefault();const urls=$('batch-urls').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(urls.length>10){$('message').textContent='Use up to 10 URLs per batch.';return;}tool(e.currentTarget,'/v1/batch',{urls,render:'never'});};
+
+// The HttpOnly checkout cookie proves browser ownership. Never put the API key
+// in a URL, browser storage, or a form field during the checkout handoff.
+async function connectCheckout() {
+  const session = new URLSearchParams(location.search).get('session_id');
+  if (!session) return;
+  history.replaceState(null, '', location.pathname);
+  $('message').textContent = 'Connecting your verified checkout…';
+  try {
+    if (!/^cs_(test|live)_[A-Za-z0-9]+$/.test(session)) throw new Error('Invalid checkout return link.');
+    const data = await call('/api/claim', {session_id:session});
+    if (!data.key) throw new Error('Checkout is still processing. Return to your checkout confirmation page and retry.');
+    apiKey = data.key;
+    await refresh();
+    $('login').hidden = true;
+    $('message').textContent = 'Dashboard connected. Try your first URL below.';
+  } catch (error) {
+    apiKey = '';
+    $('message').textContent = error.message;
+  }
+}
+connectCheckout();

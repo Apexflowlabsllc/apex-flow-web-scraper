@@ -23,6 +23,7 @@ def credits_for(body, rendered):
 def make_app(billing, scrape_fn=ascrape, hosted=None):
     active = defaultdict(int)
     recent = defaultdict(deque)
+    api_recent = defaultdict(deque)
     total_active = 0
     rendering_active = 0
     @web.middleware
@@ -36,6 +37,16 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
             return web.json_response({"error": "missing or invalid API key"}, status=401)
         if hosted and not hosted.entitled(account):
             return web.json_response({"error": "Subscription is inactive or its paid period has ended. Open billing from your dashboard."}, status=402)
+        # Search and usage are credit-free, but must not permit unbounded requests.
+        if hosted:
+            now = time.monotonic()
+            requests = api_recent[account]
+            while requests and requests[0] <= now - 60:
+                requests.popleft()
+            if len(requests) >= billing.limits(account)["rpm"]:
+                return web.json_response({"error": "API request limit reached. Please retry shortly."}, status=429,
+                                         headers={"Retry-After": "60", "Cache-Control": "no-store"})
+            requests.append(now)
         request["account"] = account
         try:
             response = await handler(request)
