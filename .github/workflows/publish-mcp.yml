@@ -1,0 +1,22 @@
+name: Publish scraper to MCP Registry
+on: workflow_dispatch
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Publish the remote server listing
+        run: |
+          set -eu
+          curl -fsSL https://github.com/modelcontextprotocol/registry/releases/download/v1.8.9/mcp-publisher_linux_amd64.tar.gz -o "$RUNNER_TEMP/publisher.tgz"
+          echo "4d527ca8f1ced0394c962dc925c2a4a4addef441cbefd62501c875e9481823a8  $RUNNER_TEMP/publisher.tgz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/publisher.tgz" -C "$RUNNER_TEMP" mcp-publisher
+          "$RUNNER_TEMP/mcp-publisher" login github-oidc
+          "$RUNNER_TEMP/mcp-publisher" publish

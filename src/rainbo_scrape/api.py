@@ -113,8 +113,10 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
         return web.json_response({"credits_used": actual, "credits_left": left, "result": dict(result)})
 
     async def batch(request):
+        return await batch_for(request["account"], await request.json())
+
+    async def batch_for(account, body):
         started = time.monotonic()
-        body = await request.json()
         if not isinstance(body, dict):
             raise ValueError("Expected a JSON object")
         urls = body.pop("urls", None)
@@ -124,7 +126,7 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
         for url in urls:
             try:
                 async with asyncio.timeout(max(0.1, 80-(time.monotonic()-started))):
-                    response=await perform(request["account"], {**body,"url":url})
+                    response=await perform(account, {**body,"url":url})
                 results.append({"url":url,"status":response.status,**json.loads(response.body)})
             except TimeoutError:
                 results.append({"url":url,"status":504,"error":"Batch deadline reached; this request was refunded."})
@@ -138,7 +140,7 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
             except Exception:
                 results.append({"url":url,"status":502,"error":"Source request failed; reserved credits were returned."})
         return web.json_response({"results":results,"processed":len(results),"unprocessed":urls[len(results):],
-                                  "credits_left":billing.remaining(request["account"])})
+                                  "credits_left":billing.remaining(account)})
 
     async def usage(request):
         return web.json_response({"credits_left": billing.remaining(request["account"])})
@@ -148,7 +150,10 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
     app.router.add_get("/v1/usage", usage)
     app.router.add_post("/v1/batch", batch)
     if hosted:
-        hosted.install(app)
+        from .mcp_http import install
+        operations = hosted.install(app)
+        operations.update({"/scrape": perform, "/batch": batch_for})
+        install(app, billing, operations, hosted.site)
     return app
 
 

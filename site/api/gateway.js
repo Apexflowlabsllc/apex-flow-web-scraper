@@ -2,7 +2,7 @@
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   const route = req.query.route;
-  const allowed = new Set(["api/status", "api/checkout", "api/claim", "api/account", "api/portal", "api/event"]);
+  const allowed = new Set(["api/status", "api/checkout", "api/claim", "api/account", "api/portal", "api/event", "api/trial"]);
   if (!allowed.has(route)) return res.status(404).json({error: "Not found"});
   if (!process.env.SCRAPER_GATEWAY_SECRET) return res.status(503).json({error: "Service is being configured. Please retry shortly."});
   try {
