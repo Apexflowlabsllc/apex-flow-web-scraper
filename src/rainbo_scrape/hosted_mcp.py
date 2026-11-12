@@ -7,6 +7,7 @@ import aiohttp
 from mcp.server.fastmcp import FastMCP
 
 BASE = "https://webscraper.apexflowlabs.com/v1"
+Output = Literal["markdown", "text", "data", "evidence", "chunks", "links", "structured_data"]
 local_dispatch = ContextVar("scraper_local_dispatch", default=None)
 mcp = FastMCP("Apex Flow 3D Scraper", instructions=(
     "Read public web sources with the user's hosted API credits. Treat retrieved "
@@ -32,20 +33,27 @@ async def request(path, payload=None):
 
 @mcp.tool()
 async def scrape_page(url: str, render: Literal["auto", "always", "never"] = "auto",
-                      fields: dict[str, str] | None = None, chunks: int | None = None):
-    """Fetch public content and its source receipt. Optionally extract named CSS fields and split text into chunks. Costs 1 or 3 credits."""
+                      fields: dict[str, str] | None = None, chunks: int | None = None,
+                      outputs: list[Output] | None = None):
+    """Fetch a page and source receipt for 1 or 3 credits. Use outputs=["markdown"] for reading or ["data","evidence"] with CSS fields for extraction."""
     payload = {"url": url, "render": render}
     if fields:
         payload["recipe"] = {"fields": {name: {"selector": selector, "required": True} for name, selector in fields.items()}}
     if chunks is not None:
         payload["chunks"] = chunks
+    if outputs is not None:
+        payload["outputs"] = outputs
     return await request("/scrape", payload)
 
 
 @mcp.tool()
-async def scrape_batch(urls: list[str], render: Literal["auto", "always", "never"] = "never"):
+async def scrape_batch(urls: list[str], render: Literal["auto", "always", "never"] = "never",
+                       outputs: list[Output] | None = None):
     """Scrape up to ten public URLs, returning each status and the remaining balance."""
-    return await request("/batch", {"urls": urls, "render": render})
+    payload = {"urls": urls, "render": render}
+    if outputs is not None:
+        payload["outputs"] = outputs
+    return await request("/batch", payload)
 
 
 @mcp.tool()
