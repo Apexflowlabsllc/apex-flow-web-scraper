@@ -37,7 +37,7 @@ def install(app, billing, operations, site):
             return reply(code=-32602, error="Expected an object for params")
         if method == "initialize":
             return reply({"protocolVersion": VERSION, "capabilities": {"tools": {}},
-                          "serverInfo": {"name": "Apex Flow 3D Scraper", "version": "0.3.1"},
+                          "serverInfo": {"name": "Apex Flow 3D Scraper", "version": "0.4.0"},
                           "instructions": mcp.instructions})
         if method == "ping":
             return reply({})
@@ -49,12 +49,12 @@ def install(app, billing, operations, site):
             return reply(code=-32602, error="Expected a tool name and arguments object")
 
         async def dispatch(path, payload):
-            if path == "/usage":
-                return {"credits_left": billing.remaining(request["account"])}
             response = await operations[path](request["account"], payload)
             result = json.loads(response.body)
             if response.status >= 400:
-                raise ValueError(result.get("error") or "Scraper request failed")
+                # Agents get the same stable code and next step that REST clients do.
+                detail = {k: result[k] for k in ("code", "retryable", "retry_after", "credits_left", "buy_url") if k in result}
+                raise ValueError((result.get("error") or "Scraper request failed") + (" " + json.dumps(detail) if detail else ""))
             return result
 
         token = local_dispatch.set(dispatch)

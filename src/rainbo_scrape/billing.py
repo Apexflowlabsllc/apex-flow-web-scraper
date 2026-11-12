@@ -11,11 +11,11 @@ from pathlib import Path
 
 # Price in USD per month, included credits. One credit = one plain (non-rendered) page.
 PLANS = {
-    "free": {"price": 0, "credits": 1000, "rpm": 30, "concurrency": 2},
-    "pass": {"price": 5, "credits": 5000, "rpm": 60, "concurrency": 6},
-    "starter": {"price": 15, "credits": 25000, "rpm": 60, "concurrency": 6},
-    "growth": {"price": 79, "credits": 150000, "rpm": 60, "concurrency": 6},
-    "scale": {"price": 299, "credits": 750000, "rpm": 60, "concurrency": 6},
+    "free": {"price": 0, "credits": 1000, "rpm": 30, "concurrency": 2, "saved_pages": 100},
+    "pass": {"price": 5, "credits": 5000, "rpm": 60, "concurrency": 6, "saved_pages": 1000},
+    "starter": {"price": 15, "credits": 25000, "rpm": 60, "concurrency": 6, "saved_pages": 1000},
+    "growth": {"price": 79, "credits": 150000, "rpm": 60, "concurrency": 6, "saved_pages": 1000},
+    "scale": {"price": 299, "credits": 750000, "rpm": 60, "concurrency": 6, "saved_pages": 1000},
 }
 # Credits per request kind. Rendered pages cost our browser time; proxied pages cost real bandwidth.
 COSTS = {"page": 1, "render": 3, "proxy_page": 8, "proxy_render": 10, "extract": 2, "search": 1}
@@ -52,6 +52,7 @@ class Billing:
             CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY, email TEXT, plan TEXT, period_start REAL, used INTEGER);
             CREATE TABLE IF NOT EXISTS keys (hash TEXT PRIMARY KEY, account TEXT, label TEXT, revoked INTEGER DEFAULT 0);
             CREATE TABLE IF NOT EXISTS usage (ts REAL, account TEXT, kind TEXT, credits INTEGER);
+            CREATE INDEX IF NOT EXISTS usage_account_ts ON usage(account, ts);
         """)
 
     def create_account(self, email, plan="free"):

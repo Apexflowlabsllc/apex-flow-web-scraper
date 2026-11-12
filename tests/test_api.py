@@ -74,7 +74,7 @@ async def test_selected_outputs_preserve_receipt_metering_and_full_index(tmp_pat
         return full
     saved = []
     hosted = SimpleNamespace(entitled=lambda account: True, install=lambda app: {},
-                             site="https://example.com", save_page=lambda account, result: saved.append(result))
+                             site="https://example.com", save_page=lambda account, result, diff=False: saved.append(result))
     billing = Billing(tmp_path / "select.db")
     hosted.billing = billing
     hosted.db = billing.db

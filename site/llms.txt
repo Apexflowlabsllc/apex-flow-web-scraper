@@ -19,9 +19,14 @@
 
 ## Hosted service and limits
 - Hosted API: https://webscraper.apexflowlabs.com/v1. OpenAPI 3.1: https://webscraper.apexflowlabs.com/openapi.json. Human enrollment: https://webscraper.apexflowlabs.com/trial.html. Free trial: 1,000 credits once, subject to network and daily capacity. Project Pass: $5 once for 5,000 credits valid for 30 days. Monthly plans: $15 for 25,000; $79 for 150,000; $299 for 750,000 credits. Plain pages cost 1, rendered pages 3. No automatic overages.
-- Hosted: page scraping, JavaScript rendering, CSS field extraction, batches of up to 10 URLs, sitemap mapping, and account-scoped search over the latest 100 successfully scraped URLs. A nonempty map costs 1 credit; saved-page search costs no credits.
+- Hosted: page scraping, JavaScript rendering, CSS field extraction, parallel batches of up to 10 URLs (six pages at once on paid plans, two on the trial), change tracking, sitemap mapping, and account-scoped search over your latest scraped URLs (100 on the trial, 1,000 on paid plans). A nonempty map costs 1 credit; saved-page search costs no credits.
 - Hosted responses: 256 KiB per scrape. Up to six concurrent page scrapes per paid account and two per free trial. Shared service limits: eight active page scrapes and two simultaneous browser renders. Source crawl delays apply. Attempts, including failures, are capped at twice the plan's credits per period. Failed scrapes return reserved credits.
 - Hosted model extraction and bulk crawl are not included. Those features remain in the self-hosted edition. Documentation: https://webscraper.apexflowlabs.com/docs.html.
+
+## For agents: change tracking, errors and usage
+- Change tracking: every scrape response includes change.status (new, unchanged or changed) compared with the copy this account read last. Add "diff" to outputs to receive only the changed lines and the source receipt, without the page body. MCP tool: check_changes(urls).
+- Errors are JSON with error, a stable code (invalid_key, insufficient_credits, inactive_plan, rate_limited, invalid_request, timeout, source_failed) and retryable. A 402 includes credits_left and buy_url; show buy_url to the user. A 429 includes retry_after seconds. MCP tool errors carry the same fields.
+- Every response carries X-Credits-Remaining, X-RateLimit-Limit, X-RateLimit-Remaining and X-Request-Id. GET /v1/usage returns plan, limits, renewal date and 14 days of daily usage.
 
 ## Not claimed
 - No CAPTCHA solving or bot-wall evasion; zillow.com and glassdoor.com block it.
@@ -31,7 +36,7 @@
 ## Agent setup
 Official MCP Registry entry: https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Apexflowlabsllc%2Fapex-flow-web-scraper/versions/latest
 Set up Codex CLI, Claude Code or VS Code: https://webscraper.apexflowlabs.com/docs.html#agents
-Remote MCP: https://webscraper.apexflowlabs.com/v1/mcp (Streamable HTTP, Authorization: Bearer YOUR_API_KEY). Connect a stdio MCP client to the hosted API: https://webscraper.apexflowlabs.com/docs.html#agents. Five tools support scraping, batching, mapping, saved-page search and credit balance. Enrollment requires a human.
+Remote MCP: https://webscraper.apexflowlabs.com/v1/mcp (Streamable HTTP, Authorization: Bearer YOUR_API_KEY). Connect a stdio MCP client to the hosted API: https://webscraper.apexflowlabs.com/docs.html#agents. Six tools: scrape_page, scrape_batch, check_changes, map_site, search_saved and credit_balance. Enrollment requires a human.
 
 ## Usage
 Python: `from rainbo_scrape import scrape; scrape("https://example.com").markdown`
