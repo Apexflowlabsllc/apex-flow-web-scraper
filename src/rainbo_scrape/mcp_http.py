@@ -37,7 +37,7 @@ def install(app, billing, operations, site):
             return reply(code=-32602, error="Expected an object for params")
         if method == "initialize":
             return reply({"protocolVersion": VERSION, "capabilities": {"tools": {}},
-                          "serverInfo": {"name": "Apex Flow 3D Scraper", "version": "0.4.1"},
+                          "serverInfo": {"name": "Apex Flow 3D Scraper", "version": "0.5.0"},
                           "instructions": mcp.instructions})
         if method == "ping":
             return reply({})
@@ -53,7 +53,7 @@ def install(app, billing, operations, site):
             result = json.loads(response.body)
             if response.status >= 400:
                 # Agents get the same stable code and next step that REST clients do.
-                detail = {k: result[k] for k in ("code", "retryable", "retry_after", "credits_left", "buy_url") if k in result}
+                detail = {k: result[k] for k in ("code", "retryable", "retry_after", "credits_left", "buy_url", "hint") if k in result}
                 raise ValueError((result.get("error") or "Scraper request failed") + (" " + json.dumps(detail) if detail else ""))
             return result
 

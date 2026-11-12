@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Apex Flow 3D Scraper",
-    "version": "0.4.1",
+    "version": "0.5.0",
     "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Paid accounts allow six simultaneous page scrapes and free trials allow two, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
   },
   "externalDocs": {
@@ -73,19 +73,7 @@
           },
           "code": {
             "type": "string",
-            "enum": [
-              "invalid_request",
-              "invalid_key",
-              "insufficient_credits",
-              "inactive_plan",
-              "rate_limited",
-              "not_available_hosted",
-              "request_too_large",
-              "unsupported_media_type",
-              "source_failed",
-              "timeout",
-              "error"
-            ]
+            "description": "Stable machine code, e.g. invalid_request, invalid_key, insufficient_credits, inactive_plan, rate_limited, access_challenge, http_error, robots_denied, fetch_failed, timeout."
           },
           "retryable": {
             "type": "boolean"
@@ -100,6 +88,10 @@
             "type": "string",
             "format": "uri",
             "description": "Where the account owner can add credits."
+          },
+          "hint": {
+            "type": "string",
+            "description": "A next step, such as retrying with the archive fallback."
           }
         }
       }
@@ -141,6 +133,32 @@
                         "data": {},
                         "rendered": {
                           "type": "boolean"
+                        },
+                        "archive": {
+                          "type": "object",
+                          "description": "Present only when an archived copy was returned instead of the live page.",
+                          "properties": {
+                            "provider": {
+                              "type": "string"
+                            },
+                            "live_page_served": {
+                              "type": "boolean"
+                            },
+                            "reason": {
+                              "type": "string"
+                            },
+                            "captured": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "snapshot_url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "note": {
+                              "type": "string"
+                            }
+                          }
                         }
                       }
                     },
@@ -175,6 +193,10 @@
                           "type": "string"
                         }
                       }
+                    },
+                    "estimated_tokens": {
+                      "type": "integer",
+                      "description": "Estimated tokens in the returned Markdown or text."
                     }
                   }
                 }
@@ -296,6 +318,19 @@
                     "maximum": 60,
                     "default": 1,
                     "description": "Part of a long document to return. Responses that exceed 256 KiB are split into consecutive parts."
+                  },
+                  "max_tokens": {
+                    "type": "integer",
+                    "minimum": 200,
+                    "maximum": 60000,
+                    "description": "Return the page in consecutive parts that each fit this token budget (four characters per token)."
+                  },
+                  "fallback": {
+                    "type": "string",
+                    "enum": [
+                      "archive"
+                    ],
+                    "description": "When the live site refuses or fails, return the latest Internet Archive copy, labelled in result.archive."
                   }
                 },
                 "required": [
