@@ -45,6 +45,12 @@ async def sitemap_urls(url, limit):
     return [u.get("url") if isinstance(u, dict) else u for u in found.get("urls", [])]
 
 
+def _site(url):
+    """example.com and www.example.com are one site; a start URL often redirects between them."""
+    host = urlsplit(url).netloc.lower()
+    return host[4:] if host.startswith("www.") else host
+
+
 def _plan(h, account):
     return h.db.execute("SELECT plan FROM accounts WHERE id=?", (account,)).fetchone()[0]
 
@@ -60,7 +66,7 @@ def install(h, app, perform, map_urls=None):
     tasks = {}
 
     async def run(job, account, start, limit, options, include, max_depth):
-        host = urlsplit(start).netloc
+        host = _site(start)
         queue, seen, seq, active = [(start, 0)], {start}, 0, 0
         scrape_options = {k: options[k] for k in ("render", "fallback", "recipe") if k in options}
         wanted = options.get("outputs") or ["markdown"]
@@ -69,7 +75,7 @@ def install(h, app, perform, map_urls=None):
         def offer(url, depth):
             url = urldefrag(url)[0]
             parts = urlsplit(url)
-            if (parts.scheme in ("http", "https") and parts.netloc == host and url not in seen and depth <= max_depth
+            if (parts.scheme in ("http", "https") and _site(url) == host and url not in seen and depth <= max_depth
                     and not parts.path.lower().endswith(SKIP) and (not include or include in url) and len(seen) < limit * 4):
                 seen.add(url)
                 queue.append((url, depth))

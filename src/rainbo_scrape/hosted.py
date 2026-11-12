@@ -188,7 +188,7 @@ class Hosted:
 
         async def health(request):
             self.db.execute("SELECT 1").fetchone()
-            return web.json_response({"ok": True, "checkout": bool(self.stripe_key and self.webhook_secret), "version": "0.6.1"})
+            return web.json_response({"ok": True, "checkout": bool(self.stripe_key and self.webhook_secret), "version": "0.6.2"})
 
         async def checkout(request):
             ip = self.limit(request, "checkout", 12)

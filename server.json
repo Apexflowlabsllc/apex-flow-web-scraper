@@ -3,7 +3,7 @@
   "name": "io.github.Apexflowlabsllc/apex-flow-web-scraper",
   "title": "Apex Flow 3D Scraper",
   "description": "Scrape, crawl and monitor public pages as Markdown with change tracking and source receipts.",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "websiteUrl": "https://webscraper.apexflowlabs.com",
   "repository": {
     "url": "https://github.com/Apexflowlabsllc/apex-flow-web-scraper",

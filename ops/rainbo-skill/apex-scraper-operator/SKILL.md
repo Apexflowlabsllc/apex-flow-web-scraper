@@ -9,15 +9,21 @@ category: apex-sop
 
 One job: money in, service up, nothing lost. Measure before you speak ([[vendor-truth]]). Server access rules are in [[rainbo-box-ops]].
 
+## 0. Live numbers (the server rewrites this block every hour; answer from it, and say when it was measured)
+<!-- live:start -->
+- Not measured yet.
+<!-- live:end -->
+When Brian or anyone asks how the scraper store is doing, answer from the block above in three lines: money, trials, health. Do not search for another tool and do not estimate.
+
 ## 1. What it is
 - A paid API that turns public web pages into clean Markdown for developers and AI agents. Site: https://webscraper.apexflowlabs.com. Code: github.com/Apexflowlabsllc/apex-flow-web-scraper (public, MIT).
 - Prices: 1,000 free trial credits once; $5 one-time pass (5,000 credits, 30 days); $15 / $79 / $299 a month for 25,000 / 150,000 / 750,000 credits. Plain page 1 credit, rendered page 3, AI extraction 25 (paid plans only). Failed pages are free. No overages.
 - It runs on this server as systemd service `apex-webscraper` (port 8850, behind Caddy at webscraper-api.159.223.109.53.nip.io). The website is the Vercel project `apex-flow-web-scraper`. Payments are Stripe, shared with other Apex businesses: never touch Stripe objects that are not tagged product=apex-flow-web-scraper.
 
 ## 2. Every day (already automated; you read and act)
-- A root timer runs `/opt/apex-webscraper/ops/apex_scraper_ops.py daily` at 03:40 UTC. It backs up the customer database (14 days kept in /opt/apex-webscraper/backups) and writes `~/rainbo-reports/apex-scraper/latest.md` and `latest.json`.
-- Read `latest.json` each morning. Report to Brian in three lines: paid orders and monthly recurring revenue, trials in the last 7 days, anything broken. A started checkout is not a sale. Only `paid_orders_total` and `paid_accounts_active` are money.
-- For live numbers at any time: `sudo python3 /opt/apex-webscraper/ops/apex_scraper_ops.py report` (read-only).
+- Root timers do the work: every hour the numbers in section 0 are refreshed; at 03:40 UTC the customer database is backed up (14 days kept in /opt/apex-webscraper/backups).
+- Each morning report section 0 to Brian in three lines: paid orders and monthly recurring revenue, trials in the last 7 days, anything broken. A started checkout is not a sale. Only paid orders are money.
+- You do not need a shell for the numbers. A person or coding agent with server access can run `sudo python3 /opt/apex-webscraper/ops/apex_scraper_ops.py report` for a live read.
 - A `new_paid_order` alert means a customer paid. Tell Brian the same hour.
 
 ## 3. Health (already automated)
@@ -29,6 +35,7 @@ One job: money in, service up, nothing lost. Measure before you speak ([[vendor-
 - Check by hand: `curl -s https://webscraper.apexflowlabs.com/api/status` must return `"ok": true`.
 
 ## 4. Releasing a change (the only way)
+Sections 4 and 5 need server shell access. If your registered tools cannot do a step, do not improvise: write the change request as one card for Brian's coding agent (Claude Code or Codex) and name this skill.
 1. Change code in the GitHub repo on a branch. Run the tests: every Python and Node test must pass. Open a pull request and merge it.
 2. API: upload `git archive HEAD src pyproject.toml` to `/opt/apex-webscraper/releases/<name>.tar`, unpack to `/opt/apex-webscraper/releases/<name>/`.
 3. Test on a COPY of the database first (see the stage check used in earlier releases). Never test against the live database.
