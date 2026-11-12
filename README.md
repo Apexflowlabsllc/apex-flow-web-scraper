@@ -11,7 +11,7 @@ Software is MIT licensed; compute, bandwidth, storage and maintenance are not fr
 
 [Start a free browser trial](https://webscraper.apexflowlabs.com/trial.html) for 1,000 credits. A Project Pass is $5 once for 5,000 credits valid for 30 days. Starter is $15/month for 25,000 credits. A successful plain page costs one credit and a rendered page costs three.
 
-Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. The five tools support page extraction, batches, sitemap mapping, account-scoped search and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
+Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. The six tools support page extraction, parallel batches, change checks, sitemap mapping, account-scoped search and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
 
 [Agent setup](https://webscraper.apexflowlabs.com/docs.html#agents) · [OpenAPI 3.1](https://webscraper.apexflowlabs.com/openapi.json) · [Benchmark and pricing comparison](https://webscraper.apexflowlabs.com/compare.html)
 
