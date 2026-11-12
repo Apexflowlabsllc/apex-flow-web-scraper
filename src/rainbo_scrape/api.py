@@ -192,10 +192,20 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
             if "chunks" in outputs and "chunks" not in body:
                 body["chunks"] = 1500
         if hosted and body.get("extract"):
+            import os
             from .llm import providers
             if not providers():
                 return fail(400, "Model extraction is available in the self-hosted edition. Hosted scraping returns Markdown, text and chunks.",
                             code="not_available_hosted")
+            # Model calls cost real money: paid plans only, priced above cost, with a daily service-wide ceiling.
+            if billing.limits(account)["price"] == 0:
+                return fail(402, "AI extraction is included on paid plans. CSS field extraction (recipe) is free on every plan.",
+                            code="paid_plan_required", **buy)
+            day = time.strftime("%Y-%m-%d", time.gmtime())
+            used = hosted.db.execute("SELECT COALESCE(SUM(count),0) FROM funnel WHERE day=? AND event='extract'", (day,)).fetchone()[0]
+            if used >= int(os.environ.get("APEX_EXTRACT_DAILY_CAP", "3000")):
+                return fail(429, "AI extraction has reached today's service limit. Retry tomorrow or use a CSS recipe.",
+                            code="extract_daily_limit", retry_after=3600, headers={"Retry-After": "3600"})
         now = time.monotonic()
         q = recent[account]
         while q and q[0] < now - 60:
@@ -255,6 +265,9 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
             total_active -= 1
             rendering_active -= int(may_render)
             logging.info("scrape account=%s duration_ms=%d", account, (time.monotonic()-started)*1000)
+        if hosted and body.get("extract"):
+            from .hosted_features import event
+            event(hosted, "extract", "")
         reply = {"credits_used": actual, "credits_left": billing.remaining(account), "result": response_result}
         longest = max((len(response_result[f]) for f in ("markdown", "text") if isinstance(response_result.get(f), str)), default=0)
         if longest:

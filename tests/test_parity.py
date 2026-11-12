@@ -149,7 +149,15 @@ async def test_web_search_and_model_extraction_stay_off_without_operator_keys(tm
         monkeypatch.setenv("DEEPSEEK_API_KEY", "fixture")
         r = await client.post("/v1/scrape", json={"url": "https://example.com", "render": "never", "extract": spec, "outputs": ["markdown"]}, headers=auth)
         body = await r.json()
-        assert r.status == 200 and body["credits_used"] == 3 and body["result"]["extracted"] == {"name": "Hi"} and calls[0]["extract"] == spec
+        assert r.status == 200 and body["credits_used"] == 26 and body["result"]["extracted"] == {"name": "Hi"} and calls[0]["extract"] == spec
+        # Trials never trigger a paid model call, and the service-wide daily ceiling holds.
+        _, trial = account(h, "free", "trial_" + "f" * 32)
+        r = await client.post("/v1/scrape", json={"url": "https://example.com", "render": "never", "extract": spec}, headers=trial)
+        body = await r.json()
+        assert r.status == 402 and body["code"] == "paid_plan_required" and body["buy_url"] and len(calls) == 1
+        monkeypatch.setenv("APEX_EXTRACT_DAILY_CAP", "1")
+        r = await client.post("/v1/scrape", json={"url": "https://example.com", "render": "never", "extract": spec}, headers=auth)
+        assert r.status == 429 and (await r.json())["code"] == "extract_daily_limit" and len(calls) == 1 and billing.remaining(acct) == 25000 - 26
     billing.db.close()
 
 
