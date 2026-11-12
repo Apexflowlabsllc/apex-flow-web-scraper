@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Apex Flow 3D Scraper",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Paid accounts allow six simultaneous page scrapes and free trials allow two, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
   },
   "externalDocs": {
@@ -154,6 +154,27 @@
                     },
                     "change": {
                       "$ref": "#/components/schemas/Change"
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "description": "Present when the document was returned in parts.",
+                      "properties": {
+                        "page": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        },
+                        "next_page": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "note": {
+                          "type": "string"
+                        }
+                      }
                     }
                   }
                 }
@@ -268,6 +289,13 @@
                       ]
                     },
                     "description": "Return selected content with available source receipt and validation warnings. Selecting chunks defaults to a 1,500-character target. Select diff to receive change.diff, the lines that changed since this account last read the URL."
+                  },
+                  "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60,
+                    "default": 1,
+                    "description": "Part of a long document to return. Responses that exceed 256 KiB are split into consecutive parts."
                   }
                 },
                 "required": [

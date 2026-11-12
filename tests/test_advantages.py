@@ -165,3 +165,33 @@ async def test_mcp_check_changes_returns_only_what_moved(svc):
     balance = json.loads((await (await client.post("/v1/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/call",
         "params": {"name": "credit_balance", "arguments": {}}}, headers=auth)).json())["result"]["content"][0]["text"])
     assert balance["plan"] == "starter" and balance["limits"]["concurrent_scrapes"] == 6
+
+
+async def test_long_documents_arrive_in_parts_that_rebuild_the_original(svc):
+    h, client, state = svc
+    state["delay"] = 0
+    acct, auth = account(h, "starter", "cs_test_paid7")
+    url = "https://example.com/spec"
+    document = "\n".join(f"## Section {i}\n" + "word " * 120 for i in range(1200))     # about 750 KB
+    state["pages"][url] = document
+    ask = lambda page: client.post("/v1/scrape", json={"url": url, "render": "never", "outputs": ["markdown"], "page": page}, headers=auth)
+    first = await (await ask(1)).json()
+    info = first["pagination"]
+    assert info["page"] == 1 and info["pages"] >= 3 and info["next_page"] == 2
+    parts = [first["result"]["markdown"]]
+    for page in range(2, info["pages"] + 1):
+        r = await ask(page)
+        body = await r.json()
+        assert r.status == 200 and len(await r.read()) <= 262144 and body["result"]["receipt"]
+        parts.append(body["result"]["markdown"])
+    assert body["pagination"]["next_page"] is None
+    assert "".join(parts) == document                       # nothing lost, nothing repeated
+    assert all(p.startswith("## Section") for p in parts)   # cut on line breaks
+    assert first["credits_used"] == 1 and h.billing.remaining(acct) == 25000 - info["pages"]
+    r = await ask(info["pages"] + 1)
+    assert r.status == 400 and "out of range" in (await r.json())["error"]
+    # A small page is untouched and rejects a page number it does not have.
+    small = await client.post("/v1/scrape", json={"url": "https://example.com/small", "render": "never"}, headers=auth)
+    assert "pagination" not in await small.json()
+    r = await client.post("/v1/scrape", json={"url": "https://example.com/small", "render": "never", "page": 2}, headers=auth)
+    assert r.status == 400

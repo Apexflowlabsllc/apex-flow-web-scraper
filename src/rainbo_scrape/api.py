@@ -11,7 +11,8 @@ from .billing import Billing, QuotaExceeded, cost_of
 from .client import ascrape
 from .policy import ScrapeError
 
-ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "recipe", "outputs"}
+ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "recipe", "outputs", "page"}
+LIMIT = 262144  # hosted response budget in bytes
 OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff"}
 SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors"}
 RETRYABLE = {408, 429, 500, 502, 503, 504}
@@ -23,6 +24,49 @@ def fail(status, message, code=None, headers=None, **extra):
     """One error shape for REST and MCP: a stable code, whether a retry can help, and what to do next."""
     body = {"error": message, "code": code or CODES.get(status, "error"), "retryable": status in RETRYABLE, **extra}
     return web.json_response(body, status=status, headers=headers)
+
+
+def _size(value):
+    return len(json.dumps(value).encode())
+
+
+def _part(result, page, pages):
+    """One of `pages` consecutive parts: long text is cut on line breaks and long lists are sliced."""
+    out = {}
+    for field, value in result.items():
+        if field in ("markdown", "text") and isinstance(value, str) and len(value) > 4000:
+            # Cut on line breaks; a single very long line is cut every 20,000 characters.
+            pieces = [line[i:i + 20000] for line in value.splitlines(keepends=True) for i in range(0, len(line), 20000)]
+            target, parts, current, used = len(value) / pages, [], [], 0
+            for piece in pieces:
+                if used >= target and len(parts) < pages - 1:
+                    parts.append("".join(current))
+                    current, used = [], 0
+                current.append(piece)
+                used += len(piece)
+            parts.append("".join(current))
+            out[field] = parts[page - 1] if page <= len(parts) else ""
+        elif isinstance(value, list) and _size(value) > 8000:
+            step = -(-len(value) // pages)
+            out[field] = value[(page - 1) * step:page * step]
+        else:
+            out[field] = value
+    return out
+
+
+def paginate(result, page, limit=LIMIT):
+    """Large documents are returned in parts that each fit the response budget, instead of failing."""
+    if _size(result) <= limit:
+        if page != 1:
+            raise ValueError("page is out of range; this result has 1 page")
+        return result, None
+    for pages in range(2, 61):
+        if all(_size(_part(result, n, pages)) <= limit - 400 for n in range(1, pages + 1)):
+            if page > pages:
+                raise ValueError(f"page is out of range; this result has {pages} pages")
+            return _part(result, page, pages), {"page": page, "pages": pages, "next_page": page + 1 if page < pages else None,
+                                                "note": "Large document returned in parts. Request the next page with the same options; send max_age to reuse the fetch."}
+    raise ValueError("Result exceeds the 256 KiB hosted response limit. Use a smaller source or the self-hosted edition.")
 
 
 def credits_for(body, rendered):
@@ -91,6 +135,9 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
         nonlocal total_active, rendering_active
         if not isinstance(body, dict) or not isinstance(body.get("url"), str) or set(body) - ALLOWED:
             raise ValueError("body must be a JSON object with a url and only these options: " + ", ".join(sorted(ALLOWED)))
+        page = body.pop("page", 1)
+        if isinstance(page, bool) or not isinstance(page, int) or not 1 <= page <= 60:
+            raise ValueError("page must be a whole number from 1 to 60")
         outputs = body.pop("outputs", None)
         if outputs is not None:
             if not isinstance(outputs, list) or not 1 <= len(outputs) <= len(OUTPUTS) or any(
@@ -133,8 +180,9 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
             response_result = dict(result) if outputs is None else {
                 field: value for field, value in result.items() if field in outputs or field in SOURCE_FIELDS
             }
-            if hosted and len(json.dumps(response_result).encode()) > 262144:
-                raise ValueError("Result exceeds the 256 KiB hosted response limit. Use a smaller source or the self-hosted edition.")
+            pagination = None
+            if hosted:
+                response_result, pagination = paginate(response_result, page)
             actual = credits_for(body, rendered=bool(result.get("rendered")))
             billing.refund(account, worst - actual)
         except BaseException:
@@ -151,6 +199,8 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
             change = hosted.save_page(account, result, diff=bool(outputs and "diff" in outputs))
             if change:
                 reply["change"] = change
+            if pagination:
+                reply["pagination"] = pagination
         return web.json_response(reply)
 
     async def batch(request):
