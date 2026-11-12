@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.apexflowlabsllc/apex-flow-web-scraper",
+  "name": "io.github.Apexflowlabsllc/apex-flow-web-scraper",
   "title": "Apex Flow 3D Scraper",
   "description": "Extract public pages into Markdown, CSS fields and RAG chunks with source receipts.",
   "version": "0.3.1",
