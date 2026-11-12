@@ -45,8 +45,8 @@ async def request(path, payload=None):
 @mcp.tool()
 async def scrape_page(url: str, render: Literal["auto", "always", "never"] = "auto",
                       fields: dict[str, str] | None = None, chunks: int | None = None,
-                      outputs: list[Output] | None = None):
-    """Fetch a page and source receipt for 1 or 3 credits. Use outputs=["markdown"] for reading or ["data","evidence"] with CSS fields for extraction. The reply's change.status says new, unchanged or changed since your last read; add "diff" to outputs to get the changed lines."""
+                      outputs: list[Output] | None = None, page: int = 1):
+    """Fetch a page and source receipt for 1 or 3 credits. Use outputs=["markdown"] for reading or ["data","evidence"] with CSS fields for extraction. The reply's change.status says new, unchanged or changed since your last read; add "diff" to outputs to get the changed lines. Long documents come back in parts: when the reply has pagination.next_page, call again with page set to it."""
     payload = {"url": url, "render": render}
     if fields:
         payload["recipe"] = {"fields": {name: {"selector": selector, "required": True} for name, selector in fields.items()}}
@@ -54,6 +54,8 @@ async def scrape_page(url: str, render: Literal["auto", "always", "never"] = "au
         payload["chunks"] = chunks
     if outputs is not None:
         payload["outputs"] = outputs
+    if page != 1:
+        payload["page"] = page
     return await request("/scrape", payload)
 
 

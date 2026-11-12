@@ -89,12 +89,13 @@ async def test_selected_outputs_preserve_receipt_metering_and_full_index(tmp_pat
             assert resp.status == 400
         assert calls == []
         resp = await client.post("/v1/scrape", json=request, headers=headers)
-        assert resp.status == 400 and billing.remaining(account) == 1000
+        body = await resp.json()   # a document over the response budget now arrives in parts instead of failing
+        assert resp.status == 200 and body["pagination"]["pages"] == 2 and billing.remaining(account) == 999
         resp = await client.post("/v1/scrape", json={**request, "outputs": ["markdown"]}, headers=headers)
         body = await resp.json()
-        assert resp.status == 200 and body["credits_left"] == 999
+        assert resp.status == 200 and body["credits_left"] == 998 and "pagination" not in body
         assert body["result"] == {k: full[k] for k in ("url", "markdown", "receipt", "validation_errors")}
-        assert saved == [full]
+        assert saved == [full, full]
         resp = await client.post("/v1/batch", json={"urls": [request["url"]], "outputs": ["chunks"]}, headers=headers)
         batch = await resp.json()
         assert batch["results"][0]["result"]["chunks"] == full["chunks"]
