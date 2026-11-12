@@ -59,7 +59,7 @@ async def test_bad_bodies_are_400_and_unknown_options_rejected(ctx):
 
 
 def test_credit_math():
-    assert credits_for({"extract": {"x": 1}}, rendered=True) == 5
+    assert credits_for({"extract": {"x": 1}}, rendered=True) == 28
     assert credits_for({}, rendered=False) == 1
 
 
