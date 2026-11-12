@@ -29,6 +29,8 @@
 - We do not claim universal competitor superiority, the lowest price for every workload, or guaranteed availability on every source.
 
 ## Agent setup
+Official MCP Registry entry: https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Apexflowlabsllc%2Fapex-flow-web-scraper/versions/latest
+Set up Codex CLI, Claude Code or VS Code: https://webscraper.apexflowlabs.com/docs.html#agents
 Remote MCP: https://webscraper.apexflowlabs.com/v1/mcp (Streamable HTTP, Authorization: Bearer YOUR_API_KEY). Connect a stdio MCP client to the hosted API: https://webscraper.apexflowlabs.com/docs.html#agents. Five tools support scraping, batching, mapping, saved-page search and credit balance. Enrollment requires a human.
 
 ## Usage
