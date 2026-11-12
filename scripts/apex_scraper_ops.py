@@ -5,6 +5,8 @@
           down, and raise a RAINBO alert when something needs a human.
   daily   once a day: back up the customer database, write the daily report RAINBO reads, and tell
           RAINBO about new paid orders.
+  refresh every hour: rewrite the report files and the live-numbers block inside RAINBO's skill, so RAINBO
+          answers "how is the store doing" from the skill it already loads, with no extra tool.
   report  print the current report as JSON (read-only; safe to run any time).
 
 No secrets are read or printed. Standard library only.
@@ -24,6 +26,8 @@ BACKUPS = Path("/opt/apex-webscraper/backups")
 STATE = Path("/opt/apex-webscraper/ops/state.json")
 REPORTS = Path("/home/rainbo/rainbo-reports/apex-scraper")
 ALERTS = Path("/home/rainbo/rainbo-alerts")
+SKILL = Path("/home/rainbo/.hermes/skills/apex-scraper-operator/SKILL.md")
+START, END = "<!-- live:start -->", "<!-- live:end -->"
 SITE = "https://webscraper.apexflowlabs.com"
 PRICES = {"pass": 5, "starter": 15, "growth": 79, "scale": 299}
 
@@ -137,6 +141,49 @@ def report():
     }
 
 
+def summary(data):
+    return ["- Measured: %s UTC by the server's own report (refreshed hourly)." % data["generated"].replace("T", " ").rstrip("Z"),
+            "- Service: %s, version %s. Public site: %s." % ("healthy" if data["healthy"] else "DOWN", data["version"], "healthy" if data["public_healthy"] else "FAILING"),
+            "- Money: %d paid order(s) ever; paid accounts active now: %s; monthly recurring revenue $%d." % (
+                data["paid_orders_total"], data["paid_accounts_active"] or "none", data["monthly_recurring_usd"]),
+            "- Trials (real people): %d total, %d in the last 7 days." % (data["trials_total"], data["trials_last_7_days"]),
+            "- Last 7 days: %s." % (", ".join("%s %s" % (v, k) for k, v in sorted(data["funnel_last_7_days"].items())) or "no activity"),
+            "- Credits used: %d in 24 hours, %d in 7 days." % (data["credits_used"]["24h"]["credits"], data["credits_used"]["7d"]["credits"]),
+            "- Newest database backup: %s hours old." % data["backup_age_hours"],
+            "- checkout_created is a started checkout, including internal tests. It is not a sale. Only paid orders are money."]
+
+
+def write_reports(data):
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    text = "\n".join(["# Apex Flow 3D Scraper report", ""] + summary(data) + [""])
+    for name, body in (("latest.md", text), ("latest.json", json.dumps(data, indent=2)),
+                       ("report-%s.md" % time.strftime("%Y%m%d", time.gmtime()), text)):
+        (REPORTS / name).write_text(body, encoding="utf-8")
+        owned_by_rainbo(REPORTS / name)
+    owned_by_rainbo(REPORTS)
+    owned_by_rainbo(REPORTS.parent)
+    # RAINBO reads skills, not arbitrary folders: put the live numbers inside the skill it loads.
+    if SKILL.exists():
+        skill = SKILL.read_text(encoding="utf-8")
+        if START in skill and END in skill:
+            head, rest = skill.split(START, 1)
+            block = START + "\n" + "\n".join(summary(data)) + "\n" + END
+            fresh = head + block + rest.split(END, 1)[1]
+            temp = SKILL.with_suffix(".md.new")
+            temp.write_text(fresh, encoding="utf-8")
+            owned_by_rainbo(temp)
+            os.chmod(temp, 0o644)
+            os.replace(temp, SKILL)
+
+
+def refresh():
+    data = report()
+    data.pop("_paid_order_ids")
+    write_reports(data)
+    print(json.dumps(data))
+    return 0
+
+
 def daily():
     BACKUPS.mkdir(parents=True, exist_ok=True)
     os.chmod(BACKUPS, 0o700)
@@ -158,21 +205,7 @@ def daily():
               "%d new paid scraper order(s). Monthly recurring revenue is now $%d. Tell Brian." % (len(fresh), data["monthly_recurring_usd"]), "info")
     state["paid_orders"] = sorted(known | set(fresh))
     save_state(state)
-    REPORTS.mkdir(parents=True, exist_ok=True)
-    lines = ["# Apex Flow 3D Scraper daily report, %s" % data["generated"], "",
-             "- Service: %s (version %s); public site: %s" % ("healthy" if data["healthy"] else "DOWN", data["version"], "healthy" if data["public_healthy"] else "FAILING"),
-             "- Paid accounts active: %s; monthly recurring revenue: $%d; paid orders ever: %d" % (data["paid_accounts_active"] or "none", data["monthly_recurring_usd"], data["paid_orders_total"]),
-             "- Trials: %d total, %d in the last 7 days" % (data["trials_total"], data["trials_last_7_days"]),
-             "- Last 7 days funnel: %s" % (data["funnel_last_7_days"] or "no activity"),
-             "- Credits used: %s" % data["credits_used"],
-             "- Crawls in the last 7 days: %s" % (data["crawls_last_7_days"] or "none"),
-             "- Newest backup: %s hours old" % data["backup_age_hours"], "", data["note"], ""]
-    for name, text in (("latest.md", "\n".join(lines)), ("latest.json", json.dumps(data, indent=2)),
-                       ("report-%s.md" % time.strftime("%Y%m%d", time.gmtime()), "\n".join(lines))):
-        (REPORTS / name).write_text(text, encoding="utf-8")
-        owned_by_rainbo(REPORTS / name)
-    owned_by_rainbo(REPORTS)
-    owned_by_rainbo(REPORTS.parent)
+    write_reports(data)
     print(json.dumps(data))
     return 0
 
@@ -183,6 +216,8 @@ if __name__ == "__main__":
         sys.exit(health())
     if command == "daily":
         sys.exit(daily())
+    if command == "refresh":
+        sys.exit(refresh())
     output = report()
     output.pop("_paid_order_ids")
     print(json.dumps(output, indent=2))

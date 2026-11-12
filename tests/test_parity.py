@@ -163,3 +163,21 @@ async def test_web_search_and_model_extraction_stay_off_without_operator_keys(tm
 
 def test_bigger_plans_get_more_pages_at_once():
     assert [PLANS[p]["concurrency"] for p in ("free", "pass", "starter", "growth", "scale")] == [2, 6, 6, 12, 20]
+
+
+async def test_crawl_treats_www_and_bare_host_as_one_site(tmp_path, monkeypatch):
+    monkeypatch.delenv("SCRAPER_GATEWAY_SECRET", raising=False)
+    billing = Billing(tmp_path / "billing.db")
+    h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
+
+    async def scrape(url, **kwargs):      # the bare host redirects to www, and every link uses www
+        final = url.replace("https://shop.example", "https://www.shop.example")
+        return {"url": final, "markdown": "# " + final, "text": final, "rendered": False,
+                "links": [{"url": f"https://www.shop.example/p{i}", "text": "p"} for i in range(6)] + [{"url": "https://other.example/"}]}
+
+    acct, auth = account(h, "starter", "cs_test_www1")
+    async with TestClient(TestServer(make_app(billing, scrape, hosted=h))) as client:
+        job = await (await client.post("/v1/crawl", json={"url": "https://shop.example/", "limit": 5}, headers=auth)).json()
+        body = await finish(client, auth, job["id"])
+        assert body["pages_done"] == 5 and all("shop.example" in r["url"] and "other" not in r["url"] for r in body["results"])
+    billing.db.close()
