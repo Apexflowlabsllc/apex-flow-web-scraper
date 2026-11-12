@@ -36,3 +36,5 @@ Remote MCP: https://webscraper.apexflowlabs.com/v1/mcp (Streamable HTTP, Authori
 ## Usage
 Python: `from rainbo_scrape import scrape; scrape("https://example.com").markdown`
 CLI: `rainbo-scrape fetch https://example.com`
+
+For a smaller REST or MCP scrape response, select outputs such as ["markdown"] or ["data", "evidence"]. Source receipts and validation warnings are retained when available.

@@ -9,7 +9,9 @@ from .billing import Billing, QuotaExceeded, cost_of
 from .client import ascrape
 from .policy import ScrapeError
 
-ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "recipe"}
+ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "recipe", "outputs"}
+OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "structured_data"}
+SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors"}
 
 
 def credits_for(body, rendered):
@@ -65,6 +67,14 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
         nonlocal total_active, rendering_active
         if not isinstance(body, dict) or not isinstance(body.get("url"), str) or set(body) - ALLOWED:
             raise ValueError("body must be a JSON object with a url and only these options: " + ", ".join(sorted(ALLOWED)))
+        outputs = body.pop("outputs", None)
+        if outputs is not None:
+            if not isinstance(outputs, list) or not 1 <= len(outputs) <= len(OUTPUTS) or any(
+                not isinstance(field, str) or field not in OUTPUTS for field in outputs
+            ):
+                raise ValueError("outputs must list one or more of: " + ", ".join(sorted(OUTPUTS)))
+            if "chunks" in outputs and "chunks" not in body:
+                body["chunks"] = 1500
         if hosted and body.get("extract"):
             return web.json_response({"error": "Model extraction is available in the self-hosted edition. Hosted scraping returns Markdown, text and chunks."}, status=400)
         now = time.monotonic()
@@ -95,7 +105,10 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
             url = body.pop("url")
             async with asyncio.timeout(90):
                 result = await scrape_fn(url, **body)
-            if hosted and len(json.dumps(dict(result)).encode()) > 262144:
+            response_result = dict(result) if outputs is None else {
+                field: value for field, value in result.items() if field in outputs or field in SOURCE_FIELDS
+            }
+            if hosted and len(json.dumps(response_result).encode()) > 262144:
                 raise ValueError("Result exceeds the 256 KiB hosted response limit. Use a smaller source or the self-hosted edition.")
             actual = credits_for(body, rendered=bool(result.get("rendered")))
             billing.refund(account, worst - actual)
@@ -110,7 +123,7 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
         left = billing.remaining(account)
         if hosted:
             hosted.save_page(account, result)
-        return web.json_response({"credits_used": actual, "credits_left": left, "result": dict(result)})
+        return web.json_response({"credits_used": actual, "credits_left": left, "result": response_result})
 
     async def batch(request):
         return await batch_for(request["account"], await request.json())

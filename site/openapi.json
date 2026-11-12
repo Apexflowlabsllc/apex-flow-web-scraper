@@ -148,6 +148,24 @@
                   },
                   "wait_selector": {
                     "type": "string"
+                  },
+                  "outputs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 7,
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "markdown",
+                        "text",
+                        "data",
+                        "evidence",
+                        "chunks",
+                        "links",
+                        "structured_data"
+                      ]
+                    },
+                    "description": "Return selected content with available source receipt and validation warnings. Selecting chunks defaults to a 1,500-character target."
                   }
                 },
                 "required": [
@@ -269,6 +287,24 @@
                   },
                   "wait_selector": {
                     "type": "string"
+                  },
+                  "outputs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 7,
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "markdown",
+                        "text",
+                        "data",
+                        "evidence",
+                        "chunks",
+                        "links",
+                        "structured_data"
+                      ]
+                    },
+                    "description": "Return selected content with available source receipt and validation warnings. Selecting chunks defaults to a 1,500-character target."
                   }
                 },
                 "required": [

@@ -61,3 +61,41 @@ async def test_bad_bodies_are_400_and_unknown_options_rejected(ctx):
 def test_credit_math():
     assert credits_for({"extract": {"x": 1}}, rendered=True) == 5
     assert credits_for({}, rendered=False) == 1
+
+
+async def test_selected_outputs_preserve_receipt_metering_and_full_index(tmp_path):
+    from types import SimpleNamespace
+    receipt = {"final_url": "https://example.com/", "content_sha256": "abc"}
+    full = {"url": receipt["final_url"], "receipt": receipt, "markdown": "# Hello",
+            "text": "x" * 270000, "validation_errors": [], "chunks": [{"text": "# Hello"}]}
+    calls = []
+    async def scrape(url, **options):
+        calls.append(options)
+        return full
+    saved = []
+    hosted = SimpleNamespace(entitled=lambda account: True, install=lambda app: {},
+                             site="https://example.com", save_page=lambda account, result: saved.append(result))
+    billing = Billing(tmp_path / "select.db")
+    hosted.billing = billing
+    hosted.db = billing.db
+    from rainbo_scrape.hosted_features import prepare
+    prepare(hosted)
+    account = billing.create_account(None)
+    headers = auth(billing.new_key(account))
+    async with TestClient(TestServer(make_app(billing, scrape, hosted))) as client:
+        request = {"url": receipt["final_url"], "render": "never"}
+        for invalid in ([], ["private"], [["markdown"]]):
+            resp = await client.post("/v1/scrape", json={**request, "outputs": invalid}, headers=headers)
+            assert resp.status == 400
+        assert calls == []
+        resp = await client.post("/v1/scrape", json=request, headers=headers)
+        assert resp.status == 400 and billing.remaining(account) == 1000
+        resp = await client.post("/v1/scrape", json={**request, "outputs": ["markdown"]}, headers=headers)
+        body = await resp.json()
+        assert resp.status == 200 and body["credits_left"] == 999
+        assert body["result"] == {k: full[k] for k in ("url", "markdown", "receipt", "validation_errors")}
+        assert saved == [full]
+        resp = await client.post("/v1/batch", json={"urls": [request["url"]], "outputs": ["chunks"]}, headers=headers)
+        batch = await resp.json()
+        assert batch["results"][0]["result"]["chunks"] == full["chunks"]
+        assert calls[-1]["chunks"] == 1500
