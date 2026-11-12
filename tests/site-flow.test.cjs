@@ -45,3 +45,22 @@ test('unpaid or wrong-browser checkout does not unlock dashboard',async()=>{
   assert.equal(p.node('message').textContent,'Wrong browser');
   assert.equal(p.calls.filter(x=>x.url==='/api/account').length,0);
 });
+
+test('only active trial users see paid offers after a scrape and logout clears the result', async () => {
+  for (const plan of ['free', 'starter']) {
+    const account = {plan, active:true, credits_left:999};
+    const p = page('dashboard.js', [
+      {status:200,data:{key:'fixture-private-key'}}, {status:200,data:account},
+      {status:200,data:{credits_used:1,result:{markdown:'# Page'}}}, {status:200,data:account},
+    ]);
+    await settle();
+    p.node('result').hidden = true;
+    p.node('url').value = 'https://example.com';
+    await p.node('scrape').onsubmit({preventDefault(){}});
+    assert.equal(p.node('result').hidden, false);
+    assert.equal(p.node('trial-offers').hidden, plan !== 'free');
+    p.node('logout').onclick();
+    assert.equal(p.node('result').hidden, true);
+    assert.equal(p.node('trial-offers').hidden, true);
+  }
+});
