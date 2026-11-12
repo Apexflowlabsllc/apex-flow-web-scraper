@@ -14,7 +14,7 @@ from .policy import ScrapeError
 ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "recipe", "outputs", "page", "fallback", "max_tokens"}
 LIMIT = 262144  # hosted response budget in bytes
 OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff"}
-SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors", "archive"}
+SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors", "archive", "extracted"}
 # Failures where the live site refused or could not serve us; a public archive copy may still exist.
 ARCHIVABLE = {"access_challenge", "http_error", "upstream_error", "rate_limited", "fetch_failed", "dns_failed",
               "robots_denied", "robots_unavailable"}
@@ -114,13 +114,14 @@ def credits_for(body, rendered):
     return total
 
 
-def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot):
+def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot, search_provider=None):
     active = defaultdict(int)
     recent = defaultdict(deque)
     api_recent = defaultdict(deque)
+    real_engine = scrape_fn is ascrape
     if hosted and scrape_fn is ascrape:
         scrape_fn = partial(ascrape, browser_slots=asyncio.BoundedSemaphore(2))
-    total_limit = 8 if hosted else 4
+    total_limit = 20 if hosted else 4
     total_active = 0
     rendering_active = 0
     buy = {"buy_url": hosted.site + "/#pricing"} if hosted else {}
@@ -191,8 +192,10 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot)
             if "chunks" in outputs and "chunks" not in body:
                 body["chunks"] = 1500
         if hosted and body.get("extract"):
-            return fail(400, "Model extraction is available in the self-hosted edition. Hosted scraping returns Markdown, text and chunks.",
-                        code="not_available_hosted")
+            from .llm import providers
+            if not providers():
+                return fail(400, "Model extraction is available in the self-hosted edition. Hosted scraping returns Markdown, text and chunks.",
+                            code="not_available_hosted")
         now = time.monotonic()
         q = recent[account]
         while q and q[0] < now - 60:
@@ -333,6 +336,10 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot)
         from .mcp_http import install
         operations = hosted.install(app)
         operations.update({"/scrape": perform, "/batch": batch_for, "/usage": usage_for})
+        from . import hosted_crawl, hosted_search
+        hosted_crawl.prepare(hosted)
+        operations.update(hosted_crawl.install(hosted, app, perform, hosted_crawl.sitemap_urls if real_engine else None))
+        operations.update(hosted_search.install(hosted, app, search_provider))
         install(app, billing, operations, hosted.site)
     return app
 

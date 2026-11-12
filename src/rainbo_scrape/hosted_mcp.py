@@ -26,6 +26,8 @@ async def request(path, payload=None):
     key = os.environ.get("APEX_SCRAPER_API_KEY")
     if not key:
         raise ValueError("Set APEX_SCRAPER_API_KEY in the MCP client's server environment.")
+    if path == "/crawl/status":      # REST form of the status call
+        path, payload = "/crawl/" + str(payload["id"]) + "?offset=" + str(int(payload.get("offset", 0))), None
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=100)) as client:
         async with client.request("GET" if payload is None else "POST", BASE + path,
                                   headers={"Authorization": "Bearer " + key},
@@ -93,6 +95,30 @@ async def check_changes(urls: list[str], render: Literal["auto", "always", "neve
 async def map_site(url: str, limit: int = 100, search: str | None = None):
     """Discover up to 1,000 public sitemap URLs. A nonempty map costs one credit."""
     return await request("/map", {"url": url, "limit": limit, "search": search})
+
+
+@mcp.tool()
+async def crawl_site(url: str, limit: int = 25, include: str | None = None,
+                     render: Literal["auto", "always", "never"] = "never", archive_fallback: bool = False):
+    """Start a background crawl of one site's own pages (up to 10 on the trial, 100 on Pass and Starter, 500 on Growth, 1,000 on Scale). Returns a job id at once; read pages with crawl_status. Each page costs the usual 1 or 3 credits and failed pages are free. include keeps only URLs containing that text."""
+    payload = {"url": url, "limit": limit, "render": render}
+    if include:
+        payload["include"] = include
+    if archive_fallback:
+        payload["fallback"] = "archive"
+    return await request("/crawl", payload)
+
+
+@mcp.tool()
+async def crawl_status(job_id: str, offset: int = 0):
+    """Read a crawl's progress and its next pages as Markdown. Pass the reply's next_offset as offset to continue; next_offset is null when everything has been read."""
+    return await request("/crawl/status", {"id": job_id, "offset": offset})
+
+
+@mcp.tool()
+async def web_search(query: str, limit: int = 10):
+    """Search the whole web and return result links, titles and snippets for 2 credits. Pass a result url to scrape_page to read it."""
+    return await request("/websearch", {"query": query, "limit": limit})
 
 
 @mcp.tool()

@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Apex Flow 3D Scraper",
-    "version": "0.5.0",
-    "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Paid accounts allow six simultaneous page scrapes and free trials allow two, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
+    "version": "0.6.0",
+    "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Accounts run 2 (trial), 6 (Pass, Starter), 12 (Growth) or 20 (Scale) page scrapes at once, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
   },
   "externalDocs": {
     "url": "https://webscraper.apexflowlabs.com/docs.html"
@@ -752,6 +752,235 @@
                       "format": "uri"
                     }
                   }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crawl": {
+      "post": {
+        "operationId": "startCrawl",
+        "summary": "Start a background crawl of one site's own pages",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 25,
+                    "description": "Maximum pages. Plan limits: 10 trial, 100 Pass and Starter, 500 Growth, 1,000 Scale."
+                  },
+                  "max_depth": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 3
+                  },
+                  "include": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "render": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "always",
+                      "never"
+                    ],
+                    "default": "never"
+                  },
+                  "outputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "fallback": {
+                    "type": "string",
+                    "enum": [
+                      "archive"
+                    ]
+                  },
+                  "recipe": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Crawl started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "status_url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crawl/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getCrawl",
+        "summary": "Read a crawl's progress and pages",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status and up to 50 pages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "completed",
+                        "stopped",
+                        "cancelled",
+                        "interrupted",
+                        "failed"
+                      ]
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "pages_done": {
+                      "type": "integer"
+                    },
+                    "pages_failed": {
+                      "type": "integer"
+                    },
+                    "credits_used": {
+                      "type": "integer"
+                    },
+                    "credits_left": {
+                      "type": "integer"
+                    },
+                    "note": {
+                      "type": "string"
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "One page: url, status, and the same fields as a scrape reply."
+                      }
+                    },
+                    "next_offset": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Pass as offset to read more. Null when every page has been read."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "cancelCrawl",
+        "summary": "Cancel a running crawl",
+        "responses": {
+          "200": {
+            "description": "Cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
                 }
               }
             }

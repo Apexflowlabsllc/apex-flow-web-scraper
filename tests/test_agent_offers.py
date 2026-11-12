@@ -56,6 +56,6 @@ async def test_remote_mcp_auth_tools_and_shared_metering(hosted):
         resp=await c.post("/v1/mcp",headers=headers,json=msg(method,params))
         data=await resp.json()
         assert resp.status==200 and "result" in data
-        if method=="tools/list": assert len(data["result"]["tools"])==6
+        if method=="tools/list": assert len(data["result"]["tools"])==8
         if method=="tools/call": assert "Fixture" in data["result"]["content"][0]["text"]
     assert h.billing.remaining(h.billing.account_for(key))==24999

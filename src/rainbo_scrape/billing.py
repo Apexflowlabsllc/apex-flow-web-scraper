@@ -14,8 +14,8 @@ PLANS = {
     "free": {"price": 0, "credits": 1000, "rpm": 30, "concurrency": 2, "saved_pages": 100},
     "pass": {"price": 5, "credits": 5000, "rpm": 60, "concurrency": 6, "saved_pages": 1000},
     "starter": {"price": 15, "credits": 25000, "rpm": 60, "concurrency": 6, "saved_pages": 1000},
-    "growth": {"price": 79, "credits": 150000, "rpm": 60, "concurrency": 6, "saved_pages": 1000},
-    "scale": {"price": 299, "credits": 750000, "rpm": 60, "concurrency": 6, "saved_pages": 1000},
+    "growth": {"price": 79, "credits": 150000, "rpm": 120, "concurrency": 12, "saved_pages": 1000},
+    "scale": {"price": 299, "credits": 750000, "rpm": 240, "concurrency": 20, "saved_pages": 1000},
 }
 # Credits per request kind. Rendered pages cost our browser time; proxied pages cost real bandwidth.
 COSTS = {"page": 1, "render": 3, "proxy_page": 8, "proxy_render": 10, "extract": 2, "search": 1}

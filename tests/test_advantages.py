@@ -125,7 +125,7 @@ async def test_rate_limit_headers_and_usage_detail(svc):
     await client.post("/v1/scrape", json={"url": "https://example.com/broken", "render": "never"}, headers=auth)
     usage = await (await client.get("/v1/usage", headers=auth)).json()
     assert usage["credits_left"] == 24999 and usage["credits_total"] == 25000 and usage["plan"] == "starter"
-    assert usage["limits"] == {"requests_per_minute": 60, "concurrent_scrapes": 6, "batch_urls": 10, "saved_pages": 1000}
+    assert usage["limits"] == {"requests_per_minute": 60, "concurrent_scrapes": 6, "batch_urls": 10, "saved_pages": 1000, "crawl_pages": 100}
     assert usage["saved_pages"] == 1 and usage["period_end"] > time.time()
     assert usage["daily"] == [{"day": time.strftime("%Y-%m-%d", time.gmtime()), "credits": 1, "requests": 2}]
     assert usage["buy_url"] == SITE + "/#pricing"
@@ -155,7 +155,7 @@ async def test_mcp_check_changes_returns_only_what_moved(svc):
     call = lambda: client.post("/v1/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                                                 "params": {"name": "check_changes", "arguments": {"urls": urls}}}, headers=auth)
     tools = (await (await client.post("/v1/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, headers=auth)).json())["result"]["tools"]
-    assert {t["name"] for t in tools} == {"scrape_page", "scrape_batch", "check_changes", "map_site", "search_saved", "credit_balance"}
+    assert {t["name"] for t in tools} == {"scrape_page", "scrape_batch", "check_changes", "map_site", "search_saved", "credit_balance", "crawl_site", "crawl_status"}
     first = json.loads((await (await call()).json())["result"]["content"][0]["text"])
     assert [p["change"]["status"] for p in first["pages"]] == ["new", "new"] and first["changed"] == []
     state["pages"][urls[1]] = "Line one\nLine two\nPrice: $99"
