@@ -51,9 +51,10 @@ def admit_attempt(h, account):
 def install(h, app):
     mapping=0
     async def map_site(request):
+        return await map_for(request["account"], await request.json())
+
+    async def map_for(account, body):
         nonlocal mapping
-        account=request["account"]
-        body=await request.json()
         if not isinstance(body,dict) or set(body)-{"url","limit","search"}:
             raise ValueError("Use url, limit and optional search")
         url=check_url(body.get("url"))
@@ -90,7 +91,9 @@ def install(h, app):
             mapping-=1
 
     async def search(request):
-        body=await request.json()
+        return await search_for(request["account"], await request.json())
+
+    async def search_for(account, body):
         query=body.get("query") if isinstance(body,dict) else None
         if not isinstance(query,str) or not 1<=len(query)<=200:
             raise ValueError("query must contain 1–200 characters")
@@ -98,7 +101,7 @@ def install(h, app):
         if not words:
             raise ValueError("query needs at least one word")
         expr=' OR '.join('"'+w+'"' for w in words)
-        rows=h.db.execute("SELECT url,title,snippet(saved_pages,3,'[',']','…',32) FROM saved_pages WHERE saved_pages MATCH ? AND account=? ORDER BY bm25(saved_pages) LIMIT 10",(expr,request["account"])).fetchall()
+        rows=h.db.execute("SELECT url,title,snippet(saved_pages,3,'[',']','…',32) FROM saved_pages WHERE saved_pages MATCH ? AND account=? ORDER BY bm25(saved_pages) LIMIT 10",(expr,account)).fetchall()
         return web.json_response({"results":[{"url":r[0],"title":r[1],"snippet":r[2]} for r in rows],"scope":"Your latest 100 successfully scraped URLs; not a web search engine.","credits_used":0})
 
     async def funnel(request):
@@ -112,3 +115,4 @@ def install(h, app):
     app.router.add_post('/v1/map',map_site)
     app.router.add_post('/v1/search',search)
     app.router.add_post('/api/event',funnel)
+    return {"/map": map_for, "/search": search_for}

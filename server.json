@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.apexflowlabsllc/apex-flow-web-scraper",
+  "title": "Apex Flow 3D Scraper",
+  "description": "Extract public pages into Markdown, CSS fields and RAG chunks with source receipts.",
+  "version": "0.3.1",
+  "websiteUrl": "https://webscraper.apexflowlabs.com",
+  "repository": {
+    "url": "https://github.com/Apexflowlabsllc/apex-flow-web-scraper",
+    "source": "github"
+  },
+  "remotes": [{
+    "type": "streamable-http",
+    "url": "https://webscraper.apexflowlabs.com/v1/mcp",
+    "headers": [{
+      "name": "Authorization",
+      "description": "Bearer followed by a space and your scraper API key.",
+      "isRequired": true,
+      "isSecret": true,
+      "format": "string"
+    }]
+  }]
+}

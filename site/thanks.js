@@ -28,5 +28,5 @@ document.getElementById('reveal').onclick = () => {
   document.getElementById('reveal').textContent = shown ? 'Reveal API key' : 'Hide API key';
 };
 document.getElementById('copy').onclick = async () => {try{await navigator.clipboard.writeText(key);document.getElementById('message').textContent='API key copied.';}catch{document.getElementById('message').textContent='Select your key above and copy it manually.';}};
-document.getElementById('download').onclick = () => {const url=URL.createObjectURL(new Blob([`APEX FLOW WEB SCRAPER\nAPI base: https://webscraper.apexflowlabs.com/v1\nAPI key: ${key}\nDocs: https://webscraper.apexflowlabs.com/docs.html\nKeep this file private.\n`],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='apex-web-scraper-access.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+document.getElementById('download').onclick = () => {const url=URL.createObjectURL(new Blob([`APEX FLOW 3D SCRAPER\nAPI base: https://webscraper.apexflowlabs.com/v1\nAPI key: ${key}\nDocs: https://webscraper.apexflowlabs.com/docs.html\nKeep this file private.\n`],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='apex-web-scraper-access.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 claim();

@@ -14,6 +14,7 @@ test = ["pytest>=8,<10", "pytest-asyncio>=1,<2"]
 
 [project.scripts]
 rainbo-scrape = "rainbo_scrape.cli:main"
+apex-scraper-mcp = "rainbo_scrape.hosted_mcp:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

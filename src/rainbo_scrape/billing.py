@@ -12,7 +12,8 @@ from pathlib import Path
 # Price in USD per month, included credits. One credit = one plain (non-rendered) page.
 PLANS = {
     "free": {"price": 0, "credits": 1000, "rpm": 30, "concurrency": 2},
-    "starter": {"price": 19, "credits": 25000, "rpm": 60, "concurrency": 2},
+    "pass": {"price": 5, "credits": 5000, "rpm": 60, "concurrency": 2},
+    "starter": {"price": 15, "credits": 25000, "rpm": 60, "concurrency": 2},
     "growth": {"price": 79, "credits": 150000, "rpm": 60, "concurrency": 2},
     "scale": {"price": 299, "credits": 750000, "rpm": 60, "concurrency": 2},
 }

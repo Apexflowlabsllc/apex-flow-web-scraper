@@ -13,6 +13,7 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 from .billing import Billing, PLANS, _hash
+from . import trials
 
 PRODUCT = "apex-flow-web-scraper"
 SITE = "https://webscraper.apexflowlabs.com"
@@ -99,7 +100,7 @@ class Hosted:
             end = item.get("current_period_end", sub.get("current_period_end", 0))
             invoice = sub.get("latest_invoice") or {}
             plan = sub.get("metadata", {}).get("plan")
-            if plan not in PLANS or plan == "free":
+            if plan not in PLANS or plan in {"free", "pass"}:
                 return
             status = "active" if sub.get("status") == "active" and isinstance(invoice, dict) and invoice.get("status") == "paid" else "inactive"
             self.db.execute("BEGIN IMMEDIATE")
@@ -124,7 +125,10 @@ class Hosted:
         if session.get("status") != "complete" or session.get("payment_status") not in {"paid", "no_payment_required"}:
             return None
         plan = meta["plan"]
-        if plan != "free" and (session.get("mode") != "subscription" or not session.get("subscription")):
+        if plan == "pass" and (session.get("mode") != "payment" or session.get("payment_status") != "paid"
+                               or session.get("currency") != "usd" or session.get("amount_total") != PLANS["pass"]["price"]*100):
+            raise ValueError("A paid project pass is required")
+        if plan not in {"free", "pass"} and (session.get("mode") != "subscription" or not session.get("subscription")):
             raise ValueError("Subscription is required")
         if not meta.get("nonce"):
             raise ValueError("Checkout has no access credential")
@@ -141,7 +145,10 @@ class Hosted:
                     account = self.billing.create_account(email, plan)
                     self.db.execute("INSERT INTO orders(session,account,subscription,customer,nonce,plan,status,email,created,free_ip) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (session_id, account, session.get("subscription"), session.get("customer"), meta["nonce"], plan,
-                         "active" if plan == "free" else "pending", email, time.time(), meta.get("ip") if plan == "free" else None))
+                         "active" if plan in {"free", "pass"} else "pending", email, time.time(), meta.get("ip") if plan == "free" else None))
+                    if plan == "pass":
+                        db_end = time.time() + 30*86400
+                        self.db.execute("UPDATE orders SET period_end=? WHERE session=?", (db_end, session_id))
                     # nonce is already a SHA256 digest, the browser secret is never stored.
                     key = self.key_for(session_id, meta["nonce"])
                     self.db.execute("INSERT INTO keys(hash,account,label) VALUES (?,?,?)", (_hash(key), account, "Checkout"))
@@ -181,7 +188,7 @@ class Hosted:
 
         async def health(request):
             self.db.execute("SELECT 1").fetchone()
-            return web.json_response({"ok": True, "checkout": bool(self.stripe_key and self.webhook_secret), "version": "0.3.0"})
+            return web.json_response({"ok": True, "checkout": bool(self.stripe_key and self.webhook_secret), "version": "0.3.1"})
 
         async def checkout(request):
             ip = self.limit(request, "checkout", 12)
@@ -191,25 +198,27 @@ class Hosted:
             plan = body.get("plan")
             if plan not in PLANS:
                 raise ValueError("Unknown plan")
-            if plan == "free" and self.db.execute("SELECT 1 FROM orders WHERE free_ip=?", (ip,)).fetchone():
-                return web.json_response({"error": "Your free account is already available. Open the dashboard with your saved key."}, status=409)
+            if plan == "free":
+                return web.json_response({"error": "Start your free trial at /trial.html.", "url": self.site + "/trial.html"}, status=409)
             nonce = secrets.token_urlsafe(32)
             digest = _hash(nonce)
-            form = {"mode": "payment" if plan == "free" else "subscription",
+            form = {"mode": "payment" if plan == "pass" else "subscription",
                     "line_items[0][quantity]": "1", "line_items[0][price_data][currency]": "usd",
                     "line_items[0][price_data][unit_amount]": str(PLANS[plan]["price"]*100),
-                    "line_items[0][price_data][product_data][name]": f"Apex Flow Web Scraper {plan.title()}",
+                    "line_items[0][price_data][product_data][name]": f"Apex Flow 3D Scraper {plan.title()}",
                     "line_items[0][price_data][product_data][description]": f"{PLANS[plan]['credits']:,} credits. Plain pages: 1 credit; rendered pages: 3.",
                     "success_url": self.site + "/thanks.html?session_id={CHECKOUT_SESSION_ID}",
                     "cancel_url": self.site + "/#pricing", "metadata[product]": PRODUCT,
                     "metadata[plan]": plan, "metadata[nonce]": digest, "metadata[ip]": ip,
                     "consent_collection[terms_of_service]": "required",
                     "custom_text[terms_of_service_acceptance][message]": "I agree to the [Terms](" + self.site + "/terms.html) and [Privacy Policy](" + self.site + "/privacy.html)."}
-            if plan != "free":
+            if plan != "pass":
                 form.update({"line_items[0][price_data][recurring][interval]": "month",
                              "subscription_data[metadata][product]": PRODUCT, "subscription_data[metadata][plan]": plan})
             else:
                 form["customer_creation"] = "always"
+                form["line_items[0][price_data][product_data][name]"] = "Apex Flow 3D Scraper Project Pass"
+                form["line_items[0][price_data][product_data][description]"] = "5,000 credits valid for 30 days from activation. One-time purchase."
             data = await self.stripe("POST", "checkout/sessions", form, "webscraper-" + digest)
             from .hosted_features import event
             event(self, "checkout_created", plan)
@@ -221,6 +230,11 @@ class Hosted:
             self.limit(request, "claim", 60)
             body = await request.json()
             session_id = body.get("session_id", "")
+            if isinstance(session_id, str) and trials.SESSION.fullmatch(session_id):
+                access = trials.owned_trial(self, request, session_id)
+                if not access:
+                    return web.json_response({"error": "Open your trial in the browser where you started it."}, status=403)
+                return web.json_response(access)
             nonce = request.cookies.get("scraper_claim_" + session_id, "")
             if not nonce:
                 return web.json_response({"error": "Return using the browser where you started checkout. Contact support if you need help."}, status=403)
@@ -272,7 +286,7 @@ class Hosted:
             if not row:
                 raise web.HTTPNotFound()
             if request.path == "/api/portal":
-                if row[0] == "free":
+                if row[0] in {"free", "pass"}:
                     return web.json_response({"url": self.site + "/#pricing"})
                 form = {"customer": row[3], "return_url": self.site + "/dashboard.html"}
                 if os.environ.get("STRIPE_PORTAL_CONFIG"):
@@ -288,8 +302,9 @@ class Hosted:
         app.router.add_post("/api/stripe/webhook", webhook)
         app.router.add_get("/api/account", account)
         app.router.add_post("/api/portal", account)
+        trials.install(self, app)
         from .hosted_features import install
-        install(self, app)
+        return install(self, app)
 
 
 def main():

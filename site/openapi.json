@@ -1,0 +1,466 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Apex Flow 3D Scraper",
+    "version": "0.3.0",
+    "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data."
+  },
+  "externalDocs": {
+    "url": "https://webscraper.apexflowlabs.com/docs.html"
+  },
+  "servers": [
+    {
+      "url": "https://webscraper.apexflowlabs.com/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerKey": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerKey": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "paths": {
+    "/scrape": {
+      "post": {
+        "operationId": "scrapePage",
+        "summary": "Convert a public page to Markdown and source metadata",
+        "responses": {
+          "200": {
+            "description": "Successful result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "Public HTTP(S) URL. Ports 80 and 443."
+                        },
+                        "markdown": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "receipt": {
+                          "type": "object"
+                        },
+                        "data": {},
+                        "rendered": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "credits_used": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "credits_left": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Public HTTP(S) URL. Ports 80 and 443."
+                  },
+                  "render": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "always",
+                      "never"
+                    ],
+                    "default": "auto"
+                  },
+                  "chunks": {
+                    "type": "integer",
+                    "minimum": 200,
+                    "maximum": 8000
+                  },
+                  "recipe": {
+                    "type": "object",
+                    "properties": {
+                      "fields": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "selector": {
+                              "type": "string"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "attribute": {
+                              "type": "string"
+                            },
+                            "all": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "selector"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "fields"
+                    ]
+                  },
+                  "max_age": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "screenshot": {
+                    "type": "boolean"
+                  },
+                  "wait_selector": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/batch": {
+      "post": {
+        "operationId": "scrapeBatch",
+        "summary": "Scrape up to ten public URLs",
+        "responses": {
+          "200": {
+            "description": "Successful result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "credits_left": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "unprocessed": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Public HTTP(S) URL. Ports 80 and 443."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "urls": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "items": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Public HTTP(S) URL. Ports 80 and 443."
+                    }
+                  },
+                  "render": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "always",
+                      "never"
+                    ],
+                    "default": "auto"
+                  },
+                  "chunks": {
+                    "type": "integer",
+                    "minimum": 200,
+                    "maximum": 8000
+                  },
+                  "recipe": {
+                    "type": "object",
+                    "properties": {
+                      "fields": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "selector": {
+                              "type": "string"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "attribute": {
+                              "type": "string"
+                            },
+                            "all": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "selector"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "fields"
+                    ]
+                  },
+                  "max_age": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "screenshot": {
+                    "type": "boolean"
+                  },
+                  "wait_selector": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "urls"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/map": {
+      "post": {
+        "operationId": "mapSite",
+        "summary": "Discover public URLs from sitemaps",
+        "responses": {
+          "200": {
+            "description": "Successful result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "urls": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "lastmod": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "source": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    },
+                    "credits_used": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "credits_left": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Public HTTP(S) URL. Ports 80 and 443."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "search": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search": {
+      "post": {
+        "operationId": "searchSavedPages",
+        "summary": "Search recently scraped pages in your account",
+        "responses": {
+          "200": {
+            "description": "Successful result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "Public HTTP(S) URL. Ports 80 and 443."
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "snippet": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "credits_used": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "query"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usage": {
+      "get": {
+        "operationId": "creditBalance",
+        "summary": "Read remaining account credits",
+        "responses": {
+          "200": {
+            "description": "Successful result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credits_left": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure."
+          }
+        }
+      }
+    }
+  }
+}
