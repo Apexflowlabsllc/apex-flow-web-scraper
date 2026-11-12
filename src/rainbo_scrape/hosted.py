@@ -43,9 +43,9 @@ class Hosted:
         from .hosted_features import prepare
         prepare(self)
 
-    def save_page(self, account, result):
+    def save_page(self, account, result, diff=False):
         from .hosted_features import save_page
-        save_page(self, account, result)
+        return save_page(self, account, result, diff)
 
     async def stripe(self, method, path, form=None, idempotency=None):
         headers = {"Authorization": "Bearer " + self.stripe_key,
@@ -188,7 +188,7 @@ class Hosted:
 
         async def health(request):
             self.db.execute("SELECT 1").fetchone()
-            return web.json_response({"ok": True, "checkout": bool(self.stripe_key and self.webhook_secret), "version": "0.3.1"})
+            return web.json_response({"ok": True, "checkout": bool(self.stripe_key and self.webhook_secret), "version": "0.4.0"})
 
         async def checkout(request):
             ip = self.limit(request, "checkout", 12)
