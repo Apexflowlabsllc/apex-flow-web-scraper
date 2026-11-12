@@ -28,8 +28,11 @@
 - Errors are JSON with error, a stable code (invalid_key, insufficient_credits, inactive_plan, rate_limited, invalid_request, timeout, source_failed) and retryable. A 402 includes credits_left and buy_url; show buy_url to the user. A 429 includes retry_after seconds. MCP tool errors carry the same fields.
 - Every response carries X-Credits-Remaining, X-RateLimit-Limit, X-RateLimit-Remaining and X-Request-Id. GET /v1/usage returns plan, limits, renewal date and 14 days of daily usage.
 
+- Context budgets: every scrape reply includes estimated_tokens. Set max_tokens (200-60000) to receive a page in consecutive parts that each fit the budget; follow pagination.next_page with page.
+- Archive fallback: when a live read fails because the site refused, errored, disallowed robots or removed the page, the error includes a hint. Retry with "fallback":"archive" (MCP: archive_fallback=true) to get the latest Internet Archive copy. result.archive states captured, snapshot_url and reason; treat the content as possibly out of date and tell the user its capture time.
+
 ## Not claimed
-- No CAPTCHA solving or bot-wall evasion; zillow.com and glassdoor.com block it.
+- No CAPTCHA solving or bot-wall evasion; zillow.com and glassdoor.com block live reads. The opt-in archive fallback returns a dated Internet Archive copy where one exists.
 - Search covers sites you have indexed, not the whole web.
 - We do not claim universal competitor superiority, the lowest price for every workload, or guaranteed availability on every source.
 

@@ -185,7 +185,7 @@ urls = map_site(<span class="s">"https://example.com"</span>)[<span class="s">"u
 rainbo-scrape fetch https://example.com
 rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span class="s">"pricing"</span></pre></section>
 
-<section id="features" class="rv"><p class="eyebrow">One engine. Two ways to use it.</p><h2>Clean structure, from messy sources.</h2><p class="note">Hosted API: single-page and parallel batch scraping, change tracking with diffs, sitemap discovery, CSS extraction, saved-page search, rendering, screenshots and RAG chunks. The full self-hosted toolkit also includes the crawl, search and model tools below.</p>
+<section id="features" class="rv"><p class="eyebrow">One engine. Two ways to use it.</p><h2>Clean structure, from messy sources.</h2><p class="note">Hosted API: single-page and parallel batch scraping, change tracking with diffs, reads sized to a token budget, a labelled archive fallback for pages that refuse automated readers, sitemap discovery, CSS extraction, saved-page search, rendering, screenshots and RAG chunks. The full self-hosted toolkit also includes the crawl, search and model tools below.</p>
 <div class="bento">
 <div class="cell w"><span class="n">01</span><h3>Markdown that keeps its shape</h3><p>Headings stay headings, tables become real tables, code keeps its language. Cookie banners and navigation are removed.</p></div>
 <div class="cell w"><span class="n">02</span><h3>JS pages, rendered safely</h3><p>A warm isolated browser with every request routed through our guarded fetcher. Hidden elements stripped, screenshots on request.</p></div>
@@ -195,6 +195,8 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
 <div class="cell"><span class="n">06</span><h3>Schema extraction</h3><p>JSON Schema in, validated JSON out via DeepSeek then OpenRouter.</p></div>
 <div class="cell"><span class="n">07</span><h3>Change tracking</h3><p>Every hosted scrape says whether the page is new, unchanged or changed since your last read. Ask for the diff and receive only the lines that moved.</p></div>
 <div class="cell"><span class="n">08</span><h3>Agent ready</h3><p>Six hosted MCP tools: scrape, parallel batch, check changes, map, saved-page search and credits. Every error says whether to retry and where to add credits. Page text is treated as untrusted data.</p></div>
+<div class="cell w"><span class="n">11</span><h3>Fits your context window</h3><p>Set <code>max_tokens</code> and a long page arrives in parts that each fit your model’s budget, cut on line breaks. Every reply reports its estimated tokens.</p></div>
+<div class="cell w"><span class="n">12</span><h3>An answer when the live site says no</h3><p>Ask for the archive fallback and a page that blocks automated readers, or no longer exists, comes back from the Internet Archive with its capture time stated. We never disguise the request or solve a CAPTCHA.</p></div>
 <div class="cell w"><span class="n">09</span><h3>Polite by default</h3><p>robots.txt, Crawl-delay, per-host pacing, retry with Retry-After, public-address-only fetching. The rules are the product.</p></div>
 <div class="cell w"><span class="n">10</span><h3>Open-web crawl</h3><p>Seed a URL and follow links across public sites, up to 1,000 pages a job. Built, not yet run at scale.</p></div>
 </div></section>

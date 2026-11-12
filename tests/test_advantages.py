@@ -195,3 +195,81 @@ async def test_long_documents_arrive_in_parts_that_rebuild_the_original(svc):
     assert "pagination" not in await small.json()
     r = await client.post("/v1/scrape", json={"url": "https://example.com/small", "render": "never", "page": 2}, headers=auth)
     assert r.status == 400
+
+
+async def test_archive_fallback_is_opt_in_labelled_and_refunds_when_no_copy_exists(tmp_path, monkeypatch):
+    from rainbo_scrape.policy import ScrapeError
+    monkeypatch.delenv("SCRAPER_GATEWAY_SECRET", raising=False)
+    billing = Billing(tmp_path / "billing.db")
+    h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
+    fetched = []
+
+    async def scrape(url, **kwargs):
+        fetched.append((url, kwargs.get("render")))
+        if url.startswith("https://web.archive.org/web/20261110121221id_/"):
+            return {"url": url, "title": "Listing", "markdown": "# Archived listing", "text": "Archived listing", "rendered": False,
+                    "receipt": {"final_url": url}}
+        if "walled" in url or "gone" in url:
+            raise ScrapeError("access_challenge", "access challenge detected; extraction paused.")
+        if "private" in url:
+            raise ScrapeError("blocked_address", "Only public internet addresses are permitted")
+        return {"url": url, "markdown": "# Live", "text": "Live", "rendered": False}
+
+    async def snapshot(url):
+        return None if "gone" in url else "20261110121221"
+
+    acct, auth = account(h, "starter", "cs_test_arch1")
+    async with TestClient(TestServer(make_app(billing, scrape, hosted=h, snapshot_fn=snapshot))) as client:
+        post = lambda body: client.post("/v1/scrape", json={"render": "auto", **body}, headers=auth)
+        # Without the option the block is reported, free, with a hint an agent can follow.
+        r = await post({"url": "https://walled.example/home"})
+        body = await r.json()
+        assert r.status == 400 and body["code"] == "access_challenge" and "fallback" in body["hint"]
+        assert billing.remaining(acct) == 25000 and len(fetched) == 1
+        # With the option the archive copy is returned and plainly labelled.
+        r = await post({"url": "https://walled.example/home", "fallback": "archive", "outputs": ["markdown"]})
+        body = await r.json()
+        archive = body["result"]["archive"]
+        assert r.status == 200 and body["result"]["markdown"] == "# Archived listing" and body["result"]["url"] == "https://walled.example/home"
+        assert archive["captured"] == "2026-11-10T12:12:21Z" and archive["live_page_served"] is False and archive["reason"] == "access_challenge"
+        assert archive["snapshot_url"] == "https://web.archive.org/web/20261110121221/https://walled.example/home"
+        assert "archived_copy" in body["result"]["warnings"] and fetched[-1][1] == "never" and body["credits_used"] == 1
+        # No copy: the original error, no charge, and no hint to try what was already tried.
+        r = await post({"url": "https://gone.example/", "fallback": "archive"})
+        body = await r.json()
+        assert r.status == 400 and body["code"] == "access_challenge" and "hint" not in body and billing.remaining(acct) == 24999
+        # A live page is never replaced, and safety refusals never fall back.
+        live = await (await post({"url": "https://open.example/", "fallback": "archive"})).json()
+        assert "archive" not in live["result"] and live["result"]["markdown"] == "# Live"
+        r = await post({"url": "https://private.example/", "fallback": "archive"})
+        assert r.status == 400 and (await r.json())["code"] == "blocked_address"
+        assert not any("web.archive.org" in u and "private" in u for u, _ in fetched)
+        r = await post({"url": "https://open.example/", "fallback": "proxy"})
+        assert r.status == 400
+        batch = await (await client.post("/v1/batch", json={"urls": ["https://walled.example/a", "https://open.example/b"], "render": "never"}, headers=auth)).json()
+        assert batch["results"][0]["code"] == "access_challenge" and "hint" in batch["results"][0] and batch["results"][1]["status"] == 200
+    billing.db.close()
+
+
+async def test_max_tokens_returns_parts_that_fit_a_context_budget(svc):
+    h, client, state = svc
+    state["delay"] = 0
+    acct, auth = account(h, "starter", "cs_test_paid8")
+    url = "https://example.com/guide"
+    document = "\n".join(f"Paragraph {i} " + "word " * 60 for i in range(400))      # about 31,000 tokens
+    state["pages"][url] = document
+    ask = lambda **extra: client.post("/v1/scrape", json={"url": url, "render": "never", "outputs": ["markdown"], **extra}, headers=auth)
+    whole = await (await ask()).json()
+    assert "pagination" not in whole and whole["estimated_tokens"] == -(-len(document) // 4)
+    first = await (await ask(max_tokens=4000)).json()
+    pages = first["pagination"]["pages"]
+    assert pages >= 8 and first["estimated_tokens"] <= 4000 * 1.1
+    parts = [first["result"]["markdown"]]
+    for page in range(2, pages + 1):
+        body = await (await ask(max_tokens=4000, page=page)).json()
+        assert body["estimated_tokens"] <= 4000 * 1.1
+        parts.append(body["result"]["markdown"])
+    assert "".join(parts) == document
+    assert (await ask(max_tokens=100)).status == 400
+    short = await (await client.post("/v1/scrape", json={"url": "https://example.com/s", "render": "never", "max_tokens": 4000}, headers=auth)).json()
+    assert "pagination" not in short
