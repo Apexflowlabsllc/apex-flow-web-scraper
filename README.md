@@ -10,6 +10,34 @@ for page in apex.crawl("https://www.sqlite.org/docs.html", limit=25):
     print(page["url"], page["status"])
 ```
 
+## Try it in 60 seconds
+
+1. [Get a free key](https://webscraper.apexflowlabs.com/trial.html): 1,000 credits, no card.
+2. Read a page:
+
+```bash
+curl https://webscraper.apexflowlabs.com/v1/scrape \
+  -H "Authorization: Bearer $APEX_SCRAPER_API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","render":"never","outputs":["markdown"]}'
+```
+
+3. Or give it to your agent (Claude Code, Codex, VS Code): [one-step MCP setup](https://webscraper.apexflowlabs.com/docs.html#agents).
+
+## Price per page
+
+Apex prices are live on the [pricing page](https://webscraper.apexflowlabs.com/#pricing). Firecrawl prices are from firecrawl.dev/pricing as read on 5 November 2026; check theirs for current figures.
+
+| Monthly spend | Apex pages | Firecrawl pages |
+|---|---|---|
+| $5 once, no subscription | 5,000 | no one-time option listed |
+| about $15 | 25,000 ($15) | 5,000 ($16) |
+| about $80 | 150,000 ($79) | 100,000 ($83) |
+| about $300 | 750,000 ($299) | 500,000 ($333) |
+
+Field extraction by CSS selector costs no extra credits. Failed and blocked pages cost nothing. There are no automatic overage charges.
+
+## What you get
+
 | What you get | Detail |
 |---|---|
 | Price | $5 once for 5,000 credits, or $15 / $79 / $299 a month for 25,000 / 150,000 / 750,000. A plain page is 1 credit. Failed and blocked pages are free. No automatic overages. |
