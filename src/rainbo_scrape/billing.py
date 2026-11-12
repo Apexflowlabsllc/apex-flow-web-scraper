@@ -12,10 +12,10 @@ from pathlib import Path
 # Price in USD per month, included credits. One credit = one plain (non-rendered) page.
 PLANS = {
     "free": {"price": 0, "credits": 1000, "rpm": 30, "concurrency": 2},
-    "pass": {"price": 5, "credits": 5000, "rpm": 60, "concurrency": 2},
-    "starter": {"price": 15, "credits": 25000, "rpm": 60, "concurrency": 2},
-    "growth": {"price": 79, "credits": 150000, "rpm": 60, "concurrency": 2},
-    "scale": {"price": 299, "credits": 750000, "rpm": 60, "concurrency": 2},
+    "pass": {"price": 5, "credits": 5000, "rpm": 60, "concurrency": 6},
+    "starter": {"price": 15, "credits": 25000, "rpm": 60, "concurrency": 6},
+    "growth": {"price": 79, "credits": 150000, "rpm": 60, "concurrency": 6},
+    "scale": {"price": 299, "credits": 750000, "rpm": 60, "concurrency": 6},
 }
 # Credits per request kind. Rendered pages cost our browser time; proxied pages cost real bandwidth.
 COSTS = {"page": 1, "render": 3, "proxy_page": 8, "proxy_render": 10, "extract": 2, "search": 1}

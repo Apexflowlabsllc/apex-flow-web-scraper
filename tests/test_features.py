@@ -294,3 +294,37 @@ def test_follow_external_is_a_validated_boolean(settings):
     assert validate_request({"urls": ["https://example.com/"]}, settings)["follow_external"] is False
     with pytest.raises(ValueError):
         validate_request({"urls": ["https://example.com/"], "follow_external": "yes"}, settings)
+
+async def test_crawl_delay_shared_by_independent_fetchers(site, settings):
+    base, _, _ = site
+    async with Fetcher(settings, Store(settings)) as first, Fetcher(settings, Store(settings)) as second:
+        await first.get(base + "/page")
+        started = time.monotonic()
+        await second.get(base + "/page2")
+        assert time.monotonic() - started >= 1.8
+
+
+async def test_waiting_browser_and_failed_launch_release_slots(settings, monkeypatch):
+    import asyncio
+    from rainbo_scrape import browser
+    from playwright import async_api
+
+    started = asyncio.Event()
+
+    class UnavailableBrowser:
+        async def start(self):
+            started.set()
+            raise RuntimeError("fixture launch failure")
+
+    slots = asyncio.BoundedSemaphore(1)
+    await slots.acquire()
+    monkeypatch.setattr(browser, "brave_path", lambda: "fixture")
+    monkeypatch.setattr(async_api, "async_playwright", UnavailableBrowser)
+    with pytest.raises(RuntimeError, match="fixture launch failure"):
+        async with Fetcher(settings, browser_slots=slots) as fetcher:
+            launch = asyncio.create_task(browser.get_browser(fetcher))
+            await asyncio.sleep(0)
+            assert not started.is_set()
+            slots.release()
+            await launch
+    assert started.is_set() and not slots.locked()

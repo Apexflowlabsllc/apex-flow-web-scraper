@@ -27,6 +27,9 @@ async def get_browser(fetcher):
     executable = brave_path()
     if not executable:
         raise ScrapeError("brave_missing", "Installed Brave is required for rendered pages")
+    if fetcher.browser_slots is not None and not fetcher.browser_slot_held:
+        await fetcher.browser_slots.acquire()
+        fetcher.browser_slot_held = True
     fetcher._playwright = await async_playwright().start()
     fetcher._browser = await fetcher._playwright.chromium.launch(
         executable_path=executable, headless=True,

@@ -22,8 +22,10 @@ def retry_delay(value):
 
 
 class Fetcher:
-    def __init__(self, settings, store=None):
+    def __init__(self, settings, store=None, *, browser_slots=None):
         self.settings, self.store = settings, store
+        self.browser_slots = browser_slots
+        self.browser_slot_held = False
         self.session = None
         self.robots, self.locks, self.last, self.delays = {}, {}, {}, {}
         self.requests = self.transferred = self.cache_hits = 0
@@ -47,15 +49,22 @@ class Fetcher:
         try:
             await close_browser(self)
         finally:
+            if self.browser_slot_held:
+                self.browser_slots.release()
+                self.browser_slot_held = False
             await self.session.close()
 
     async def _throttle(self, url, mark=True):
         # The robots.txt request itself does not start a Crawl-delay window:
         # the delay separates page fetches, so the first page is not held back.
         host = urlsplit(url).netloc
+        delay = max(self.settings.host_delay, self.delays.get(host, 0))
+        if self.store is not None and delay > 0:
+            while wait := self.store.host_wait(host, delay, mark):
+                await asyncio.sleep(wait)
+            return
         lock = self.locks.setdefault(host, asyncio.Lock())
         async with lock:
-            delay = max(self.settings.host_delay, self.delays.get(host, 0))
             await asyncio.sleep(max(0, self.last.get(host, 0)+delay-time.monotonic()))
             if mark:
                 self.last[host] = time.monotonic()

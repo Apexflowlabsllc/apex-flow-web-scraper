@@ -20,7 +20,7 @@
 ## Hosted service and limits
 - Hosted API: https://webscraper.apexflowlabs.com/v1. OpenAPI 3.1: https://webscraper.apexflowlabs.com/openapi.json. Human enrollment: https://webscraper.apexflowlabs.com/trial.html. Free trial: 1,000 credits once, subject to network and daily capacity. Project Pass: $5 once for 5,000 credits valid for 30 days. Monthly plans: $15 for 25,000; $79 for 150,000; $299 for 750,000 credits. Plain pages cost 1, rendered pages 3. No automatic overages.
 - Hosted: page scraping, JavaScript rendering, CSS field extraction, batches of up to 10 URLs, sitemap mapping, and account-scoped search over the latest 100 successfully scraped URLs. A nonempty map costs 1 credit; saved-page search costs no credits.
-- Hosted responses: 256 KiB per scrape. Two concurrent scrapes per account, subject to shared capacity. Attempts, including failures, are capped at twice the plan's credits per period. Failed scrapes return reserved credits.
+- Hosted responses: 256 KiB per scrape. Up to six concurrent page scrapes per paid account and two per free trial. Shared service limits: eight active page scrapes and two simultaneous browser renders. Source crawl delays apply. Attempts, including failures, are capped at twice the plan's credits per period. Failed scrapes return reserved credits.
 - Hosted model extraction and bulk crawl are not included. Those features remain in the self-hosted edition. Documentation: https://webscraper.apexflowlabs.com/docs.html.
 
 ## Not claimed
