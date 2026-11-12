@@ -72,13 +72,15 @@ def usage_details(h, account):
     from .billing import PLANS
     limits = h.billing.limits(account)
     plan = next(name for name, value in PLANS.items() if value is limits)
+    from .hosted_crawl import PAGE_LIMITS
+    crawl_pages = PAGE_LIMITS.get(plan, 100)
     order = h.db.execute("SELECT period_end FROM orders WHERE account=?", (account,)).fetchone()
     days = h.db.execute("""SELECT strftime('%Y-%m-%d',ts,'unixepoch'),SUM(credits),SUM(kind!='refund')
                            FROM usage WHERE account=? AND ts>? GROUP BY 1 ORDER BY 1""", (account, time.time()-14*86400)).fetchall()
     saved = h.db.execute("SELECT COUNT(*) FROM page_versions WHERE account=?", (account,)).fetchone()[0]
     return {"plan": plan, "credits_total": limits["credits"], "period_end": (order[0] or None) if order else None,
             "limits": {"requests_per_minute": limits["rpm"], "concurrent_scrapes": limits["concurrency"],
-                       "batch_urls": 10, "saved_pages": limits.get("saved_pages", 100)},
+                       "batch_urls": 10, "saved_pages": limits.get("saved_pages", 100), "crawl_pages": crawl_pages},
             "saved_pages": saved,
             "daily": [{"day": d, "credits": max(0, c or 0), "requests": n or 0} for d, c, n in days],
             "buy_url": h.site + "/#pricing"}

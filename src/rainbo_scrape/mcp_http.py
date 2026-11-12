@@ -37,12 +37,14 @@ def install(app, billing, operations, site):
             return reply(code=-32602, error="Expected an object for params")
         if method == "initialize":
             return reply({"protocolVersion": VERSION, "capabilities": {"tools": {}},
-                          "serverInfo": {"name": "Apex Flow 3D Scraper", "version": "0.5.0"},
+                          "serverInfo": {"name": "Apex Flow 3D Scraper", "version": "0.6.0"},
                           "instructions": mcp.instructions})
         if method == "ping":
             return reply({})
         if method == "tools/list":
-            return reply({"tools": [tool.model_dump(mode="json", exclude_none=True) for tool in await mcp.list_tools()]})
+            from .hosted_search import configured
+            return reply({"tools": [tool.model_dump(mode="json", exclude_none=True) for tool in await mcp.list_tools()
+                                    if tool.name != "web_search" or configured() or "/websearch_enabled" in operations]})
         if method != "tools/call":
             return reply(code=-32601, error="Unknown method")
         if not isinstance(params.get("name"), str) or not isinstance(params.get("arguments", {}), dict):

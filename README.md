@@ -1,5 +1,29 @@
 # Apex Flow 3D Scraper
 
+**Hosted API for developers and AI agents: scrape, crawl and monitor the public web as clean Markdown.** [Get 1,000 free credits](https://webscraper.apexflowlabs.com/trial.html) · [Docs](https://webscraper.apexflowlabs.com/docs.html) · [Pricing](https://webscraper.apexflowlabs.com/#pricing) · [OpenAPI](https://webscraper.apexflowlabs.com/openapi.json)
+
+```python
+from rainbo_scrape.hosted_client import Apex   # pip install "git+https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git"
+apex = Apex()                                   # reads APEX_SCRAPER_API_KEY
+page = apex.scrape("https://example.com", outputs=["markdown"], max_tokens=4000)
+for page in apex.crawl("https://www.sqlite.org/docs.html", limit=25):
+    print(page["url"], page["status"])
+```
+
+| What you get | Detail |
+|---|---|
+| Price | $5 once for 5,000 credits, or $15 / $79 / $299 a month for 25,000 / 150,000 / 750,000. A plain page is 1 credit. Failed and blocked pages are free. No automatic overages. |
+| Whole-site crawl | One call, background job, up to 1,000 pages, results as they arrive. |
+| Parallel batches | Up to 20 pages at once on Scale. |
+| Change tracking on every read | `new`, `unchanged` or `changed`, plus a changes-only diff. |
+| Built for context windows | `max_tokens` splits a page to fit; every reply reports estimated tokens. |
+| Archive fallback | A dated Internet Archive copy when the live site refuses. No CAPTCHA solving, no disguised requests. |
+| Agent-ready errors | A stable `code`, `retryable`, `retry_after`, a `hint`, and a `buy_url` when credits run out. |
+| MCP | Remote server at `https://webscraper.apexflowlabs.com/v1/mcp`, listed in the official MCP Registry. |
+| Clients | Python (`rainbo_scrape.hosted_client`) and Node (`sdk/node/hosted.mjs`), no dependencies. |
+| Self-host | MIT licensed engine in this repository. |
+
+
 An owned web extraction engine from [Apex Flow Labs](https://www.apexflowlabs.com).
 Collect public pages, keep extraction evidence, and work with durable jobs from
 a CLI, a private local workspace or a compatible MCP assistant.
@@ -11,7 +35,7 @@ Software is MIT licensed; compute, bandwidth, storage and maintenance are not fr
 
 [Start a free browser trial](https://webscraper.apexflowlabs.com/trial.html) for 1,000 credits. A Project Pass is $5 once for 5,000 credits valid for 30 days. Starter is $15/month for 25,000 credits. A successful plain page costs one credit and a rendered page costs three.
 
-Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. The six tools support page extraction, parallel batches, change checks, sitemap mapping, account-scoped search and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
+Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. The eight tools support page extraction, parallel batches, change checks, sitemap mapping, whole-site crawls, account-scoped search and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
 
 [Agent setup](https://webscraper.apexflowlabs.com/docs.html#agents) · [OpenAPI 3.1](https://webscraper.apexflowlabs.com/openapi.json) · [Benchmark and pricing comparison](https://webscraper.apexflowlabs.com/compare.html)
 
