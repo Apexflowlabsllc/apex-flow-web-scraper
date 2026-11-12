@@ -4,6 +4,7 @@ import logging
 import json
 import time
 from collections import defaultdict, deque
+from functools import partial
 from aiohttp import web
 from .billing import Billing, QuotaExceeded, cost_of
 from .client import ascrape
@@ -26,6 +27,9 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
     active = defaultdict(int)
     recent = defaultdict(deque)
     api_recent = defaultdict(deque)
+    if hosted and scrape_fn is ascrape:
+        scrape_fn = partial(ascrape, browser_slots=asyncio.BoundedSemaphore(2))
+    total_limit = 8 if hosted else 4
     total_active = 0
     rendering_active = 0
     @web.middleware
@@ -83,7 +87,7 @@ def make_app(billing, scrape_fn=ascrape, hosted=None):
             q.popleft()
         limits = billing.limits(account)
         may_render = body.get("render", "auto") != "never" or bool(body.get("screenshot"))
-        if len(q) >= limits["rpm"] or active[account] >= limits["concurrency"] or total_active >= 4 or (may_render and rendering_active >= 2):
+        if len(q) >= limits["rpm"] or active[account] >= limits["concurrency"] or total_active >= total_limit or (not hosted and may_render and rendering_active >= 2):
             return web.json_response({"error": "Request limit reached. Please retry shortly."}, status=429, headers={"Retry-After": "10"})
         worst = credits_for(body, rendered=body.get("render", "auto") != "never")
         left = billing.remaining(account)

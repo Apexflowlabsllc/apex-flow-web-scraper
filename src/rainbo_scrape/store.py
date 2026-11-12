@@ -27,6 +27,8 @@ class Store:
             CREATE TABLE IF NOT EXISTS events (
               id INTEGER PRIMARY KEY AUTOINCREMENT, job TEXT, ts REAL, message TEXT);
             CREATE INDEX IF NOT EXISTS events_job ON events(job,id);
+            CREATE TABLE IF NOT EXISTS host_pacing (host TEXT PRIMARY KEY, started REAL, next_allowed REAL);
+            CREATE INDEX IF NOT EXISTS pacing_expiry ON host_pacing(next_allowed);
             CREATE TABLE IF NOT EXISTS cache (
               key TEXT PRIMARY KEY, ts REAL, headers TEXT, body BLOB, url TEXT, status INTEGER);
             CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5(url UNINDEXED, job UNINDEXED, title, body, tokenize="porter unicode61");
@@ -45,6 +47,22 @@ class Store:
                 yield db
         finally:
             db.close()
+
+    def host_wait(self, host, delay, mark):
+        """Coordinate uncached page starts across clients sharing this store."""
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            now = time.time()
+            # Remember starts for the longest supported robots crawl delay.
+            db.execute("DELETE FROM host_pacing WHERE next_allowed < ?", (now - 60,))
+            row = db.execute("SELECT started,next_allowed FROM host_pacing WHERE host=?", (host,)).fetchone()
+            if row:
+                wait = max(row["started"] + delay, row["next_allowed"]) - now
+                if wait > 0:
+                    return wait
+            if mark:
+                db.execute("INSERT OR REPLACE INTO host_pacing VALUES(?,?,?)", (host, now, now + delay))
+            return 0
 
     def create(self, request):
         ident, now = uuid.uuid4().hex[:16], time.time()

@@ -218,3 +218,30 @@ async def test_free_search_and_usage_share_api_rate_limit_without_charging(hoste
     response=await c.get('/v1/usage',headers=headers)
     assert response.status==429 and response.headers['Retry-After']=='60'
     assert h.billing.remaining(account)==25000
+
+async def test_paid_scrape_burst_rejects_seventh_without_charging(hosted):
+    h, _, session, _, nonce, _ = hosted
+    await h.fulfill(session["id"])
+    key = h.key_for(session["id"], _hash(nonce))
+    headers = {"Authorization": "Bearer " + key}
+    body = {"url": "https://example.com", "render": "auto"}
+    full, release = asyncio.Event(), asyncio.Event()
+    started = 0
+    async def held_scrape(url, **options):
+        nonlocal started
+        started += 1
+        if started == 6:
+            full.set()
+        await release.wait()
+        return {"markdown": "fixture", "rendered": False}
+    async with TestClient(TestServer(make_app(h.billing, held_scrape, hosted=h))) as client:
+        pending = asyncio.gather(*(client.post("/v1/scrape", headers=headers, json=body) for _ in range(6)))
+        try:
+            await asyncio.wait_for(full.wait(), 5)
+            response = await client.post("/v1/scrape", headers=headers, json=body)
+            assert response.status == 429 and response.headers.get("Retry-After")
+        finally:
+            release.set()
+            responses = await pending
+        assert all(response.status == 200 for response in responses)
+    assert h.billing.remaining(h.billing.account_for(key)) == 24994

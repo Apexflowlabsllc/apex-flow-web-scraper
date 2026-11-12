@@ -16,7 +16,7 @@ class Page(dict):
 
 
 async def ascrape(url, *, render="auto", recipe=None, max_age=None, screenshot=False, extract=None,
-                  wait_selector=None, chunks=None, settings=None):
+                  wait_selector=None, chunks=None, settings=None, browser_slots=None):
     settings = settings or Settings()
     request = {"urls": [url], "max_pages": 1, "max_depth": 0, "render": render, "screenshot": screenshot}
     for key, value in (("recipe", recipe), ("max_age", max_age), ("extract", extract), ("wait_selector", wait_selector),
@@ -24,7 +24,7 @@ async def ascrape(url, *, render="auto", recipe=None, max_age=None, screenshot=F
         if value is not None:
             request[key] = value
     options = validate_request(request, settings)
-    async with Fetcher(settings, Store(settings)) as fetcher:
+    async with Fetcher(settings, Store(settings), browser_slots=browser_slots) as fetcher:
         async with asyncio.timeout(settings.timeout * 3 + 20):
             return Page(await _scrape(fetcher, options["urls"][0], options))
 
