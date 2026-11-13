@@ -75,3 +75,12 @@ their own authorised proxy or session (`RAINBO_SCRAPE_PROXY_URL`) and the sites'
 
 Firecrawl and Tavily latency, memory, Tavily search quality (we have no web search), live schema extraction,
 whether either service returns the same output from other networks, and anything at crawl scale.
+
+## Re-run, 13 November 2026 (0.8.0)
+
+Same 30 URLs and the same reference checks, one run, from a development machine, with the hosted API's rule that a named page is read even where robots.txt disallows it (`BENCH_ROBOTS=requested`). Raw rows: `tests/benchmark/results-0.8.0.json`.
+
+- Fetched live: 27 of 30 (was 26). text.npr.org now reads. reuters.com (HTTP 401), zillow.com and glassdoor.com (HTTP 403) refused this run. On the hosted API the same day, zillow.com's front page read live twice; treat it as intermittent. Refused pages return a labelled Internet Archive copy on the hosted API.
+- Reference checks: 88 of 94 passed. The two failures from 5 November are unchanged (spa-4 keeps "Enable JavaScript to see products"; page-2 keeps a "Login" link). The other four failures are checks that look for 5 November headlines on aljazeera.com, bbc.com and theguardian.com that are no longer on those front pages; the references need refreshing before this number can be compared with 92 of 94.
+- Time per URL: median 1.56 s, mean 2.15 s (5 November: median 1.45 s, mean 2.17 s).
+- Firecrawl was not re-run.
