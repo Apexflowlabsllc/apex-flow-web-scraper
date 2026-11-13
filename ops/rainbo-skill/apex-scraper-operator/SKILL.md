@@ -43,7 +43,7 @@ Sections 4 and 5 need server shell access. If your registered tools cannot do a 
 5. Switch: write a new drop-in in `/etc/systemd/system/apex-webscraper.service.d/` containing `Environment=PYTHONPATH=<release>/src`. The file that sorts LAST alphabetically wins, so name it after the newest existing one. Then `systemctl daemon-reload && systemctl restart apex-webscraper`.
 6. Verify within 20 seconds: local `/api/status` shows the new version. If not, roll back at once (section 5).
 7. Verify the changed behaviour through the public address with a labelled internal QA account that you revoke afterwards (pattern: `scripts/verify-hosted.py` in the repo). Internal QA accounts use the email internal-qa@apexflowlabs.com so reports exclude them.
-8. Website: from `site/`, `vercel deploy --prod --yes --scope apex-flow-labs`. It does NOT deploy on merge.
+8. Website: the Vercel project builds from this GitHub repository with root directory `site`. Deploy production from `main` after merging (Vercel deployment with Git source, target production), then check the live pages.
 9. MCP Registry: bump `server.json`, then `gh workflow run publish-mcp.yml --ref main`.
 
 ## 5. Rollback (one minute)
