@@ -25,7 +25,7 @@ curl https://webscraper.apexflowlabs.com/v1/scrape \
 
 ## Price per page
 
-Apex prices are live on the [pricing page](https://webscraper.apexflowlabs.com/#pricing). Firecrawl prices are from firecrawl.dev/pricing as read on 5 November 2026; check theirs for current figures.
+Apex prices are live on the [pricing page](https://webscraper.apexflowlabs.com/#pricing). Firecrawl figures are its annual-billing prices from firecrawl.dev/pricing, re-read on 13 November 2026 (monthly billing is $19 / $99 / $399); check theirs for current figures.
 
 | Monthly spend | Apex pages | Firecrawl pages |
 |---|---|---|
@@ -45,7 +45,9 @@ Field extraction by CSS selector costs no extra credits. Failed and blocked page
 | Parallel batches | Up to 20 pages at once on Scale. |
 | Change tracking on every read | `new`, `unchanged` or `changed`, plus a changes-only diff. |
 | Built for context windows | `max_tokens` splits a page to fit; every reply reports estimated tokens. |
-| Archive fallback | A dated Internet Archive copy when the live site refuses. No CAPTCHA solving, no disguised requests. |
+| Pages you name are read | A page you request by exact address is read even where robots.txt disallows it, and the receipt says so. Crawls and site maps still obey robots.txt. |
+| Archive copy by default | When the live site refuses, you get the latest Internet Archive copy, labelled with its capture time. Send `"fallback":"none"` for the error instead. No CAPTCHA solving, no disguised requests. |
+| Data packages | `POST /v1/packages/zillow`: a US metro's typical home value or rent, one-year change and monthly series from Zillow Research public data. `POST /v1/packages/npr`: NPR headlines by topic. 1 credit an answer. |
 | Agent-ready errors | A stable `code`, `retryable`, `retry_after`, a `hint`, and a `buy_url` when credits run out. |
 | MCP | Remote server at `https://webscraper.apexflowlabs.com/v1/mcp`, listed in the official MCP Registry. |
 | Clients | Python (`rainbo_scrape.hosted_client`) and Node (`sdk/node/hosted.mjs`), no dependencies. |
@@ -63,7 +65,7 @@ Software is MIT licensed; compute, bandwidth, storage and maintenance are not fr
 
 [Start a free browser trial](https://webscraper.apexflowlabs.com/trial.html) for 1,000 credits. A Project Pass is $5 once for 5,000 credits valid for 30 days. Starter is $15/month for 25,000 credits. A successful plain page costs one credit and a rendered page costs three.
 
-Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. Its tools support page extraction, parallel batches, change checks, sitemap mapping, whole-site crawls, account-scoped search and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
+Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. Its tools support page extraction, parallel batches, change checks, sitemap mapping, whole-site crawls, account-scoped search, Zillow market data, NPR headlines and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
 
 [Agent setup](https://webscraper.apexflowlabs.com/docs.html#agents) · [OpenAPI 3.1](https://webscraper.apexflowlabs.com/openapi.json) · [Benchmark and pricing comparison](https://webscraper.apexflowlabs.com/compare.html)
 
@@ -162,7 +164,7 @@ The parser subprocess has Linux CPU/memory limits; this is not a full sandbox.
 Windows parsing has a timeout but no equivalent hard memory cap. Retained job
 results do not yet have a global disk quota; monitor and manage storage.
 
-Use explicit job budgets. The engine respects robots instructions, but technical
+Use explicit job budgets. Crawls respect robots instructions; a single page you name can be read on request (`robots="requested"`). Technical
 access is not a complete determination of rights to use or republish content.
 
 ## Development and evidence
@@ -201,6 +203,8 @@ See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged capability pla
 
 
 ## Measured (0.2.0, 30-URL benchmark, 5 Nov 2026)
+
+Update, 13 November 2026 (hosted API 0.7.0): the four URLs that run could not fetch were requested again through the live API. text.npr.org and zillow.com were read live; reuters.com/world and glassdoor.com were refused live and returned labelled Internet Archive copies (captured 17 October 2026 and 28 August 2023). The other 26 URLs were not re-run.
 
 26/30 URLs fetched, 92/94 Markdown-fidelity checks passed (97.9%), median 1.45 s per URL, about 56 MB process memory.
 Details, failures and what is NOT measured (includes a 24-URL Firecrawl comparison: 91/93 vs 85/93 checks; Firecrawl fetched all 30 URLs, we fetched 26): `BENCHMARK-2026-11-05.md`.
