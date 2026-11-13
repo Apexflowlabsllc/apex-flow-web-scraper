@@ -17,7 +17,7 @@ When Brian or anyone asks how the scraper store is doing, answer from the block 
 
 ## 1. What it is
 - A paid API that turns public web pages into clean Markdown for developers and AI agents. Site: https://webscraper.apexflowlabs.com. Code: github.com/Apexflowlabsllc/apex-flow-web-scraper (public, MIT).
-- Prices: 1,000 free trial credits once; $5 one-time pass (5,000 credits, 30 days); $15 / $79 / $299 a month for 25,000 / 150,000 / 750,000 credits. Plain page 1 credit, rendered page 3, AI extraction 25 (paid plans only). Failed pages are free. No overages.
+- Prices: 1,000 free trial credits once; $5 one-time pass (35,000 credits, 30 days); $15 / $79 / $299 a month for 110,000 / 850,000 / 3,750,000 credits. Plain page 1 credit, rendered page 3, AI extraction 25 (paid plans only). Failed pages are free. No overages.
 - It runs on this server as systemd service `apex-webscraper` (port 8850, behind Caddy at webscraper-api.159.223.109.53.nip.io). The website is the Vercel project `apex-flow-web-scraper`. Payments are Stripe, shared with other Apex businesses: never touch Stripe objects that are not tagged product=apex-flow-web-scraper.
 
 ## 2. Every day (already automated; you read and act)
@@ -50,7 +50,7 @@ Sections 4 and 5 need server shell access. If your registered tools cannot do a 
 Delete the newest drop-in in `/etc/systemd/system/apex-webscraper.service.d/`, then `systemctl daemon-reload && systemctl restart apex-webscraper`, then check `/api/status`. The previous release starts. The database is forward-compatible; do not restore a backup unless data is actually damaged, and ask Brian first.
 
 ## 6. Money rules (never break these)
-- Never turn on a feature that pays a vendor per request unless its credit price is above its worst-case cost on the cheapest plan. AI extraction is 25 credits, paid plans only, 20,000 characters per call, 3,000 calls a day service-wide. Web search stays off until a search key exists and it is priced above that key's per-query cost.
+- Never turn on a feature that pays a vendor per request unless its credit price is above its worst-case cost on the cheapest plan. AI extraction is 150 credits, paid plans only, 20,000 characters per call, 3,000 calls a day service-wide. Web search stays off until a search key exists and it is priced above that key's per-query cost.
 - Never raise the free trial (1,000 credits, 20 new trials a day, one per network).
 - Never lower prices, issue refunds, change Stripe settings, or spend money without Brian saying yes to that exact action.
 - Never add CAPTCHA solving, disguised requests or proxy rotation. Crawls obey robots.txt; a page a customer names is read even where robots.txt disallows it (Brian's ruling, 13 November 2026). Bot walls are never evaded; a refused page returns the labelled archive copy by default.

@@ -37,7 +37,7 @@ async def test_pass_payment_and_duplicate_fulfillment(hosted):
     h.billing.charge(acct,"page",2)
     end=h.db.execute("SELECT period_end FROM orders WHERE account=?",(acct,)).fetchone()[0]
     await h.fulfill(s["id"])
-    assert h.entitled(acct) and h.billing.remaining(acct)==4998
+    assert h.entitled(acct) and h.billing.remaining(acct)==34998
     assert abs(end-time.time()-30*86400)<5
     assert h.db.execute("SELECT period_end FROM orders WHERE account=?",(acct,)).fetchone()[0]==end
 
@@ -58,4 +58,4 @@ async def test_remote_mcp_auth_tools_and_shared_metering(hosted):
         assert resp.status==200 and "result" in data
         if method=="tools/list": assert len(data["result"]["tools"])==10
         if method=="tools/call": assert "Fixture" in data["result"]["content"][0]["text"]
-    assert h.billing.remaining(h.billing.account_for(key))==24999
+    assert h.billing.remaining(h.billing.account_for(key))==109999

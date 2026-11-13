@@ -51,7 +51,7 @@ async def test_delivery_is_idempotent_and_duplicate_events_do_not_refill(hosted)
     assert account and h.entitled(account)
     h.billing.charge(account,"page",30)
     await h.fulfill(session["id"])
-    assert h.billing.remaining(account)==24970
+    assert h.billing.remaining(account)==109970
     assert h.db.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]==1
 
 
@@ -87,10 +87,10 @@ async def test_renewal_refills_once_and_cancellation_revokes_entitlement(hosted)
     sub["items"]["data"][0]["current_period_start"]+=2592000
     sub["items"]["data"][0]["current_period_end"]+=2592000
     await h.sync_subscription(sub["id"])
-    assert h.billing.remaining(a)==25000
+    assert h.billing.remaining(a)==110000
     h.billing.charge(a,"page",5)
     await h.sync_subscription(sub["id"])
-    assert h.billing.remaining(a)==24995
+    assert h.billing.remaining(a)==109995
     sub["status"]="canceled"
     await h.sync_subscription(sub["id"])
     assert not h.entitled(a)
@@ -104,7 +104,7 @@ async def test_failed_invoice_does_not_grant_new_period(hosted):
     sub["latest_invoice"]["status"]="open"
     sub["status"]="past_due"
     await h.sync_subscription(sub["id"])
-    assert not h.entitled(a) and h.billing.remaining(a)==24990
+    assert not h.entitled(a) and h.billing.remaining(a)==109990
 
 
 async def test_webhook_signature_rejects_forgery_and_accepts_signed_event(hosted):
@@ -124,8 +124,8 @@ async def test_failed_scrape_refunds_and_concurrent_requests_cannot_overspend(ho
     key=h.key_for(s["id"],_hash(nonce)); a=h.billing.account_for(key)
     headers={"Authorization":"Bearer "+key}
     r=await c.post("/v1/scrape",json={"url":"https://example.com/failure","render":"never"},headers=headers)
-    assert r.status==400 and h.billing.remaining(a)==25000
-    h.billing.charge(a,"page",24999)
+    assert r.status==400 and h.billing.remaining(a)==110000
+    h.billing.charge(a,"page",109999)
     responses=await asyncio.gather(*[c.post("/v1/scrape",json={"url":"https://example.com","render":"never"},headers=headers) for _ in range(2)])
     assert sorted(r.status for r in responses)==[200,402]
     assert h.billing.remaining(a)==0
@@ -174,7 +174,7 @@ async def test_batch_reports_individual_failures_and_bills_only_success(hosted):
     r=await c.post('/v1/batch',json={"urls":["https://example.com","https://example.com/failure"],"render":"never"},headers={"Authorization":"Bearer "+key})
     data=await r.json()
     assert r.status==200 and [x['status'] for x in data['results']]==[200,400]
-    assert h.billing.remaining(account)==24999
+    assert h.billing.remaining(account)==109999
 
 
 async def test_map_rejects_private_addresses_before_charge(hosted):
@@ -182,7 +182,7 @@ async def test_map_rejects_private_addresses_before_charge(hosted):
     await h.fulfill(s["id"])
     key=h.key_for(s["id"],_hash(nonce)); account=h.billing.account_for(key)
     r=await c.post('/v1/map',json={"url":"http://127.0.0.1"},headers={"Authorization":"Bearer "+key})
-    assert r.status==400 and h.billing.remaining(account)==25000
+    assert r.status==400 and h.billing.remaining(account)==110000
 
 
 async def test_attempt_budget_blocks_repeated_failures_without_spending_credits(hosted):
@@ -190,9 +190,9 @@ async def test_attempt_budget_blocks_repeated_failures_without_spending_credits(
     await h.fulfill(s["id"])
     key=h.key_for(s["id"],_hash(nonce)); account=h.billing.account_for(key)
     period=h.db.execute('SELECT period_start FROM accounts WHERE id=?',(account,)).fetchone()[0]
-    h.db.execute('INSERT INTO attempt_counts VALUES(?,?,?)',(account,period,50000))
+    h.db.execute('INSERT INTO attempt_counts VALUES(?,?,?)',(account,period,220000))
     r=await c.post('/v1/scrape',json={"url":"https://example.com","render":"never"},headers={"Authorization":"Bearer "+key})
-    assert r.status==429 and h.billing.remaining(account)==25000
+    assert r.status==429 and h.billing.remaining(account)==110000
 
 
 async def test_batch_keeps_completed_results_when_attempt_limit_is_hit(hosted):
@@ -200,11 +200,11 @@ async def test_batch_keeps_completed_results_when_attempt_limit_is_hit(hosted):
     await h.fulfill(s["id"])
     key=h.key_for(s["id"],_hash(nonce)); account=h.billing.account_for(key)
     period=h.db.execute('SELECT period_start FROM accounts WHERE id=?',(account,)).fetchone()[0]
-    h.db.execute('INSERT INTO attempt_counts VALUES(?,?,?)',(account,period,49999))
+    h.db.execute('INSERT INTO attempt_counts VALUES(?,?,?)',(account,period,219999))
     r=await c.post('/v1/batch',json={"urls":["https://example.com","https://example.org"],"render":"never"},headers={"Authorization":"Bearer "+key})
     d=await r.json()
     assert r.status==200 and [x['status'] for x in d['results']]==[200,429]
-    assert h.billing.remaining(account)==24999
+    assert h.billing.remaining(account)==109999
 
 
 async def test_free_search_and_usage_share_api_rate_limit_without_charging(hosted):
@@ -217,7 +217,7 @@ async def test_free_search_and_usage_share_api_rate_limit_without_charging(hoste
         assert response.status==200
     response=await c.get('/v1/usage',headers=headers)
     assert response.status==429 and response.headers['Retry-After']=='60'
-    assert h.billing.remaining(account)==25000
+    assert h.billing.remaining(account)==110000
 
 async def test_paid_scrape_burst_rejects_seventh_without_charging(hosted):
     h, _, session, _, nonce, _ = hosted
@@ -244,4 +244,4 @@ async def test_paid_scrape_burst_rejects_seventh_without_charging(hosted):
             release.set()
             responses = await pending
         assert all(response.status == 200 for response in responses)
-    assert h.billing.remaining(h.billing.account_for(key)) == 24994
+    assert h.billing.remaining(h.billing.account_for(key)) == 109994

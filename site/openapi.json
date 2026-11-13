@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Apex Flow 3D Scraper",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Accounts run 2 (trial), 6 (Pass, Starter), 12 (Growth) or 20 (Scale) page scrapes at once, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
   },
   "externalDocs": {
@@ -354,7 +354,7 @@
                     "required": [
                       "schema"
                     ],
-                    "description": "Paid plans. A model returns JSON validated against your schema in result.extracted. 25 extra credits.",
+                    "description": "Paid plans. A model returns JSON validated against your schema in result.extracted. 150 extra credits.",
                     "properties": {
                       "schema": {
                         "type": "object",

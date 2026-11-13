@@ -80,7 +80,7 @@ async def test_package_endpoints_charge_one_credit_only_for_an_answer(tmp_path, 
         r = await client.post("/v1/packages/zillow", json={"region": "Phoenix, AZ"}, headers=auth)
         body = await r.json()
         assert r.status == 200 and body["credits_used"] == 1 and body["result"]["latest"]["value"] == 447480.0
-        assert body["result"]["change_1y_pct"] == -1.0 and billing.remaining(acct) == 24999
+        assert body["result"]["change_1y_pct"] == -1.0 and billing.remaining(acct) == 109999
         # The same file serves the next question without another download.
         await client.post("/v1/packages/zillow", json={"region": "Sacramento, CA"}, headers=auth)
         assert len([u for u in loads if "zhvi" in u]) == 1
@@ -91,7 +91,7 @@ async def test_package_endpoints_charge_one_credit_only_for_an_answer(tmp_path, 
         # Source failure: a retryable error, nothing charged.
         r = await client.post("/v1/packages/zillow", json={"region": "Phoenix, AZ", "metric": "rents"}, headers=auth)
         body = await r.json()
-        assert r.status == 502 and body["retryable"] is True and billing.remaining(acct) == 24998
+        assert r.status == 502 and body["retryable"] is True and billing.remaining(acct) == 109998
         r = await client.post("/v1/packages/npr", json={"topic": "news", "limit": 2}, headers=auth)
         body = await r.json()
         assert r.status == 200 and body["credits_used"] == 1 and body["result"]["count"] == 2
