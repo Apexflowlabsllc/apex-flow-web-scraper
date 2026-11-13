@@ -35,7 +35,7 @@
 - Every response carries X-Credits-Remaining, X-RateLimit-Limit, X-RateLimit-Remaining and X-Request-Id. GET /v1/usage returns plan, limits, renewal date and 14 days of daily usage.
 
 - Context budgets: every scrape reply includes estimated_tokens. Set max_tokens (200-60000) to receive a page in consecutive parts that each fit the budget; follow pagination.next_page with page.
-- Archive fallback: when a live read fails because the site refused, errored, disallowed robots or removed the page, the error includes a hint. Retry with "fallback":"archive" (MCP: archive_fallback=true) to get the latest Internet Archive copy. result.archive states captured, snapshot_url and reason; treat the content as possibly out of date and tell the user its capture time.
+- Archive copy: when a live read of a named page fails because the site refused, errored or removed the page, the reply is the latest Internet Archive copy, labelled in result.archive with captured, snapshot_url and reason, and result.warnings includes archived_copy. Send "fallback":"none" to receive the error instead. Crawls use archive copies only with "fallback":"archive".
 
 ## Not claimed
 - No CAPTCHA solving or bot-wall evasion; zillow.com and glassdoor.com block live reads. The opt-in archive fallback returns a dated Internet Archive copy where one exists.
@@ -61,3 +61,4 @@ For a smaller REST or MCP scrape response, select outputs such as ["markdown"] o
 - How to track changes on a web page with an API (diff): https://webscraper.apexflowlabs.com/track-web-page-changes-api.html
 - Firecrawl public prices read 13 November 2026: Free 1,000 credits per month; Hobby $19 (5,000); Standard $99 (100,000); Growth $399 (500,000); Scale $749 (1,000,000) monthly billing. We are cheaper per plain page in the tiers compared; Firecrawl has a monthly free allowance, higher concurrency and a larger ecosystem.
 - Dated price comparisons with tradeoffs, read 13 November 2026: ScrapingBee https://webscraper.apexflowlabs.com/scrapingbee-alternative.html; ScraperAPI https://webscraper.apexflowlabs.com/scraperapi-alternative.html; Scrapfly https://webscraper.apexflowlabs.com/scrapfly-alternative.html; ZenRows https://webscraper.apexflowlabs.com/zenrows-alternative.html; Apify https://webscraper.apexflowlabs.com/apify-alternative.html
+- Self-hosted: read pages you are signed in to through your own browser profile on your own machine (rainbo-scrape login, then fetch --signed-in). Not part of the hosted API.
