@@ -34,7 +34,8 @@ def peak_mb():
 
 async def main(url, render, outfile):
     settings = Settings(data_dir=Path(os.environ.get("RAINBO_SCRAPE_DATA", ".bench-data")))
-    options = validate_request({"urls": [url], "max_pages": 1, "max_depth": 0, "render": render, "cache": False}, settings)
+    options = validate_request({"urls": [url], "max_pages": 1, "max_depth": 0, "render": render, "cache": False,
+                                "robots": os.environ.get("BENCH_ROBOTS", "obey")}, settings)
     row = {"url": url, "ok": False}
     started = time.monotonic()
     try:
