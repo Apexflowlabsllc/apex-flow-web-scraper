@@ -46,6 +46,25 @@ async def find_snapshot(url):
     return stamp
 
 
+def restore_links(value, stamp, url, _top=True):
+    """Point an archived page's own links back at the site it came from.
+
+    The raw capture keeps the page's relative links, which resolve against web.archive.org and lead nowhere.
+    The receipt and the archive label are left untouched: they record where the bytes really came from."""
+    import re
+    from urllib.parse import urlsplit
+    if isinstance(value, str):
+        parts = urlsplit(url)
+        value = re.sub(r"https?://web\.archive\.org/web/%s(?:id_)?/(?=https?://)" % stamp, "", value)
+        return re.sub(r"https?://web\.archive\.org/(?!web/)", f"{parts.scheme}://{parts.netloc}/", value)
+    if isinstance(value, list):
+        return [restore_links(item, stamp, url, False) for item in value]
+    if isinstance(value, dict):
+        return {key: item if _top and key in ("receipt", "archive") else restore_links(item, stamp, url, False)
+                for key, item in value.items()}
+    return value
+
+
 def failure(exc, asked_archive=False):
     """Error fields for a scrape that failed: the engine's own code and, where it applies, the archive hint."""
     code = getattr(exc, "code", None) if isinstance(exc, ScrapeError) else None
@@ -241,7 +260,7 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
                     stamp = await snapshot_fn(url) if fallback == "archive" and exc.code in ARCHIVABLE else None
                     if not stamp:
                         raise
-                    result = dict(await scrape_fn(f"https://web.archive.org/web/{stamp}id_/{url}", **{**body, "render": "never"}))
+                    result = restore_links(dict(await scrape_fn(f"https://web.archive.org/web/{stamp}id_/{url}", **{**body, "render": "never"})), stamp, url)
                     result["url"] = url
                     result["archive"] = {
                         "provider": "Internet Archive Wayback Machine", "live_page_served": False, "reason": exc.code,
