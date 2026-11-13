@@ -285,8 +285,10 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
   function legacy(){
   var io=null;
   if('IntersectionObserver' in window){
-    io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+    io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:0,rootMargin:'0px 0px -8% 0px'});
     document.querySelectorAll('.rv').forEach(function(n){io.observe(n)});
+    // Never leave a section hidden: tall sections, background tabs and in-app browsers can miss the observer.
+    setTimeout(function(){document.querySelectorAll('.rv:not(.in)').forEach(function(n){n.classList.add('in')})},2500);
   }else{document.querySelectorAll('.rv').forEach(function(n){n.classList.add('in')})}
   document.querySelectorAll('.cell').forEach(function(c){
     c.addEventListener('pointermove',function(e){var r=c.getBoundingClientRect();c.style.setProperty('--x',(e.clientX-r.left)+'px');c.style.setProperty('--y',(e.clientY-r.top)+'px')});
