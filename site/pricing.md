@@ -12,7 +12,7 @@ Last checked: 13 November 2026. Hosted API: https://webscraper.apexflowlabs.com/
 | Scale | $299 / month | 3,750,000 credits | |
 
 ## Credit costs
-- Plain page: 1 credit. Data package answer (Zillow market data, NPR headlines): 1 credit. JavaScript-rendered page: 3 credits. AI schema extraction: 150 extra credits (paid plans only). CSS field extraction: free. Non-empty site map: 1 credit. Saved-page search: free.
+- Plain page: 1 credit. Data package answer (house prices by metro, NPR headlines): 1 credit. JavaScript-rendered page: 3 credits. AI schema extraction: 150 extra credits (paid plans only). CSS field extraction: free. Non-empty site map: 1 credit. Saved-page search: free.
 - Failed scrapes return the reserved credits. No automatic overages: when credits run out, requests stop; you are never billed extra.
 
 ## Effective price per 1,000 plain pages

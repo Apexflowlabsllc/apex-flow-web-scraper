@@ -92,9 +92,9 @@ class Apex:
         """The data packages and their inputs. Free."""
         return self._call("GET", "/packages")
 
-    def zillow_market(self, region, metric="home_values", months=24):
-        """A US metro's typical home value or rent, one-year change and monthly series (Zillow Research public data). 1 credit."""
-        return self._call("POST", "/packages/zillow", {"region": region, "metric": metric, "months": months})
+    def house_prices(self, region, quarters=8):
+        """A US metro's house price index, one- and five-year change and quarterly series (FHFA, public domain). 1 credit."""
+        return self._call("POST", "/packages/housing", {"region": region, "quarters": quarters})
 
     def npr_news(self, topic="news", limit=10):
         """Latest NPR headlines for a topic, with links. 1 credit."""

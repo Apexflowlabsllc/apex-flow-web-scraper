@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.Apexflowlabsllc/apex-flow-web-scraper",
   "title": "Apex Flow 3D Scraper",
-  "description": "Scrape, crawl and monitor public pages as Markdown, with Zillow and NPR data tools and receipts.",
-  "version": "0.9.0",
+  "description": "Scrape, crawl and monitor public pages as Markdown, with house-price and news data tools.",
+  "version": "0.10.0",
   "websiteUrl": "https://webscraper.apexflowlabs.com",
   "repository": {
     "url": "https://github.com/Apexflowlabsllc/apex-flow-web-scraper",

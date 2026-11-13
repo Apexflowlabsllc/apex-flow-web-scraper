@@ -128,9 +128,9 @@ async def search_saved(query: str, limit: int = 10):
 
 
 @mcp.tool()
-async def zillow_market(region: str, metric: Literal["home_values", "rents"] = "home_values", months: int = 24):
-    """Typical home value or asking rent for a US metro such as "Sacramento, CA", with the one-year change and a monthly series, from Zillow Research's public data files. One credit for an answer; a list of candidate metro names is free. Show the attribution in result.source."""
-    return await request("/packages/zillow", {"region": region, "metric": metric, "months": months})
+async def house_prices(region: str, quarters: int = 8):
+    """House price index for a US metro such as "Sacramento, CA": the latest quarter, one-year and five-year change and a quarterly series, from the Federal Housing Finance Agency (U.S. government, public domain). It is an index, not a dollar price. One credit for an answer; a list of candidate metro names is free."""
+    return await request("/packages/housing", {"region": region, "quarters": quarters})
 
 
 @mcp.tool()

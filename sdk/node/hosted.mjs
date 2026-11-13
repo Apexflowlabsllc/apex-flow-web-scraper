@@ -64,7 +64,7 @@ export class Apex {
   usage() { return this.#call("GET", "/usage"); }
   // Data packages: answers from a publisher's own public data. 1 credit an answer.
   packages() { return this.#call("GET", "/packages"); }
-  zillowMarket(region, metric = "home_values", months = 24) { return this.#call("POST", "/packages/zillow", { region, metric, months }); }
+  housePrices(region, quarters = 8) { return this.#call("POST", "/packages/housing", { region, quarters }); }
   nprNews(topic = "news", limit = 10) { return this.#call("POST", "/packages/npr", { topic, limit }); }
   startCrawl(url, limit = 25, options = {}) { return this.#call("POST", "/crawl", { url, limit, ...options }); }
   crawlStatus(id, offset = 0) { return this.#call("GET", `/crawl/${id}?offset=${Number(offset) || 0}`); }
