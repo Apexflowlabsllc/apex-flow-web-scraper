@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Apex Flow 3D Scraper",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Accounts run 2 (trial), 6 (Pass, Starter), 12 (Growth) or 20 (Scale) page scrapes at once, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
   },
   "externalDocs": {
@@ -1014,6 +1014,301 @@
         "responses": {
           "200": {
             "description": "Cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/zillow": {
+      "post": {
+        "operationId": "zillowMarket",
+        "summary": "Typical home value or rent for a US metro, from Zillow Research public data (1 credit)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "description": "Metro name, for example \"Sacramento, CA\"."
+                  },
+                  "metric": {
+                    "type": "string",
+                    "enum": [
+                      "home_values",
+                      "rents"
+                    ],
+                    "default": "home_values"
+                  },
+                  "months": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120,
+                    "default": 24
+                  }
+                },
+                "required": [
+                  "region"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answer. credits_used is 0 when no single answer could be given.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "region": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metric": {
+                          "type": "string"
+                        },
+                        "latest": {
+                          "type": "object",
+                          "properties": {
+                            "date": {
+                              "type": "string",
+                              "format": "date"
+                            },
+                            "value": {
+                              "type": "number"
+                            }
+                          }
+                        },
+                        "change_1y_pct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "series": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "date": {
+                                "type": "string",
+                                "format": "date"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        },
+                        "matches": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Present instead of latest when no single metro matched. Free."
+                        },
+                        "source": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "attribution": {
+                              "type": "string",
+                              "description": "Show this wherever you show the data."
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "credits_used": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "credits_left": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages/npr": {
+      "post": {
+        "operationId": "nprNews",
+        "summary": "Latest NPR headlines for a topic, from NPR public feeds (1 credit)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "topic": {
+                    "type": "string",
+                    "enum": [
+                      "news",
+                      "world",
+                      "business",
+                      "science",
+                      "politics",
+                      "technology",
+                      "health"
+                    ],
+                    "default": "news"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 25,
+                    "default": 10
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answer. credits_used is 0 when no single answer could be given.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "topic": {
+                          "type": "string"
+                        },
+                        "count": {
+                          "type": "integer"
+                        },
+                        "stories": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "summary": {
+                                "type": "string"
+                              },
+                              "published": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "source": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "attribution": {
+                              "type": "string",
+                              "description": "Show this wherever you show the data."
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "credits_used": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "credits_left": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/packages": {
+      "get": {
+        "operationId": "listPackages",
+        "summary": "List the data packages and their inputs (free)",
+        "responses": {
+          "200": {
+            "description": "Packages",
             "content": {
               "application/json": {
                 "schema": {

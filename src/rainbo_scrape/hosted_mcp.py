@@ -128,6 +128,18 @@ async def search_saved(query: str, limit: int = 10):
 
 
 @mcp.tool()
+async def zillow_market(region: str, metric: Literal["home_values", "rents"] = "home_values", months: int = 24):
+    """Typical home value or asking rent for a US metro such as "Sacramento, CA", with the one-year change and a monthly series, from Zillow Research's public data files. One credit for an answer; a list of candidate metro names is free. Show the attribution in result.source."""
+    return await request("/packages/zillow", {"region": region, "metric": metric, "months": months})
+
+
+@mcp.tool()
+async def npr_news(topic: Literal["news", "world", "business", "science", "politics", "technology", "health"] = "news", limit: int = 10):
+    """Latest NPR headlines for a topic with summaries and links, from NPR's public feed. One credit. Pass a story link to scrape_page to read it."""
+    return await request("/packages/npr", {"topic": topic, "limit": limit})
+
+
+@mcp.tool()
 async def credit_balance():
     """Return remaining credits, plan, limits, renewal date, recent daily usage and the link for buying more."""
     return await request("/usage")
