@@ -29,10 +29,10 @@ Apex prices are live on the [pricing page](https://webscraper.apexflowlabs.com/#
 
 | Monthly spend | Apex pages | Firecrawl pages |
 |---|---|---|
-| $5 once, no subscription | 5,000 | no one-time option listed |
-| about $15 | 25,000 ($15) | 5,000 ($16) |
-| about $80 | 150,000 ($79) | 100,000 ($83) |
-| about $300 | 750,000 ($299) | 500,000 ($333) |
+| $5 once, no subscription | 35,000 | no one-time option listed |
+| about $15 | 110,000 ($15) | 5,000 ($16) |
+| about $80 | 850,000 ($79) | 100,000 ($83) |
+| about $300 | 3,750,000 ($299) | 500,000 ($333) |
 
 Field extraction by CSS selector costs no extra credits. Failed and blocked pages cost nothing. There are no automatic overage charges.
 
@@ -40,7 +40,7 @@ Field extraction by CSS selector costs no extra credits. Failed and blocked page
 
 | What you get | Detail |
 |---|---|
-| Price | $5 once for 5,000 credits, or $15 / $79 / $299 a month for 25,000 / 150,000 / 750,000. A plain page is 1 credit. Failed and blocked pages are free. No automatic overages. |
+| Price | $5 once for 35,000 credits, or $15 / $79 / $299 a month for 110,000 / 850,000 / 3,750,000. A plain page is 1 credit. Failed and blocked pages are free. No automatic overages. |
 | Whole-site crawl | One call, background job, up to 1,000 pages, results as they arrive. |
 | Parallel batches | Up to 20 pages at once on Scale. |
 | Change tracking on every read | `new`, `unchanged` or `changed`, plus a changes-only diff. |
@@ -63,7 +63,7 @@ Software is MIT licensed; compute, bandwidth, storage and maintenance are not fr
 
 ## Hosted API for agents
 
-[Start a free browser trial](https://webscraper.apexflowlabs.com/trial.html) for 1,000 credits. A Project Pass is $5 once for 5,000 credits valid for 30 days. Starter is $15/month for 25,000 credits. A successful plain page costs one credit and a rendered page costs three.
+[Start a free browser trial](https://webscraper.apexflowlabs.com/trial.html) for 1,000 credits. A Project Pass is $5 once for 35,000 credits valid for 30 days. Starter is $15/month for 110,000 credits. A successful plain page costs one credit and a rendered page costs three.
 
 Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. Its tools support page extraction, parallel batches, change checks, sitemap mapping, whole-site crawls, account-scoped search, Zillow market data, NPR headlines and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
 

@@ -57,7 +57,7 @@ async def test_crawl_follows_one_site_charges_only_successes_and_pages_results(s
     assert r.status == 200 and started["status"] == "running" and started["id"].startswith("crawl_")
     body = await finish(client, auth, started["id"])
     assert body["status"] == "completed" and body["pages_done"] == 12 and body["pages_failed"] == 1
-    assert body["credits_used"] == 12 and h.billing.remaining(acct) == 25000 - 12       # the failed page was free
+    assert body["credits_used"] == 12 and h.billing.remaining(acct) == 110000 - 12       # the failed page was free
     assert all(u.startswith("https://docs.example/p") for u in seen) and len(seen) == len(set(seen))
     pages, offset = [], 0
     while offset is not None:
@@ -118,13 +118,13 @@ async def test_mcp_crawl_tools_and_web_search_visibility(svc):
     assert status["status"] == "completed" and status["pages_done"] == 4 and len(status["results"]) >= 4
 
 
-async def test_web_search_charges_two_credits_and_nothing_for_no_results(svc):
+async def test_web_search_charges_above_cost_and_nothing_for_no_results(svc):
     h, client, seen = svc
     acct, auth = account(h, "starter", "cs_test_search1")
     body = await (await client.post("/v1/websearch", json={"query": "apex scraper", "limit": 3}, headers=auth)).json()
-    assert len(body["results"]) == 3 and body["credits_used"] == 2 and body["credits_left"] == 24998
+    assert len(body["results"]) == 3 and body["credits_used"] == 70 and body["credits_left"] == 109930
     body = await (await client.post("/v1/websearch", json={"query": "nothing"}, headers=auth)).json()
-    assert body["results"] == [] and body["credits_used"] == 0 and h.billing.remaining(acct) == 24998
+    assert body["results"] == [] and body["credits_used"] == 0 and h.billing.remaining(acct) == 109930
     assert (await client.post("/v1/websearch", json={"query": ""}, headers=auth)).status == 400
 
 
@@ -149,7 +149,7 @@ async def test_web_search_and_model_extraction_stay_off_without_operator_keys(tm
         monkeypatch.setenv("DEEPSEEK_API_KEY", "fixture")
         r = await client.post("/v1/scrape", json={"url": "https://example.com", "render": "never", "extract": spec, "outputs": ["markdown"]}, headers=auth)
         body = await r.json()
-        assert r.status == 200 and body["credits_used"] == 26 and body["result"]["extracted"] == {"name": "Hi"} and calls[0]["extract"] == spec
+        assert r.status == 200 and body["credits_used"] == 151 and body["result"]["extracted"] == {"name": "Hi"} and calls[0]["extract"] == spec
         # Trials never trigger a paid model call, and the service-wide daily ceiling holds.
         _, trial = account(h, "free", "trial_" + "f" * 32)
         r = await client.post("/v1/scrape", json={"url": "https://example.com", "render": "never", "extract": spec}, headers=trial)
@@ -157,7 +157,7 @@ async def test_web_search_and_model_extraction_stay_off_without_operator_keys(tm
         assert r.status == 402 and body["code"] == "paid_plan_required" and body["buy_url"] and len(calls) == 1
         monkeypatch.setenv("APEX_EXTRACT_DAILY_CAP", "1")
         r = await client.post("/v1/scrape", json={"url": "https://example.com", "render": "never", "extract": spec}, headers=auth)
-        assert r.status == 429 and (await r.json())["code"] == "extract_daily_limit" and len(calls) == 1 and billing.remaining(acct) == 25000 - 26
+        assert r.status == 429 and (await r.json())["code"] == "extract_daily_limit" and len(calls) == 1 and billing.remaining(acct) == 110000 - 151
     billing.db.close()
 
 

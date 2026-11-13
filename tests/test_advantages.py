@@ -57,7 +57,7 @@ async def test_paid_batch_runs_six_at_once_and_keeps_order(svc):
     assert [r["url"] for r in body["results"]] == urls and body["processed"] == 10 and body["unprocessed"] == []
     assert state["peak"] == 6 and body["concurrency"] == 6
     assert elapsed < 10 * state["delay"] * 0.6      # sequential would take ten delays
-    assert body["credits_left"] == 25000 - 10
+    assert body["credits_left"] == 110000 - 10
 
 
 async def test_trial_batch_is_limited_to_two_and_failures_are_refunded(svc):
@@ -122,10 +122,10 @@ async def test_rate_limit_headers_and_usage_detail(svc):
     acct, auth = account(h, "starter", "cs_test_paid4")
     r = await client.post("/v1/scrape", json={"url": "https://example.com/1", "render": "never"}, headers=auth)
     assert r.headers["X-RateLimit-Limit"] == "60" and r.headers["X-RateLimit-Remaining"] == "59"
-    assert r.headers["X-Credits-Remaining"] == "24999"
+    assert r.headers["X-Credits-Remaining"] == "109999"
     await client.post("/v1/scrape", json={"url": "https://example.com/broken", "render": "never"}, headers=auth)
     usage = await (await client.get("/v1/usage", headers=auth)).json()
-    assert usage["credits_left"] == 24999 and usage["credits_total"] == 25000 and usage["plan"] == "starter"
+    assert usage["credits_left"] == 109999 and usage["credits_total"] == 110000 and usage["plan"] == "starter"
     assert usage["limits"] == {"requests_per_minute": 60, "concurrent_scrapes": 6, "batch_urls": 10, "saved_pages": 1000, "crawl_pages": 100}
     assert usage["saved_pages"] == 1 and usage["period_end"] > time.time()
     assert usage["daily"] == [{"day": time.strftime("%Y-%m-%d", time.gmtime()), "credits": 1, "requests": 2}]
@@ -162,7 +162,7 @@ async def test_mcp_check_changes_returns_only_what_moved(svc):
     state["pages"][urls[1]] = "Line one\nLine two\nPrice: $99"
     second = json.loads((await (await call()).json())["result"]["content"][0]["text"])
     assert second["changed"] == [urls[1]] and "+Price: $99" in second["pages"][1]["change"]["diff"]
-    assert "markdown" not in json.dumps(second) and second["credits_left"] == 25000 - 4
+    assert "markdown" not in json.dumps(second) and second["credits_left"] == 110000 - 4
     balance = json.loads((await (await client.post("/v1/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/call",
         "params": {"name": "credit_balance", "arguments": {}}}, headers=auth)).json())["result"]["content"][0]["text"])
     assert balance["plan"] == "starter" and balance["limits"]["concurrent_scrapes"] == 6
@@ -188,7 +188,7 @@ async def test_long_documents_arrive_in_parts_that_rebuild_the_original(svc):
     assert body["pagination"]["next_page"] is None
     assert "".join(parts) == document                       # nothing lost, nothing repeated
     assert all(p.startswith("## Section") for p in parts)   # cut on line breaks
-    assert first["credits_used"] == 1 and h.billing.remaining(acct) == 25000 - info["pages"]
+    assert first["credits_used"] == 1 and h.billing.remaining(acct) == 110000 - info["pages"]
     r = await ask(info["pages"] + 1)
     assert r.status == 400 and "out of range" in (await r.json())["error"]
     # A small page is untouched and rejects a page number it does not have.
@@ -226,7 +226,7 @@ async def test_archive_fallback_is_labelled_can_be_declined_and_refunds_when_no_
         r = await post({"url": "https://walled.example/home", "fallback": "none"})
         body = await r.json()
         assert r.status == 400 and body["code"] == "access_challenge" and "fallback" in body["hint"]
-        assert billing.remaining(acct) == 25000 and len(fetched) == 1
+        assert billing.remaining(acct) == 110000 and len(fetched) == 1
         # With the option the archive copy is returned and plainly labelled.
         r = await post({"url": "https://walled.example/home", "fallback": "archive", "outputs": ["markdown"]})
         body = await r.json()
@@ -238,7 +238,7 @@ async def test_archive_fallback_is_labelled_can_be_declined_and_refunds_when_no_
         # No copy: the original error, no charge, and no hint to try what was already tried.
         r = await post({"url": "https://gone.example/", "fallback": "archive"})
         body = await r.json()
-        assert r.status == 400 and body["code"] == "access_challenge" and "hint" not in body and billing.remaining(acct) == 24999
+        assert r.status == 400 and body["code"] == "access_challenge" and "hint" not in body and billing.remaining(acct) == 109999
         # A live page is never replaced, and safety refusals never fall back.
         live = await (await post({"url": "https://open.example/", "fallback": "archive"})).json()
         assert "archive" not in live["result"] and live["result"]["markdown"] == "# Live"

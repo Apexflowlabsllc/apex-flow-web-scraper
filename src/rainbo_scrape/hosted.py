@@ -188,7 +188,7 @@ class Hosted:
 
         async def health(request):
             self.db.execute("SELECT 1").fetchone()
-            return web.json_response({"ok": True, "checkout": bool(self.stripe_key and self.webhook_secret), "version": "0.8.0"})
+            return web.json_response({"ok": True, "checkout": bool(self.stripe_key and self.webhook_secret), "version": "0.9.0"})
 
         async def checkout(request):
             ip = self.limit(request, "checkout", 12)
@@ -218,7 +218,7 @@ class Hosted:
             else:
                 form["customer_creation"] = "always"
                 form["line_items[0][price_data][product_data][name]"] = "Apex Flow 3D Scraper Project Pass"
-                form["line_items[0][price_data][product_data][description]"] = "5,000 credits valid for 30 days from activation. One-time purchase."
+                form["line_items[0][price_data][product_data][description]"] = "35,000 credits valid for 30 days from activation. One-time purchase."
             data = await self.stripe("POST", "checkout/sessions", form, "webscraper-" + digest)
             from .hosted_features import event
             event(self, "checkout_created", plan)

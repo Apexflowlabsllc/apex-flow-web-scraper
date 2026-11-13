@@ -21,7 +21,7 @@ Codex: `codex mcp add apex-scraper --url https://webscraper.apexflowlabs.com/v1/
 - Scrape one page to Markdown: `POST /v1/scrape {"url":"https://example.com","render":"never"}`. Use `"render":"auto"` only when the page needs JavaScript (3 credits instead of 1). The Markdown is in `result.markdown`.
 - Parallel pages: `POST /v1/batch` with up to 10 URLs.
 - Whole site: `POST /v1/crawl {"url":"https://example.com","limit":50}` then `GET /v1/crawl/{id}?offset=N` until `next_offset` is null.
-- Site map: `POST /v1/map`. Named fields without an AI model: add a CSS recipe to a scrape (free). AI schema extraction: add `extract {schema, prompt}` (25 extra credits, paid plans).
+- Site map: `POST /v1/map`. Named fields without an AI model: add a CSS recipe to a scrape (free). AI schema extraction: add `extract {schema, prompt}` (150 extra credits, paid plans).
 - Changes: each scrape says whether the page is new, unchanged or changed since your last read; request the diff to receive only the changed lines.
 - Long pages come back in parts of 256 KiB: follow `pagination.next_page`.
 

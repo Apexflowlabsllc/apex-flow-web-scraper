@@ -6,7 +6,7 @@ from aiohttp import web
 
 from .billing import QuotaExceeded
 
-CREDITS = 2
+CREDITS = 70  # a search costs us half a US cent; this stays above cost on every plan
 
 
 def configured():
