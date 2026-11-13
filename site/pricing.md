@@ -28,4 +28,4 @@ Firecrawl bills credits per page too. Their list: Free 1,000 credits a month; Ho
 Where we are cheaper per page at the same monthly billing: Starter $0.60 vs Hobby $3.80 and Standard $0.99; Scale $0.40 vs $0.75. Where they are ahead: a free allowance every month, higher concurrency, search at scale, more integrations and company size. See https://webscraper.apexflowlabs.com/compare.html.
 
 ## For agents
-- MCP tools (six hosted) and REST. A human creates the account once at https://webscraper.apexflowlabs.com/trial.html; the key is then used as a Bearer token. Skill file: https://webscraper.apexflowlabs.com/agent-onboarding/SKILL.md.
+- Hosted MCP tools and REST. A human creates the account once at https://webscraper.apexflowlabs.com/trial.html; the key is then used as a Bearer token. Skill file: https://webscraper.apexflowlabs.com/agent-onboarding/SKILL.md.
