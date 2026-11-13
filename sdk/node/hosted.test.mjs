@@ -42,15 +42,15 @@ test("crawl yields pages until the job reports no more", async () => {
 
 test("data packages post to their endpoints", async () => {
   const { apex, calls } = fake([
-    { data: { credits_used: 1, result: { region: "Sacramento, CA", latest: { date: "2026-09-30", value: 572812.67 } } } },
+    { data: { credits_used: 1, result: { region: "Sacramento-Roseville-Folsom, CA", latest: { period: "2026-Q2", index: 363.31 } } } },
     { data: { credits_used: 1, result: { topic: "business", count: 1, stories: [{ title: "t", url: "https://www.npr.org/a" }] } } },
   ]);
-  const market = await apex.zillowMarket("Sacramento, CA", "home_values", 12);
+  const market = await apex.housePrices("Sacramento, CA", 12);
   const news = await apex.nprNews("business", 1);
-  assert.equal(market.result.latest.value, 572812.67);
+  assert.equal(market.result.latest.index, 363.31);
   assert.equal(news.result.count, 1);
   assert.deepEqual(calls.map((c) => [c.method, c.url.replace(/^.*\/v1/, ""), c.body]), [
-    ["POST", "/packages/zillow", { region: "Sacramento, CA", metric: "home_values", months: 12 }],
+    ["POST", "/packages/housing", { region: "Sacramento, CA", quarters: 12 }],
     ["POST", "/packages/npr", { topic: "business", limit: 1 }],
   ]);
 });

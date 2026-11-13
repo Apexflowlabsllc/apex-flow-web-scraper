@@ -1,6 +1,6 @@
 {
   "name": "apex-flow-web-scraper",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Node client for a local Apex Flow Web Scraper workspace (rainbo-scrape web). Not published.",
   "type": "module",
   "main": "index.mjs",

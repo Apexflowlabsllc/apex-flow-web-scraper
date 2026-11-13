@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Apex Flow 3D Scraper",
-    "version": "0.9.0",
+    "version": "0.10.0",
     "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Accounts run 2 (trial), 6 (Pass, Starter), 12 (Growth) or 20 (Scale) page scrapes at once, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
   },
   "externalDocs": {
@@ -1035,40 +1035,32 @@
         }
       }
     },
-    "/packages/zillow": {
+    "/packages/housing": {
       "post": {
-        "operationId": "zillowMarket",
-        "summary": "Typical home value or rent for a US metro, from Zillow Research public data (1 credit)",
+        "operationId": "housePrices",
+        "summary": "House price index for a US metro, from the Federal Housing Finance Agency (1 credit)",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "region"
+                ],
+                "additionalProperties": false,
                 "properties": {
                   "region": {
                     "type": "string",
                     "description": "Metro name, for example \"Sacramento, CA\"."
                   },
-                  "metric": {
-                    "type": "string",
-                    "enum": [
-                      "home_values",
-                      "rents"
-                    ],
-                    "default": "home_values"
-                  },
-                  "months": {
+                  "quarters": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 120,
-                    "default": 24
+                    "default": 8
                   }
-                },
-                "required": [
-                  "region"
-                ],
-                "additionalProperties": false
+                }
               }
             }
           }
@@ -1087,11 +1079,8 @@
                         "region": {
                           "type": "string"
                         },
-                        "state": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                        "cbsa": {
+                          "type": "string"
                         },
                         "metric": {
                           "type": "string"
@@ -1099,11 +1088,11 @@
                         "latest": {
                           "type": "object",
                           "properties": {
-                            "date": {
+                            "period": {
                               "type": "string",
-                              "format": "date"
+                              "description": "Year and quarter, for example 2026-Q2."
                             },
-                            "value": {
+                            "index": {
                               "type": "number"
                             }
                           }
@@ -1114,16 +1103,22 @@
                             "null"
                           ]
                         },
+                        "change_5y_pct": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
                         "series": {
                           "type": "array",
                           "items": {
                             "type": "object",
                             "properties": {
-                              "date": {
+                              "period": {
                                 "type": "string",
-                                "format": "date"
+                                "description": "Year and quarter, for example 2026-Q2."
                               },
-                              "value": {
+                              "index": {
                                 "type": "number"
                               }
                             }

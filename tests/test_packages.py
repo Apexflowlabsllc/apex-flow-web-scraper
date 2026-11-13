@@ -1,18 +1,25 @@
-"""Data packages: official public sources for sites that are hard to read page by page."""
+"""Data packages: official public sources whose terms allow automated reading and redistribution."""
 import time
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 from rainbo_scrape.api import make_app
 from rainbo_scrape.billing import Billing, _hash
 from rainbo_scrape.hosted import Hosted
-from rainbo_scrape.hosted_packages import npr_news, zillow_market
+from rainbo_scrape.hosted_packages import FHFA_METRO, house_prices, npr_news
 
-ZHVI = (
-    "RegionID,SizeRank,RegionName,RegionType,StateName,2025-09-30,2025-10-31,2026-09-30,2026-10-31\n"
-    "102001,0,United States,country,,350000.0,351000.0,360000.4,361530.6\n"
-    "395045,26,\"Sacramento, CA\",msa,CA,560000.0,562000.0,570000.0,573240.0\n"
-    "395056,40,\"Sacramento Valley, CA\",msa,CA,300000.0,,310000.0,\n"
-    "394913,12,\"Phoenix, AZ\",msa,AZ,450000.0,452000.0,455000.0,447480.0\n"
+# FHFA all-transactions metro file: name, CBSA code, year, quarter, index, standard error. No header row.
+HPI = (
+    '"Sacramento-Roseville-Folsom, CA",40900,2020,4,-,-\n'
+    '"Sacramento-Roseville-Folsom, CA",40900,2021,2,250.00,1.10\n'
+    '"Sacramento-Roseville-Folsom, CA",40900,2025,1,340.00,1.20\n'
+    '"Sacramento-Roseville-Folsom, CA",40900,2025,2,350.00,1.20\n'
+    '"Sacramento-Roseville-Folsom, CA",40900,2026,1,360.00,1.30\n'
+    '"Sacramento-Roseville-Folsom, CA",40900,2026,2,357.00,1.30\n'
+    '"Kansas City, MO-KS",28140,2025,2,300.00,1.00\n'
+    '"Kansas City, MO-KS",28140,2026,2,309.00,1.00\n'
+    '"Springfield, MA",44140,2026,2,280.00,1.00\n'
+    '"Springfield, MO",44180,2026,2,270.00,1.00\n'
+    '"Empty Metro, TX",99999,2026,2,-,-\n'
 )
 RSS = """<?xml version="1.0"?><rss version="2.0"><channel><title>NPR Topics: News</title>
 <item><title>First &amp; foremost story</title><link>https://www.npr.org/2026/11/13/a</link>
@@ -31,23 +38,28 @@ def account(h, plan, session):
     return acct, {"Authorization": "Bearer " + key}
 
 
-def test_zillow_market_finds_a_metro_and_reports_latest_value_and_change():
-    result = zillow_market(ZHVI, "sacramento, ca", "home_values", months=3)
-    assert result["region"] == "Sacramento, CA" and result["state"] == "CA" and result["metric"] == "home_values"
-    assert result["latest"] == {"date": "2026-10-31", "value": 573240.0}
-    assert result["change_1y_pct"] == 2.0  # 562,000 a year earlier
-    assert [p["date"] for p in result["series"]] == ["2025-10-31", "2026-09-30", "2026-10-31"]
-    assert "Zillow" in result["source"]["attribution"] and result["source"]["url"].startswith("https://files.zillowstatic.com/")
+def test_house_prices_finds_a_metro_by_city_and_state_and_reports_changes():
+    result = house_prices(HPI, "sacramento, ca", quarters=3)
+    assert result["region"] == "Sacramento-Roseville-Folsom, CA" and result["cbsa"] == "40900" and result["metric"] == "house_price_index"
+    assert result["latest"] == {"period": "2026-Q2", "index": 357.0}
+    assert result["change_1y_pct"] == 2.0 and result["change_5y_pct"] == 42.8   # 350 a year earlier, 250 five years earlier
+    assert [p["period"] for p in result["series"]] == ["2025-Q2", "2026-Q1", "2026-Q2"]
+    assert "public domain" in result["source"]["attribution"] and result["source"]["url"] == FHFA_METRO
+    # A metro that spans states is found by either state.
+    assert house_prices(HPI, "Kansas City, KS")["region"] == "Kansas City, MO-KS"
+    assert house_prices(HPI, "Kansas City, MO-KS")["change_1y_pct"] == 3.0
 
 
-def test_zillow_market_lists_candidates_when_the_name_is_ambiguous_or_unknown():
-    result = zillow_market(ZHVI, "sacramento", "home_values")
-    assert "latest" not in result and result["matches"] == ["Sacramento, CA", "Sacramento Valley, CA"]
-    assert zillow_market(ZHVI, "atlantis", "home_values")["matches"] == []
-    # A metro whose newest month is blank reports the newest month that has a value.
-    assert zillow_market(ZHVI, "Sacramento Valley, CA", "home_values")["latest"] == {"date": "2026-09-30", "value": 310000.0}
-    with pytest.raises(ValueError):
-        zillow_market(ZHVI, "Phoenix, AZ", "mortgages")
+def test_house_prices_lists_candidates_when_the_name_is_ambiguous_or_unknown():
+    result = house_prices(HPI, "springfield")
+    assert "latest" not in result and result["matches"] == ["Springfield, MA", "Springfield, MO"]
+    assert house_prices(HPI, "Springfield, MO")["region"] == "Springfield, MO"
+    assert house_prices(HPI, "atlantis")["matches"] == []
+    assert house_prices(HPI, "Sacramento, NV")["matches"] == []          # the state has to match
+    assert house_prices(HPI, "Empty Metro, TX")["matches"] == []         # no values: no answer, no charge
+    for bad in ({"region": "x"}, {"region": "Springfield", "quarters": 0}):
+        with pytest.raises(ValueError):
+            house_prices(HPI, **bad)
 
 
 def test_npr_news_returns_dated_headlines_with_links():
@@ -62,41 +74,45 @@ async def test_package_endpoints_charge_one_credit_only_for_an_answer(tmp_path, 
     monkeypatch.delenv("SCRAPER_GATEWAY_SECRET", raising=False)
     billing = Billing(tmp_path / "billing.db")
     h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
-    loads = []
+    loads, fail = [], []
 
     async def loader(url):
         loads.append(url)
-        if "zori" in url:
+        if fail:
             raise OSError("source down")
-        return RSS if "npr.org" in url else ZHVI
+        return RSS if "npr.org" in url else HPI
 
     async def scrape(url, **kwargs):
         return {"url": url, "markdown": "# x", "text": "x", "rendered": False}
 
     acct, auth = account(h, "starter", "cs_test_pkg1")
+    start = billing.remaining(acct)
     async with TestClient(TestServer(make_app(billing, scrape, hosted=h, package_loader=loader))) as client:
         listing = await (await client.get("/v1/packages", headers=auth)).json()
-        assert {p["id"] for p in listing["packages"]} == {"zillow", "npr"}
-        r = await client.post("/v1/packages/zillow", json={"region": "Phoenix, AZ"}, headers=auth)
+        assert {p["id"] for p in listing["packages"]} == {"housing", "npr"}
+        r = await client.post("/v1/packages/housing", json={"region": "Kansas City, MO"}, headers=auth)
         body = await r.json()
-        assert r.status == 200 and body["credits_used"] == 1 and body["result"]["latest"]["value"] == 447480.0
-        assert body["result"]["change_1y_pct"] == -1.0 and billing.remaining(acct) == 109999
+        assert r.status == 200 and body["credits_used"] == 1 and body["result"]["latest"]["index"] == 309.0
+        assert body["result"]["change_1y_pct"] == 3.0 and billing.remaining(acct) == start - 1
         # The same file serves the next question without another download.
-        await client.post("/v1/packages/zillow", json={"region": "Sacramento, CA"}, headers=auth)
-        assert len([u for u in loads if "zhvi" in u]) == 1
+        await client.post("/v1/packages/housing", json={"region": "Sacramento, CA"}, headers=auth)
+        assert len([u for u in loads if u == FHFA_METRO]) == 1
         # No single match: candidates come back free.
-        r = await client.post("/v1/packages/zillow", json={"region": "sacramento"}, headers=auth)
+        r = await client.post("/v1/packages/housing", json={"region": "springfield"}, headers=auth)
         body = await r.json()
         assert r.status == 200 and body["credits_used"] == 0 and len(body["result"]["matches"]) == 2
+        # The retired vendor-specific endpoint is gone.
+        assert (await client.post("/v1/packages/zillow", json={"region": "Phoenix, AZ"}, headers=auth)).status == 404
         # Source failure: a retryable error, nothing charged.
-        r = await client.post("/v1/packages/zillow", json={"region": "Phoenix, AZ", "metric": "rents"}, headers=auth)
+        fail.append(True)
+        r = await client.post("/v1/packages/npr", json={"topic": "news"}, headers=auth)
         body = await r.json()
-        assert r.status == 502 and body["retryable"] is True and billing.remaining(acct) == 109998
+        assert r.status == 502 and body["retryable"] is True and billing.remaining(acct) == start - 2
+        fail.clear()
         r = await client.post("/v1/packages/npr", json={"topic": "news", "limit": 2}, headers=auth)
         body = await r.json()
         assert r.status == 200 and body["credits_used"] == 1 and body["result"]["count"] == 2
-        r = await client.post("/v1/packages/npr", json={"topic": "celebrity-gossip"}, headers=auth)
-        assert r.status == 400
-        r = await client.post("/v1/packages/zillow", json={"region": "Phoenix, AZ"})
-        assert r.status == 401
+        assert (await client.post("/v1/packages/npr", json={"topic": "celebrity-gossip"}, headers=auth)).status == 400
+        assert (await client.post("/v1/packages/housing", json={"region": "Kansas City, MO", "metric": "rents"}, headers=auth)).status == 400
+        assert (await client.post("/v1/packages/housing", json={"region": "Kansas City, MO"})).status == 401
     billing.db.close()

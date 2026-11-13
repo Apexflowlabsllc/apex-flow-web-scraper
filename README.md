@@ -47,7 +47,7 @@ Field extraction by CSS selector costs no extra credits. Failed and blocked page
 | Built for context windows | `max_tokens` splits a page to fit; every reply reports estimated tokens. |
 | Pages you name are read | A page you request by exact address is read even where robots.txt disallows it, and the receipt says so. Crawls and site maps still obey robots.txt. |
 | Archive copy by default | When the live site refuses, you get the latest Internet Archive copy, labelled with its capture time. Send `"fallback":"none"` for the error instead. No CAPTCHA solving, no disguised requests. |
-| Data packages | `POST /v1/packages/zillow`: a US metro's typical home value or rent, one-year change and monthly series from Zillow Research public data. `POST /v1/packages/npr`: NPR headlines by topic. 1 credit an answer. |
+| Data packages | `POST /v1/packages/housing`: a US metro's house price index, one- and five-year change and quarterly series from the Federal Housing Finance Agency (public domain). `POST /v1/packages/npr`: NPR headlines by topic. 1 credit an answer. |
 | Agent-ready errors | A stable `code`, `retryable`, `retry_after`, a `hint`, and a `buy_url` when credits run out. |
 | MCP | Remote server at `https://webscraper.apexflowlabs.com/v1/mcp`, listed in the official MCP Registry. |
 | Clients | Python (`rainbo_scrape.hosted_client`) and Node (`sdk/node/hosted.mjs`), no dependencies. |
@@ -65,7 +65,7 @@ Software is MIT licensed; compute, bandwidth, storage and maintenance are not fr
 
 [Start a free browser trial](https://webscraper.apexflowlabs.com/trial.html) for 1,000 credits. A Project Pass is $5 once for 35,000 credits valid for 30 days. Starter is $15/month for 110,000 credits. A successful plain page costs one credit and a rendered page costs three.
 
-Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. Its tools support page extraction, parallel batches, change checks, sitemap mapping, whole-site crawls, account-scoped search, Zillow market data, NPR headlines and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
+Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. Its tools support page extraction, parallel batches, change checks, sitemap mapping, whole-site crawls, account-scoped search, house prices by metro, NPR headlines and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
 
 [Agent setup](https://webscraper.apexflowlabs.com/docs.html#agents) · [OpenAPI 3.1](https://webscraper.apexflowlabs.com/openapi.json) · [Benchmark and pricing comparison](https://webscraper.apexflowlabs.com/compare.html)
 
