@@ -34,7 +34,7 @@ class Apex:
         data = None if body is None else json.dumps({k: v for k, v in body.items() if v is not None}).encode()
         for attempt in range(self.retries + 1):
             request = urllib.request.Request(self.base + path, data=data, method=method, headers={
-                "Authorization": "Bearer " + self.key, "Content-Type": "application/json", "User-Agent": "apex-scraper-python/0.6.0"})
+                "Authorization": "Bearer " + self.key, "Content-Type": "application/json", "User-Agent": "apex-scraper-python/0.9.0"})
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
                     return json.load(response)
@@ -87,6 +87,18 @@ class Apex:
 
     def usage(self):
         return self._call("GET", "/usage")
+
+    def packages(self):
+        """The data packages and their inputs. Free."""
+        return self._call("GET", "/packages")
+
+    def zillow_market(self, region, metric="home_values", months=24):
+        """A US metro's typical home value or rent, one-year change and monthly series (Zillow Research public data). 1 credit."""
+        return self._call("POST", "/packages/zillow", {"region": region, "metric": metric, "months": months})
+
+    def npr_news(self, topic="news", limit=10):
+        """Latest NPR headlines for a topic, with links. 1 credit."""
+        return self._call("POST", "/packages/npr", {"topic": topic, "limit": limit})
 
     def start_crawl(self, url, limit=25, **options):
         return self._call("POST", "/crawl", {"url": url, "limit": limit, **options})

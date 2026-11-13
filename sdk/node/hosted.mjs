@@ -24,7 +24,7 @@ export class Apex {
     for (let attempt = 0; ; attempt++) {
       const res = await this.fetch(this.base + path, {
         method,
-        headers: { Authorization: "Bearer " + this.key, "Content-Type": "application/json", "User-Agent": "apex-scraper-node/0.6.0" },
+        headers: { Authorization: "Bearer " + this.key, "Content-Type": "application/json", "User-Agent": "apex-scraper-node/0.9.0" },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
@@ -62,6 +62,10 @@ export class Apex {
   search(query, limit = 10) { return this.#call("POST", "/search", { query, limit }); }
   webSearch(query, limit = 10) { return this.#call("POST", "/websearch", { query, limit }); }
   usage() { return this.#call("GET", "/usage"); }
+  // Data packages: answers from a publisher's own public data. 1 credit an answer.
+  packages() { return this.#call("GET", "/packages"); }
+  zillowMarket(region, metric = "home_values", months = 24) { return this.#call("POST", "/packages/zillow", { region, metric, months }); }
+  nprNews(topic = "news", limit = 10) { return this.#call("POST", "/packages/npr", { topic, limit }); }
   startCrawl(url, limit = 25, options = {}) { return this.#call("POST", "/crawl", { url, limit, ...options }); }
   crawlStatus(id, offset = 0) { return this.#call("GET", `/crawl/${id}?offset=${Number(offset) || 0}`); }
   cancelCrawl(id) { return this.#call("DELETE", `/crawl/${id}`); }
