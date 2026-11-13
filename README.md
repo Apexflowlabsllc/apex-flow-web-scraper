@@ -115,6 +115,25 @@ installation's data directory. The web interface binds to loopback and is **not
 a public multi-tenant hosting service**. It has Host/Origin checks, not an account
 and authorization system for internet exposure.
 
+## Read pages you are signed in to (self-hosted)
+
+Some sites only show their content to signed-in members. The self-hosted engine can read those pages through
+your own account, on your own machine:
+
+```sh
+rainbo-scrape login https://example-members-site.com/login --profile work   # a browser window opens; you sign in, then close it
+rainbo-scrape fetch https://example-members-site.com/reports/latest --signed-in --profile work
+```
+
+- You type your own login in a real browser window. The engine never sees or stores your password.
+- The session lives in `profiles/<name>` inside your data directory. It is not uploaded, and the hosted API has no part in it.
+- Each profile is separate. Delete the folder to sign out.
+- Run the `fetch` line from your operating system's scheduler to refresh a page daily or weekly.
+- Nothing hides that the browser is automated and no challenge is solved. If the site refuses, you get the refusal.
+- You are responsible for staying within the terms of the site you signed in to.
+
+Tested against a local members-only fixture with installed Brave. Not yet tested against a real third-party sign-in.
+
 ## Assistant connection (MCP)
 
 Configure your client with an absolute path to the installed command:

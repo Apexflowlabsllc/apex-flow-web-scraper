@@ -17,9 +17,10 @@ def _utf8():
 
 def main(argv=None):
     _utf8()
+    from .policy import ScrapeError
     parser = argparse.ArgumentParser(prog="rainbo-scrape")
     parser.add_argument("command", choices=["health", "scrape", "fetch", "map", "status", "results", "jobs",
-                                            "cancel", "worker", "web", "mcp", "search", "index", "crawl-web", "llms-txt", "api", "new-key"])
+                                            "cancel", "worker", "web", "mcp", "search", "index", "crawl-web", "llms-txt", "api", "new-key", "login"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--render", choices=["auto", "never", "always"], default="auto")
     parser.add_argument("--pages", type=int, default=1)
@@ -32,6 +33,9 @@ def main(argv=None):
     parser.add_argument("--plan", choices=["free", "starter", "growth", "scale"], default="free", help="new-key: plan for the account")
     parser.add_argument("--full", action="store_true", help="llms-txt: also include every page's Markdown (llms-full.txt)")
     parser.add_argument("--json", action="store_true", help="fetch: print the full result as JSON")
+    parser.add_argument("--signed-in", action="store_true",
+                        help="fetch: read through your own signed-in browser profile on this machine (run login first)")
+    parser.add_argument("--profile", default="default", help="login / fetch --signed-in: which saved browser profile to use")
     args = parser.parse_args(argv)
     if args.command == "mcp":
         from .mcp_server import mcp
@@ -44,6 +48,25 @@ def main(argv=None):
     if args.command == "web":
         from .web import run
         run(port=args.port)
+        return
+    if args.command == "login":
+        # Opens a real browser window. You sign in yourself; the session stays in a profile folder on this machine.
+        from .signed_in import sign_in
+        print("A browser window is opening. Sign in, then close the window.", file=sys.stderr, flush=True)
+        try:
+            saved = asyncio.run(sign_in(args.value, profile=args.profile))
+        except (ValueError, ScrapeError) as exc:
+            sys.exit("error: " + str(exc))
+        print("profile=" + saved["profile"])
+        print("folder=" + saved["folder"])
+        return
+    if args.command == "fetch" and args.signed_in:
+        from .signed_in import read_signed_in
+        try:
+            page = asyncio.run(read_signed_in(args.value, profile=args.profile))
+        except (ValueError, ScrapeError) as exc:
+            sys.exit("error: " + str(exc))
+        print(json.dumps(page, indent=2, ensure_ascii=False) if args.json else page.get("markdown") or page.get("text") or "")
         return
     if args.command == "fetch":
         from .client import scrape
