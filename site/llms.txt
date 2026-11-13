@@ -6,6 +6,7 @@
 - Converts pages to Markdown with headings, GFM tables, fenced code with language, absolute links; removes navigation, cookie banners and hidden elements.
 - Renders JavaScript pages in an isolated Brave browser, with screenshots on request.
 - Reads PDF, DOCX, RSS/Atom feeds and JSON.
+- Data packages (hosted, 1 credit an answer): POST /v1/packages/zillow {region, metric: home_values|rents, months} returns a US metro's typical home value or rent, one-year change and monthly series from Zillow Research public data; POST /v1/packages/npr {topic, limit} returns NPR headlines with links. GET /v1/packages lists them. MCP tools: zillow_market, npr_news. Metro-level data only, not individual listings.
 - Maps sites (robots.txt, nested and gzip sitemaps), crawls with durable jobs, change tracking with diffs.
 - Owned full-text search (SQLite FTS5, BM25) over everything scraped.
 - JSON-Schema extraction using DeepSeek first, OpenRouter second.
