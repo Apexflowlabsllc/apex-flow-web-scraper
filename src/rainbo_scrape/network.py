@@ -28,6 +28,9 @@ class Fetcher:
         self.browser_slot_held = False
         self.session = None
         self.robots, self.locks, self.last, self.delays = {}, {}, {}, {}
+        # Origins of pages the requester named by exact address. robots.txt is still read (Crawl-delay applies)
+        # but a Disallow does not stop the read; every such read is listed in robots_overridden.
+        self.requested_origins, self.robots_overridden = set(), set()
         self.requests = self.transferred = self.cache_hits = 0
         self.charge = None
         self._browser = self._playwright = None
@@ -101,7 +104,15 @@ class Fetcher:
         for redirect in range(7):
             check_url(url, self.settings.allow_test_loopback)
             if robots:
-                await self.allowed(url)
+                origin = "://".join(urlsplit(url)[:2])
+                if redirect and "://".join(urlsplit(original)[:2]) in self.requested_origins:
+                    self.requested_origins.add(origin)
+                try:
+                    await self.allowed(url)
+                except ScrapeError as exc:
+                    if exc.code != "robots_denied" or origin not in self.requested_origins:
+                        raise
+                    self.robots_overridden.add(origin)
             key = hashlib.sha256(url.encode()).hexdigest()
             cached = self.store.cache_get(key) if cache and self.store else None
             ttl = self.settings.cache_ttl if max_age is None else max_age/1000

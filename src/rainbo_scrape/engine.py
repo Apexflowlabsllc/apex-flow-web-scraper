@@ -16,7 +16,7 @@ def validate_request(request, settings):
         raise ValueError("Job must be a JSON object")
     allowed = {"urls", "max_pages", "max_depth", "max_seconds", "max_bytes", "concurrency",
                "render", "recipe", "wait_selector", "scrolls", "include_paths", "exclude_paths", "cache",
-               "max_age", "screenshot", "extract", "change_tracking", "follow_external", "chunks"}
+               "max_age", "screenshot", "extract", "change_tracking", "follow_external", "chunks", "robots"}
     if set(request)-allowed:
         raise ValueError("Unknown job options: "+", ".join(set(request)-allowed))
     urls = request.get("urls")
@@ -36,6 +36,8 @@ def validate_request(request, settings):
     result.setdefault("render", "auto")
     if result["render"] not in {"auto", "never", "always"}:
         raise ValueError("render must be auto, never or always")
+    if result.setdefault("robots", "obey") not in {"obey", "requested"}:
+        raise ValueError("robots must be obey or requested")
     result.setdefault("cache", True)
     if not isinstance(result["cache"], bool):
         raise ValueError("cache must be boolean")
@@ -67,6 +69,8 @@ def validate_request(request, settings):
 
 async def scrape(fetcher, url, options):
     started = time.monotonic()
+    if options.get("robots") == "requested":
+        fetcher.requested_origins.add("://".join(urlsplit(url)[:2]))
     response = await fetcher.get(url, cache=options.get("cache", True), max_age=options.get("max_age"))
     if response["status"] >= 400:
         raise ScrapeError("http_error", f"Site returned HTTP {response['status']}")
@@ -87,7 +91,8 @@ async def scrape(fetcher, url, options):
                   content_sha256=hashlib.sha256(result["text"].encode()).hexdigest(),
                   hosted_scraping_calls=0)
     result["receipt"] = {"requested_url": url, "final_url": response["url"], "status": response["status"],
-                         "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "robots_txt": "allowed",
+                         "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                         "robots_txt": "disallowed_read_on_request" if getattr(fetcher, "robots_overridden", None) else "allowed",
                          "user_agent": fetcher.settings.user_agent, "rendered": rendered,
                          "content_sha256": result["content_sha256"], "source_sha256": result.get("source_sha256")}
     if options.get("chunks"):

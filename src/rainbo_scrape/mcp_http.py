@@ -37,7 +37,7 @@ def install(app, billing, operations, site):
             return reply(code=-32602, error="Expected an object for params")
         if method == "initialize":
             return reply({"protocolVersion": VERSION, "capabilities": {"tools": {}},
-                          "serverInfo": {"name": "Apex Flow 3D Scraper", "version": "0.6.2"},
+                          "serverInfo": {"name": "Apex Flow 3D Scraper", "version": "0.7.0"},
                           "instructions": mcp.instructions})
         if method == "ping":
             return reply({})

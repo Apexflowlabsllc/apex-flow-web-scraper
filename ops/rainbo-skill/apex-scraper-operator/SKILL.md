@@ -53,13 +53,13 @@ Delete the newest drop-in in `/etc/systemd/system/apex-webscraper.service.d/`, t
 - Never turn on a feature that pays a vendor per request unless its credit price is above its worst-case cost on the cheapest plan. AI extraction is 25 credits, paid plans only, 20,000 characters per call, 3,000 calls a day service-wide. Web search stays off until a search key exists and it is priced above that key's per-query cost.
 - Never raise the free trial (1,000 credits, 20 new trials a day, one per network).
 - Never lower prices, issue refunds, change Stripe settings, or spend money without Brian saying yes to that exact action.
-- Never add CAPTCHA solving, disguised requests or proxy rotation. The store obeys robots.txt and site blocks; the archive fallback is the answer for blocked pages.
+- Never add CAPTCHA solving, disguised requests or proxy rotation. Crawls obey robots.txt; a page a customer names is read even where robots.txt disallows it (Brian's ruling, 13 November 2026). Bot walls are never evaded; a refused page returns the labelled archive copy by default.
 - Never claim "number one", user counts, or a win over a competitor that you have not measured. Published comparisons must give the date and method.
 
 ## 7. Customers
 - Access problems: the customer opens the dashboard in the browser where they bought; the key is re-shown there. A lost trial key cannot be re-issued; they start a paid plan.
 - Out of credits: point to https://webscraper.apexflowlabs.com/#pricing. Billing changes and cancellation: the "Manage billing" button in the dashboard (Stripe portal).
-- A page that will not scrape: ask for the URL and the error `code`. `robots_denied`, `access_challenge` and `http_error` are the site refusing; suggest `"fallback":"archive"`. Anything else, reproduce it, then fix it through section 4.
+- A page that will not scrape: ask for the URL and the error `code`. `robots_denied`, `access_challenge` and `http_error` are the site refusing; the archive copy is returned by default unless the customer sent `"fallback":"none"`. Anything else, reproduce it, then fix it through section 4.
 - Refund or dispute requests go to Brian the same day with the order id.
 
 ## 8. Growth loop (the store has almost no visitors; this is the real work)
