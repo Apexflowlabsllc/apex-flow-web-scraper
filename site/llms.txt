@@ -50,3 +50,11 @@ Python: `from rainbo_scrape import scrape; scrape("https://example.com").markdow
 CLI: `rainbo-scrape fetch https://example.com`
 
 For a smaller REST or MCP scrape response, select outputs such as ["markdown"] or ["data", "evidence"]. Source receipts and validation warnings are retained when available.
+
+## For agents and answer pages (added 13 November 2026)
+- Machine-readable pricing: https://webscraper.apexflowlabs.com/pricing.md
+- Agent skill file: https://webscraper.apexflowlabs.com/agent-onboarding/SKILL.md
+- Firecrawl alternative, dated price comparison with tradeoffs: https://webscraper.apexflowlabs.com/firecrawl-alternative.html
+- How to fit a web page into an LLM context window (max_tokens): https://webscraper.apexflowlabs.com/fit-web-page-in-llm-context.html
+- How to track changes on a web page with an API (diff): https://webscraper.apexflowlabs.com/track-web-page-changes-api.html
+- Firecrawl public prices read 13 November 2026: Free 1,000 credits per month; Hobby $19 (5,000); Standard $99 (100,000); Growth $399 (500,000); Scale $749 (1,000,000) monthly billing. We are cheaper per plain page in the tiers compared; Firecrawl has a monthly free allowance, higher concurrency and a larger ecosystem.

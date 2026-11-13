@@ -1,0 +1,31 @@
+# Apex Flow 3D Scraper: pricing (machine-readable)
+
+Last checked: 13 November 2026. Hosted API: https://webscraper.apexflowlabs.com/v1. Docs: https://webscraper.apexflowlabs.com/docs.html. OpenAPI: https://webscraper.apexflowlabs.com/openapi.json.
+
+## Plans (USD)
+| Plan | Price | Credits | Notes |
+|---|---|---|---|
+| Free trial | $0 once | 1,000 credits, one time | Limited daily capacity, one per network. No card. |
+| Project Pass | $5 once | 5,000 credits, valid 30 days | No subscription, no renewal. |
+| Starter | $15 / month | 25,000 credits | Cancel any time in the dashboard. |
+| Growth | $79 / month | 150,000 credits | |
+| Scale | $299 / month | 750,000 credits | |
+
+## Credit costs
+- Plain page: 1 credit. JavaScript-rendered page: 3 credits. AI schema extraction: 25 extra credits (paid plans only). CSS field extraction: free. Non-empty site map: 1 credit. Saved-page search: free.
+- Failed scrapes return the reserved credits. No automatic overages: when credits run out, requests stop; you are never billed extra.
+
+## Effective price per 1,000 plain pages
+- Starter $0.60. Growth $0.53. Scale $0.40. Project Pass $1.00.
+
+## Limits
+- 256 KiB per response (longer documents come back in consecutive parts). Concurrent page scrapes: 2 on the trial, 6 on Pass and Starter, 12 on Growth, 20 on Scale. Batches of up to 10 URLs.
+- We obey robots.txt and Crawl-delay. We do not solve CAPTCHAs, rotate proxies or disguise requests.
+
+## Compared with Firecrawl (their public pricing page, read 13 November 2026)
+Firecrawl bills credits per page too. Their list: Free 1,000 credits a month; Hobby $19 monthly ($16 billed yearly) for 5,000; Standard $99 ($83 yearly) for 100,000; Growth $399 ($333 yearly) for 500,000; Scale $749 ($599 yearly) for 1,000,000; pay-as-you-go in $5 increments on paid plans. They charge 1 credit for a page that returns an error status such as 403 or 404. Their paid plans have higher concurrency (5, 25, 50, 100). Per 1,000 plain pages at monthly billing: Hobby $3.80, Standard $0.99, Growth $0.80, Scale $0.75. Credit definitions differ between vendors, so compare your own workload.
+
+Where we are cheaper per page at the same monthly billing: Starter $0.60 vs Hobby $3.80 and Standard $0.99; Scale $0.40 vs $0.75. Where they are ahead: a free allowance every month, higher concurrency, search at scale, more integrations and company size. See https://webscraper.apexflowlabs.com/compare.html.
+
+## For agents
+- MCP tools (six hosted) and REST. A human creates the account once at https://webscraper.apexflowlabs.com/trial.html; the key is then used as a Bearer token. Skill file: https://webscraper.apexflowlabs.com/agent-onboarding/SKILL.md.
