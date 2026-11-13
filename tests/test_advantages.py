@@ -273,3 +273,23 @@ async def test_max_tokens_returns_parts_that_fit_a_context_budget(svc):
     assert (await ask(max_tokens=100)).status == 400
     short = await (await client.post("/v1/scrape", json={"url": "https://example.com/s", "render": "never", "max_tokens": 4000}, headers=auth)).json()
     assert "pagination" not in short
+
+
+def test_archive_copy_links_point_at_the_original_site_not_the_archive():
+    from rainbo_scrape.api import restore_links
+    stamp, url = "20261017024655", "https://news.example/world/"
+    wrapped = f"https://web.archive.org/web/{stamp}id_/{url}"
+    result = {
+        "markdown": f"[Root](https://web.archive.org/world/story) [Rel]({wrapped}story-2) [Old](https://web.archive.org/web/2020/https://other.example/)",
+        "links": [{"url": "http://web.archive.org/about", "text": "About"}, f"{wrapped}?page=2"],
+        "receipt": {"final_url": wrapped},
+        "archive": {"snapshot_url": f"https://web.archive.org/web/{stamp}/{url}"},
+    }
+    fixed = restore_links(result, stamp, url)
+    # Root-relative and page-relative links resolve against the site the reader asked for.
+    assert fixed["markdown"].startswith("[Root](https://news.example/world/story) [Rel](https://news.example/world/story-2)")
+    # A link the page itself made to some other archive capture is left alone.
+    assert "(https://web.archive.org/web/2020/https://other.example/)" in fixed["markdown"]
+    assert fixed["links"] == [{"url": "https://news.example/about", "text": "About"}, "https://news.example/world/?page=2"]
+    # The receipt and the archive label keep the true source of the bytes.
+    assert fixed["receipt"]["final_url"] == wrapped and fixed["archive"] == result["archive"]
