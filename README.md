@@ -56,14 +56,14 @@ An owned web extraction engine from [Apex Flow Labs](https://www.apexflowlabs.co
 Collect public pages, keep extraction evidence, and work with durable jobs from
 a CLI, a private local workspace or a compatible MCP assistant.
 
-**Release 0.2.0.** No hosted scraping API or model key is required.
+The self-hosted engine needs no hosted scraping API or model key.
 Software is MIT licensed; compute, bandwidth, storage and maintenance are not free.
 
 ## Hosted API for agents
 
 [Start a free browser trial](https://webscraper.apexflowlabs.com/trial.html) for 1,000 credits. A Project Pass is $5 once for 5,000 credits valid for 30 days. Starter is $15/month for 25,000 credits. A successful plain page costs one credit and a rendered page costs three.
 
-Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. The eight tools support page extraction, parallel batches, change checks, sitemap mapping, whole-site crawls, account-scoped search and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
+Connect a Streamable HTTP MCP client to `https://webscraper.apexflowlabs.com/v1/mcp` with a bearer API key. Its tools support page extraction, parallel batches, change checks, sitemap mapping, whole-site crawls, account-scoped search and credit balance. Local stdio clients can run the `apex-scraper-mcp` command with `APEX_SCRAPER_API_KEY` in their secret environment.
 
 [Agent setup](https://webscraper.apexflowlabs.com/docs.html#agents) · [OpenAPI 3.1](https://webscraper.apexflowlabs.com/openapi.json) · [Benchmark and pricing comparison](https://webscraper.apexflowlabs.com/compare.html)
 
@@ -176,7 +176,7 @@ python -m pytest -q
 rendering with installed Brave. Browser tests can depend on Brave availability.
 Tests cover policy, cache/ETag, response limits, atomic accounting, recovery,
 cancellation, recipes and private-web boundaries. Upstream dependency suites
-were not run. No cross-provider performance benchmark has been completed.
+were not run. A dated Firecrawl comparison is in `BENCHMARK-2026-11-05.md`.
 
 Access challenge pages are detected and reported with an `access_challenge`
 error. The current release does not provide an isolated signed-in account
@@ -214,7 +214,7 @@ urls = map_site("https://docs.python.org/3/")["urls"]
 CLI: `rainbo-scrape fetch URL`, `map URL`, `scrape URL --wait` (first line is `job_id=...`).
 Schema extraction needs `DEEPSEEK_API_KEY` (first) or `OPENROUTER_API_KEY`; mocked in tests, not live-measured.
 Owned search: `rainbo-scrape index https://site/` crawls a site into a local SQLite FTS5 index; `rainbo-scrape search "query"` returns BM25-ranked, stemmed hits with highlighted snippets (measured: 73 pages indexed in 59 s, relevant top hit). It searches what you have indexed, not the whole web.
-Not built: whole-web search, Node SDK, public landing page.
+Not built: a whole-web search index of our own.
 
 ## Also in 0.2.0
 
@@ -222,4 +222,4 @@ Not built: whole-web search, Node SDK, public landing page.
 - Every result carries a `receipt`: requested and final URL, status, fetch time, user agent, content hash, robots.txt decision.
 - `rainbo-scrape llms-txt https://your-site.com --pages 30 [--full]`: writes llms.txt / llms-full.txt for a site you operate.
 - `rainbo-scrape crawl-web <seed>`: open-web crawl, up to 1,000 pages a job, robots.txt obeyed. Built, not yet run at scale.
-- `sdk/node`: Node client for a local workspace (private, unpublished).
+- `sdk/node`: Node clients for a local workspace and the hosted API (in this repository, not yet on npm).
