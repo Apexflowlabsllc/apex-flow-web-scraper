@@ -3,6 +3,7 @@ import asyncio
 import json
 import time
 import pytest
+from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 from rainbo_scrape.api import make_app
 from rainbo_scrape.billing import Billing, _hash
@@ -197,7 +198,7 @@ async def test_long_documents_arrive_in_parts_that_rebuild_the_original(svc):
     assert r.status == 400
 
 
-async def test_archive_fallback_is_opt_in_labelled_and_refunds_when_no_copy_exists(tmp_path, monkeypatch):
+async def test_archive_fallback_is_labelled_can_be_declined_and_refunds_when_no_copy_exists(tmp_path, monkeypatch):
     from rainbo_scrape.policy import ScrapeError
     monkeypatch.delenv("SCRAPER_GATEWAY_SECRET", raising=False)
     billing = Billing(tmp_path / "billing.db")
@@ -221,8 +222,8 @@ async def test_archive_fallback_is_opt_in_labelled_and_refunds_when_no_copy_exis
     acct, auth = account(h, "starter", "cs_test_arch1")
     async with TestClient(TestServer(make_app(billing, scrape, hosted=h, snapshot_fn=snapshot))) as client:
         post = lambda body: client.post("/v1/scrape", json={"render": "auto", **body}, headers=auth)
-        # Without the option the block is reported, free, with a hint an agent can follow.
-        r = await post({"url": "https://walled.example/home"})
+        # Declined: the block is reported, free, with a hint an agent can follow.
+        r = await post({"url": "https://walled.example/home", "fallback": "none"})
         body = await r.json()
         assert r.status == 400 and body["code"] == "access_challenge" and "fallback" in body["hint"]
         assert billing.remaining(acct) == 25000 and len(fetched) == 1
@@ -246,7 +247,7 @@ async def test_archive_fallback_is_opt_in_labelled_and_refunds_when_no_copy_exis
         assert not any("web.archive.org" in u and "private" in u for u, _ in fetched)
         r = await post({"url": "https://open.example/", "fallback": "proxy"})
         assert r.status == 400
-        batch = await (await client.post("/v1/batch", json={"urls": ["https://walled.example/a", "https://open.example/b"], "render": "never"}, headers=auth)).json()
+        batch = await (await client.post("/v1/batch", json={"urls": ["https://walled.example/a", "https://open.example/b"], "render": "never", "fallback": "none"}, headers=auth)).json()
         assert batch["results"][0]["code"] == "access_challenge" and "hint" in batch["results"][0] and batch["results"][1]["status"] == 200
     billing.db.close()
 
@@ -293,3 +294,101 @@ def test_archive_copy_links_point_at_the_original_site_not_the_archive():
     assert fixed["links"] == [{"url": "https://news.example/about", "text": "About"}, "https://news.example/world/?page=2"]
     # The receipt and the archive label keep the true source of the bytes.
     assert fixed["receipt"]["final_url"] == wrapped and fixed["archive"] == result["archive"]
+
+
+# ---------- access: a page the customer names is read; crawls still obey robots.txt ----------
+
+@pytest.fixture
+async def walled_site():
+    async def robots(request):
+        return web.Response(text="User-agent: *\nDisallow: /\n")
+
+    async def page(request):
+        return web.Response(text="<html><body><main><h1>Front page</h1><p>Readable story text for the requester.</p></main></body></html>",
+                            content_type="text/html")
+
+    async def hop(request):
+        raise web.HTTPFound("/story")
+    app = web.Application()
+    app.router.add_get("/robots.txt", robots)
+    app.router.add_get("/story", page)
+    app.router.add_get("/hop", hop)
+    server = TestServer(app)
+    await server.start_server()
+    yield f"http://127.0.0.1:{server.port}"
+    await server.close()
+
+
+async def test_requested_page_is_read_where_robots_disallows_and_the_receipt_says_so(walled_site, tmp_path):
+    from rainbo_scrape.client import ascrape
+    from rainbo_scrape.policy import ScrapeError
+    from rainbo_scrape.settings import Settings
+    settings = Settings(data_dir=tmp_path, host_delay=0, allow_test_loopback=True)
+    # Default (self-hosted, crawls, maps): robots.txt is obeyed.
+    with pytest.raises(ScrapeError) as denied:
+        await ascrape(walled_site + "/story", render="never", settings=settings)
+    assert denied.value.code == "robots_denied"
+    # A page the requester named by exact address is read, and the receipt records the robots.txt decision.
+    page = await ascrape(walled_site + "/story", render="never", settings=settings, robots="requested")
+    assert "Readable story text" in page["markdown"] and page["receipt"]["robots_txt"] == "disallowed_read_on_request"
+    # A redirect from the named address is followed on the same terms.
+    hop = await ascrape(walled_site + "/hop", render="never", settings=settings, robots="requested", max_age=0)
+    assert hop["receipt"]["final_url"].endswith("/story") and hop["receipt"]["robots_txt"] == "disallowed_read_on_request"
+    with pytest.raises(ValueError):
+        await ascrape(walled_site + "/story", render="never", settings=settings, robots="ignore-everything")
+
+
+async def test_hosted_reads_named_pages_but_crawled_pages_keep_obeying_robots(tmp_path, monkeypatch):
+    monkeypatch.delenv("SCRAPER_GATEWAY_SECRET", raising=False)
+    billing = Billing(tmp_path / "billing.db")
+    h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
+    seen = []
+
+    async def scrape(url, **kwargs):
+        seen.append((url, kwargs.get("robots")))
+        return {"url": url, "markdown": "# Page", "text": "Page", "rendered": False, "links": []}
+
+    acct, auth = account(h, "starter", "cs_test_access1")
+    async with TestClient(TestServer(make_app(billing, scrape, hosted=h))) as client:
+        r = await client.post("/v1/scrape", json={"url": "https://named.example/a", "render": "never"}, headers=auth)
+        assert r.status == 200 and seen[-1] == ("https://named.example/a", "requested")
+        r = await client.post("/v1/batch", json={"urls": ["https://named.example/b"], "render": "never"}, headers=auth)
+        assert r.status == 200 and seen[-1] == ("https://named.example/b", "requested")
+        # The customer cannot widen or switch the rule through the request body.
+        r = await client.post("/v1/scrape", json={"url": "https://named.example/a", "robots": "requested"}, headers=auth)
+        assert r.status == 400
+        r = await client.post("/v1/crawl", json={"url": "https://crawl.example/", "limit": 2}, headers=auth)
+        assert r.status == 200
+        job = (await r.json())["id"]
+        for _ in range(400):
+            status = await (await client.get(f"/v1/crawl/{job}", headers=auth)).json()
+            if status["status"] != "running":
+                break
+            await asyncio.sleep(0.02)
+        crawled = [flag for url, flag in seen if "crawl.example" in url]
+        assert crawled and all(flag != "requested" for flag in crawled)
+
+
+async def test_refused_page_returns_the_archive_copy_by_default_and_can_be_switched_off(tmp_path, monkeypatch):
+    from rainbo_scrape.policy import ScrapeError
+    monkeypatch.delenv("SCRAPER_GATEWAY_SECRET", raising=False)
+    billing = Billing(tmp_path / "billing.db")
+    h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
+
+    async def scrape(url, **kwargs):
+        if url.startswith("https://web.archive.org/web/20261110121221id_/"):
+            return {"url": url, "markdown": "# Archived", "text": "Archived", "rendered": False, "receipt": {"final_url": url}}
+        raise ScrapeError("http_error", "Site returned HTTP 403")
+
+    async def snapshot(url):
+        return "20261110121221"
+
+    acct, auth = account(h, "starter", "cs_test_access2")
+    async with TestClient(TestServer(make_app(billing, scrape, hosted=h, snapshot_fn=snapshot))) as client:
+        r = await client.post("/v1/scrape", json={"url": "https://walled.example/", "render": "never"}, headers=auth)
+        body = await r.json()
+        assert r.status == 200 and body["result"]["markdown"] == "# Archived" and body["result"]["archive"]["live_page_served"] is False
+        assert "archived_copy" in body["result"]["warnings"]
+        r = await client.post("/v1/scrape", json={"url": "https://walled.example/", "render": "never", "fallback": "none"}, headers=auth)
+        body = await r.json()
+        assert r.status == 400 and body["code"] == "http_error" and "fallback" in body["hint"]

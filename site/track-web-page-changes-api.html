@@ -2,7 +2,7 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
 {"@type":"Question","name":"How do I track changes on a web page with an API?","acceptedAnswer":{"@type":"Answer","text":"Scrape the page on a schedule with the Apex Flow 3D Scraper API. Each result says whether the page is new, unchanged or changed since your last read; ask for the diff output and you receive a unified diff of only the lines that changed."}},
 {"@type":"Question","name":"Does change tracking cost extra credits?","acceptedAnswer":{"@type":"Answer","text":"The scrape costs the normal 1 credit for a plain page or 3 for a rendered page. Check the current docs for any output-specific charges before a large job."}},
-{"@type":"Question","name":"What can it not do?","acceptedAnswer":{"@type":"Answer","text":"It compares the text it reads. It obeys robots.txt and does not solve CAPTCHAs, so pages that refuse automated readers cannot be tracked."}}]}</script></head><body><nav><a href="/">APEX FLOW 3D SCRAPER</a><a href="/dashboard.html">Dashboard →</a></nav><main>
+{"@type":"Question","name":"What can it not do?","acceptedAnswer":{"@type":"Answer","text":"It compares the text it reads. It does not solve CAPTCHAs or evade bot walls, so pages that refuse automated readers cannot be tracked."}}]}</script></head><body><nav><a href="/">APEX FLOW 3D SCRAPER</a><a href="/dashboard.html">Dashboard →</a></nav><main>
 <p class="eyebrow">How-to</p><h1>How to track changes on a web page with an API.</h1>
 <p class="lede">Scrape the page on a schedule. Each result tells you whether it is new, unchanged or changed, and can return only the lines that moved.</p>
 <pre>curl https://webscraper.apexflowlabs.com/v1/scrape \
@@ -16,5 +16,5 @@
 -Price: $10
 +Price: $12</pre>
 <p>Run it from a scheduler of your choice and alert on <code>changed</code>. Pages you scrape are also saved to a searchable index in your account.</p>
-<h2>Limits to know</h2><ul><li>It compares the text it reads, not screenshots.</li><li>It obeys robots.txt and does not solve CAPTCHAs or evade bot walls.</li><li>Credit cost per scrape applies: 1 plain, 3 rendered; failures are refunded.</li></ul>
+<h2>Limits to know</h2><ul><li>It compares the text it reads, not screenshots.</li><li>It does not solve CAPTCHAs or evade bot walls.</li><li>Credit cost per scrape applies: 1 plain, 3 rendered; failures are refunded.</li></ul>
 <p><a class="button" href="/trial.html">Try 1,000 free credits →</a> <a class="button secondary" href="/docs.html">API docs</a></p></main></body></html>

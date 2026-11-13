@@ -20,7 +20,7 @@ Last checked: 13 November 2026. Hosted API: https://webscraper.apexflowlabs.com/
 
 ## Limits
 - 256 KiB per response (longer documents come back in consecutive parts). Concurrent page scrapes: 2 on the trial, 6 on Pass and Starter, 12 on Growth, 20 on Scale. Batches of up to 10 URLs.
-- We obey robots.txt and Crawl-delay. We do not solve CAPTCHAs, rotate proxies or disguise requests.
+- Crawls obey robots.txt and every request obeys Crawl-delay. A page you name is read even where robots.txt disallows it; a refused page returns a labelled archive copy. We do not solve CAPTCHAs, rotate proxies or disguise requests.
 
 ## Compared with Firecrawl (their public pricing page, read 13 November 2026)
 Firecrawl bills credits per page too. Their list: Free 1,000 credits a month; Hobby $19 monthly ($16 billed yearly) for 5,000; Standard $99 ($83 yearly) for 100,000; Growth $399 ($333 yearly) for 500,000; Scale $749 ($599 yearly) for 1,000,000; pay-as-you-go in $5 increments on paid plans. They charge 1 credit for a page that returns an error status such as 403 or 404. Their paid plans have higher concurrency (5, 25, 50, 100). Per 1,000 plain pages at monthly billing: Hobby $3.80, Standard $0.99, Growth $0.80, Scale $0.75. Credit definitions differ between vendors, so compare your own workload.

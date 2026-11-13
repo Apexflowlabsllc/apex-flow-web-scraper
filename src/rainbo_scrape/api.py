@@ -18,7 +18,7 @@ SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "val
 # Failures where the live site refused or could not serve us; a public archive copy may still exist.
 ARCHIVABLE = {"access_challenge", "http_error", "upstream_error", "rate_limited", "fetch_failed", "dns_failed",
               "robots_denied", "robots_unavailable"}
-HINT = 'The live site did not serve this page. Retry with "fallback":"archive" to read the latest Internet Archive copy, labelled with its capture time.'
+HINT = 'The live site did not serve this page. Remove "fallback":"none" to read the latest Internet Archive copy, labelled with its capture time.'
 RETRYABLE = {408, 429, 500, 502, 503, 504}
 CODES = {400: "invalid_request", 401: "invalid_key", 402: "insufficient_credits", 413: "request_too_large",
          415: "unsupported_media_type", 429: "rate_limited", 502: "source_failed", 504: "timeout"}
@@ -189,16 +189,18 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         body = await request.json()
         return await perform(request["account"], body)
 
-    async def perform(account, body):
+    async def perform(account, body, named=True):
+        """named: the customer gave this exact address (single scrape, batch). Crawl-discovered pages pass False."""
         nonlocal total_active, rendering_active
         if not isinstance(body, dict) or not isinstance(body.get("url"), str) or set(body) - ALLOWED:
             raise ValueError("body must be a JSON object with a url and only these options: " + ", ".join(sorted(ALLOWED)))
         page = body.pop("page", 1)
         if isinstance(page, bool) or not isinstance(page, int) or not 1 <= page <= 60:
             raise ValueError("page must be a whole number from 1 to 60")
-        fallback = body.pop("fallback", None)
-        if fallback not in (None, "archive"):
-            raise ValueError('fallback must be "archive" when supplied')
+        fallback = body.pop("fallback", "archive" if named else None)
+        if fallback not in (None, "archive", "none"):
+            raise ValueError('fallback must be "archive" or "none" when supplied')
+        fallback = None if fallback == "none" else fallback
         max_tokens = body.pop("max_tokens", None)
         if max_tokens is not None and (isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not 200 <= max_tokens <= 60000):
             raise ValueError("max_tokens must be a whole number from 200 to 60000")
@@ -253,9 +255,10 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
             url = body.pop("url")
             async with asyncio.timeout(90):
                 try:
-                    result = await scrape_fn(url, **body)
+                    # A page the customer named is read even where robots.txt disallows it; the receipt records that.
+                    result = await scrape_fn(url, **body, **({"robots": "requested"} if named else {}))
                 except ScrapeError as exc:
-                    # The live site refused or failed. Only when asked, read the public Internet Archive copy instead.
+                    # The live site refused or failed. Unless switched off, read the public Internet Archive copy instead.
                     exc.asked_archive = fallback == "archive"
                     stamp = await snapshot_fn(url) if fallback == "archive" and exc.code in ARCHIVABLE else None
                     if not stamp:

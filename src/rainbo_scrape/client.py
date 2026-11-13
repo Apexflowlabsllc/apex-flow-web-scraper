@@ -16,9 +16,9 @@ class Page(dict):
 
 
 async def ascrape(url, *, render="auto", recipe=None, max_age=None, screenshot=False, extract=None,
-                  wait_selector=None, chunks=None, settings=None, browser_slots=None):
+                  wait_selector=None, chunks=None, settings=None, browser_slots=None, robots="obey"):
     settings = settings or Settings()
-    request = {"urls": [url], "max_pages": 1, "max_depth": 0, "render": render, "screenshot": screenshot}
+    request = {"urls": [url], "max_pages": 1, "max_depth": 0, "render": render, "screenshot": screenshot, "robots": robots}
     for key, value in (("recipe", recipe), ("max_age", max_age), ("extract", extract), ("wait_selector", wait_selector),
                          ("chunks", chunks)):
         if value is not None:

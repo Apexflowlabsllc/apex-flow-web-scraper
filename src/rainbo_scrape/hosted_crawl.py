@@ -106,7 +106,7 @@ def install(h, app, perform, map_urls=None):
                     item = None
                     for attempt in range(6):
                         try:
-                            response = await perform(account, {"url": url, "outputs": sorted(set(wanted) | {"links"}), **scrape_options})
+                            response = await perform(account, named=False, body={"url": url, "outputs": sorted(set(wanted) | {"links"}), **scrape_options})
                             item = {"status": response.status, **json.loads(response.body)}
                         except (ValueError, KeyError, TypeError, ScrapeError) as exc:
                             item = {"status": 400, "error": str(exc), "code": getattr(exc, "code", None) or "invalid_request"}

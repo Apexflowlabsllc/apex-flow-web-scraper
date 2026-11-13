@@ -10,7 +10,8 @@
 - Owned full-text search (SQLite FTS5, BM25) over everything scraped.
 - JSON-Schema extraction using DeepSeek first, OpenRouter second.
 - MCP tools for agents: fetch, map, crawl, search, compare.
-- Obeys robots.txt and Crawl-delay; fetches public addresses only.
+- Crawls and maps obey robots.txt; all requests obey Crawl-delay. A page requested by exact address is read even where robots.txt disallows it (receipt.robots_txt is then disallowed_read_on_request). A refused live read returns the Internet Archive copy by default, labelled; send "fallback":"none" for the error instead.
+- Fetches public addresses only.
 
 ## Measured results (30 public URLs, 94 hand-checked reference checks, 5 Nov 2026)
 - 26 of 30 URLs fetched; 92 of 94 Markdown fidelity checks passed (97.9%).

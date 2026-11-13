@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Apex Flow 3D Scraper",
-    "version": "0.6.2",
+    "version": "0.7.0",
     "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Accounts run 2 (trial), 6 (Pass, Starter), 12 (Growth) or 20 (Scale) page scrapes at once, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
   },
   "externalDocs": {
@@ -343,9 +343,11 @@
                   "fallback": {
                     "type": "string",
                     "enum": [
-                      "archive"
+                      "archive",
+                      "none"
                     ],
-                    "description": "When the live site refuses or fails, return the latest Internet Archive copy, labelled in result.archive."
+                    "description": "What to return when the live site refuses or fails. \"archive\" (default for a page you name) returns the latest Internet Archive copy, labelled in result.archive. \"none\" returns the error instead.",
+                    "default": "archive"
                   },
                   "extract": {
                     "type": "object",
@@ -854,8 +856,11 @@
                   "fallback": {
                     "type": "string",
                     "enum": [
-                      "archive"
-                    ]
+                      "archive",
+                      "none"
+                    ],
+                    "default": "archive",
+                    "description": "What to return when the live site refuses or fails. \"archive\" (default for a page you name) returns the latest Internet Archive copy, labelled in result.archive. \"none\" returns the error instead."
                   },
                   "recipe": {
                     "type": "object"
