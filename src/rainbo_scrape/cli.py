@@ -20,7 +20,8 @@ def main(argv=None):
     from .policy import ScrapeError
     parser = argparse.ArgumentParser(prog="rainbo-scrape")
     parser.add_argument("command", choices=["health", "scrape", "fetch", "map", "status", "results", "jobs",
-                                            "cancel", "worker", "web", "mcp", "search", "index", "crawl-web", "llms-txt", "api", "new-key", "login"])
+                                            "cancel", "worker", "web", "mcp", "search", "index", "crawl-web", "llms-txt", "api", "new-key", "login",
+                                            "store-track", "store-rising", "store-list"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--render", choices=["auto", "never", "always"], default="auto")
     parser.add_argument("--pages", type=int, default=1)
@@ -36,7 +37,25 @@ def main(argv=None):
     parser.add_argument("--signed-in", action="store_true",
                         help="fetch: read through your own signed-in browser profile on this machine (run login first)")
     parser.add_argument("--profile", default="default", help="login / fetch --signed-in: which saved browser profile to use")
+    parser.add_argument("--days", type=float, default=7, help="store-rising: how many days of changes to rank")
     args = parser.parse_args(argv)
+    if args.command in {"store-track", "store-rising", "store-list"}:
+        # Store watch: snapshot a Shopify store's public catalog, then rank what changed between snapshots.
+        from . import storewatch
+        try:
+            if args.command == "store-track":
+                result = asyncio.run(storewatch.track(args.value))
+            else:
+                watch = storewatch.open_watch()
+                try:
+                    result = watch.stores() if args.command == "store-list" else watch.rising(
+                        storewatch.store_origin(args.value), days=args.days, limit=args.limit if args.limit != 5000 else 20)
+                finally:
+                    watch.close()
+        except (ValueError, OSError, ScrapeError) as exc:
+            sys.exit("error: " + str(exc))
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return
     if args.command == "mcp":
         from .mcp_server import mcp
         mcp.run()
