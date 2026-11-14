@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shopify store tracker API: see what changes in any store's catalog · Apex Flow 3D Scraper</title><meta property="og:title" content="Shopify store tracker API · Apex Flow 3D Scraper"><meta property="og:description" content="Track any Shopify store's public catalog. See new products, price changes, sell-outs and restocks, and a ranking of the products that are moving. One credit per 250 products."><meta property="og:url" content="https://webscraper.apexflowlabs.com/shopify-store-tracker.html"><meta property="og:type" content="website"><meta name="description" content="Track any Shopify store's public catalog. See new products, price changes, sell-outs and restocks, and a ranking of the products that are moving. One credit per 250 products."><link rel="canonical" href="https://webscraper.apexflowlabs.com/shopify-store-tracker.html"><link rel="stylesheet" href="/app.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"How do I track a competitor's Shopify store?","acceptedAnswer":{"@type":"Answer","text":"Send the store's address to POST /v1/stores/track on the Apex Flow 3D Scraper API. It saves a snapshot of the store's public catalog. Send it again later and the reply lists what changed: new products, price drops and rises, products that sold out or came back, and variants that changed. POST /v1/stores/rising then ranks the products with the most changes."}},
+{"@type":"Question","name":"Does it show a store's revenue or sales?","acceptedAnswer":{"@type":"Answer","text":"No. A store's revenue and order count are not public, and we do not publish guesses as facts. The ranking is built only from changes we can see in the store's own public catalog file, and every reply says so."}},
+{"@type":"Question","name":"What does it cost?","acceptedAnswer":{"@type":"Answer","text":"One credit per catalog page read, and a page holds 250 products. A 20-product store costs 1 credit a snapshot; a 1,000-product store costs 4. Reading the ranking and listing your stores is free. The free trial tracks 3 stores; paid plans track 50."}},
+{"@type":"Question","name":"Which stores does it work on?","acceptedAnswer":{"@type":"Answer","text":"Shopify stores that publish their catalog file, which is the default. If a store has closed that file or its robots.txt disallows it, the request returns a clear error and nothing is charged."}}]}</script></head><body><nav><a href="/">APEX FLOW 3D SCRAPER</a><a href="/dashboard.html">Dashboard →</a></nav><main>
+<p class="eyebrow">Store watch</p><h1>Track any Shopify store. See what moves.</h1>
+<p class="lede">Name a store. We save a snapshot of its public catalog. Ask again later and you get exactly what changed: new products, price changes, sell-outs, restocks. Then ask which products are moving.</p>
+<h2>1. Take a snapshot</h2>
+<pre>curl https://webscraper.apexflowlabs.com/v1/stores/track \
+  -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" \
+  -d '{"store":"example-store.com"}'</pre>
+<p>The first reply is the baseline. Every later reply lists the changes since your last snapshot:</p>
+<pre>{"credits_used": 1,
+ "result": {"store": "https://example-store.com", "products": 56, "first_snapshot": false,
+   "changes": {"new": 2, "price_drop": 1, "sold_out": 1, "activity": 9},
+   "events": [{"title": "Rope Toy", "kind": "sold_out", "detail": "all variants unavailable"},
+              {"title": "Travel Bowl", "kind": "price_drop", "detail": "24.00 -> 19.00"}]}}</pre>
+<h2>2. Ask what is rising</h2>
+<pre>curl https://webscraper.apexflowlabs.com/v1/stores/rising \
+  -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" \
+  -d '{"store":"example-store.com","days":7,"limit":10}'</pre>
+<p>Products come back ranked by the changes seen in the window, each with its price, stock state, link and the signals behind its score. This call is free.</p>
+<h2>What you can do with it</h2><ul><li>Watch five competitors and see which new products they keep in stock and which they drop.</li><li>Catch a competitor's price cut the day it happens.</li><li>Spot products that sell out and come back: demand you can measure.</li><li>Give an AI agent the tools <code>track_store</code> and <code>rising_products</code> through our <a href="/docs.html#agents">MCP server</a>.</li></ul>
+<h2>What it does not do</h2><ul><li>It does not report revenue or order counts. Those are not public, and a guess is not a fact.</li><li>"Activity" means a variant record changed between two snapshots. That happens on a sale and on any edit, so it is a signal, not a sales count.</li><li>It reads only the catalog file the store publishes, obeys robots.txt, and never disguises a request.</li><li>The ranking needs at least two snapshots taken at different times. One store can be read once an hour.</li></ul>
+<h2>Price</h2><p>One credit per catalog page read (250 products a page). Reading the ranking, listing your stores and forgetting a store are free. The free trial tracks 3 stores; paid plans track 50.</p>
+<p><a class="button" href="/trial.html">Try 1,000 free credits →</a> <a class="button secondary" href="/docs.html#stores">API docs</a></p></main></body></html>

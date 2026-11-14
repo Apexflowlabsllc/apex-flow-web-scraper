@@ -113,3 +113,22 @@ async def test_collect_pages_until_a_short_page_and_explains_a_closed_store(monk
         return {"status": 500, "body": b""}
     with pytest.raises(OSError):
         await collect("https://shop.example.com", broken)
+
+
+def test_watch_keeps_owners_apart_and_forgets_a_store(tmp_path):
+    import sqlite3
+    db = sqlite3.connect(str(tmp_path / "shared.db"), isolation_level=None)
+    a, b = Watch(db, "acct_a"), Watch(db, "acct_b")
+    store = "https://shop.example.com"
+    a.record(store, parse_products(page(product(1, "Rope"))), now=1.0)
+    a.record(store, parse_products(page(product(1, "Rope"), product(2, "Ball"))), now=2.0)
+    assert b.stores() == [] and b.latest(store) == (None, None, {}) and not b.tracked(store)
+    b.record(store, parse_products(page(product(9, "Bed"))), now=3.0)
+    assert [s["products"] for s in a.stores()] == [2] and [s["products"] for s in b.stores()] == [1]
+    # Only the newest snapshot of each store keeps its product rows.
+    assert db.execute("SELECT COUNT(DISTINCT snapshot) FROM sw_items").fetchone()[0] == 2
+    assert a.forget(store) is True and a.stores() == [] and a.forget(store) is False
+    assert [s["products"] for s in b.stores()] == [1]      # the other account is untouched
+    a.close()
+    db.execute("SELECT 1")                                 # a borrowed connection is left open
+    db.close()

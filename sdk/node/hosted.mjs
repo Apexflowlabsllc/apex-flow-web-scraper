@@ -66,6 +66,11 @@ export class Apex {
   packages() { return this.#call("GET", "/packages"); }
   housePrices(region, quarters = 8) { return this.#call("POST", "/packages/housing", { region, quarters }); }
   nprNews(topic = "news", limit = 10) { return this.#call("POST", "/packages/npr", { topic, limit }); }
+  // Store watch: snapshot a Shopify store's public catalog and rank what changed. 1 credit per 250 products; ranking is free.
+  trackStore(store) { return this.#call("POST", "/stores/track", { store }); }
+  risingProducts(store, days = 7, limit = 20) { return this.#call("POST", "/stores/rising", { store, days, limit }); }
+  trackedStores() { return this.#call("GET", "/stores"); }
+  forgetStore(store) { return this.#call("POST", "/stores/forget", { store }); }
   startCrawl(url, limit = 25, options = {}) { return this.#call("POST", "/crawl", { url, limit, ...options }); }
   crawlStatus(id, offset = 0) { return this.#call("GET", `/crawl/${id}?offset=${Number(offset) || 0}`); }
   cancelCrawl(id) { return this.#call("DELETE", `/crawl/${id}`); }

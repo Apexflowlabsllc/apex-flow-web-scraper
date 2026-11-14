@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Apex Flow 3D Scraper",
-    "version": "0.10.0",
+    "version": "0.11.0",
     "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Accounts run 2 (trial), 6 (Pass, Starter), 12 (Growth) or 20 (Scale) page scrapes at once, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
   },
   "externalDocs": {
@@ -1304,6 +1304,227 @@
         "responses": {
           "200": {
             "description": "Packages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stores/track": {
+      "post": {
+        "operationId": "trackStore",
+        "summary": "Snapshot a Shopify store's public catalog and return what changed (1 credit per 250 products)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "store": {
+                    "type": "string",
+                    "description": "The store's public address, for example example-store.com",
+                    "minLength": 3
+                  }
+                },
+                "required": [
+                  "store"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Snapshot saved. result.changes counts each kind of change since the previous snapshot; result.events lists them. 429 with code too_soon when the store was read less than an hour ago.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object"
+                    },
+                    "credits_used": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "credits_left": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stores/rising": {
+      "post": {
+        "operationId": "risingProducts",
+        "summary": "Rank a tracked store's products by changes between snapshots (free)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "store": {
+                    "type": "string",
+                    "description": "The store's public address, for example example-store.com",
+                    "minLength": 3
+                  },
+                  "days": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 365,
+                    "default": 7
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200,
+                    "default": 20
+                  }
+                },
+                "required": [
+                  "store"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ranking. A change signal, not a sales or revenue figure; result.note says what it means.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object"
+                    },
+                    "credits_used": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "credits_left": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stores/forget": {
+      "post": {
+        "operationId": "forgetStore",
+        "summary": "Stop tracking a store and delete its saved data (free)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "store": {
+                    "type": "string",
+                    "description": "The store's public address, for example example-store.com",
+                    "minLength": 3
+                  }
+                },
+                "required": [
+                  "store"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "store": {
+                      "type": "string"
+                    },
+                    "forgotten": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stores": {
+      "get": {
+        "operationId": "listStores",
+        "summary": "List the stores this account tracks (free)",
+        "responses": {
+          "200": {
+            "description": "Stores",
             "content": {
               "application/json": {
                 "schema": {

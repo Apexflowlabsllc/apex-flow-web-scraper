@@ -54,3 +54,22 @@ test("data packages post to their endpoints", async () => {
     ["POST", "/packages/npr", { topic: "business", limit: 1 }],
   ]);
 });
+
+test("store watch posts to its endpoints", async () => {
+  const { apex, calls } = fake([
+    { data: { credits_used: 1, result: { store: "https://shop.example.com", products: 20, first_snapshot: true } } },
+    { data: { credits_used: 0, result: { store: "https://shop.example.com", products: [] } } },
+    { data: { stores: [] } },
+    { data: { store: "https://shop.example.com", forgotten: true } },
+  ]);
+  assert.equal((await apex.trackStore("shop.example.com")).result.products, 20);
+  await apex.risingProducts("shop.example.com", 14, 5);
+  await apex.trackedStores();
+  assert.equal((await apex.forgetStore("shop.example.com")).forgotten, true);
+  assert.deepEqual(calls.map((c) => [c.method, c.url.replace(/^.*\/v1/, ""), c.body]), [
+    ["POST", "/stores/track", { store: "shop.example.com" }],
+    ["POST", "/stores/rising", { store: "shop.example.com", days: 14, limit: 5 }],
+    ["GET", "/stores", undefined],
+    ["POST", "/stores/forget", { store: "shop.example.com" }],
+  ]);
+});

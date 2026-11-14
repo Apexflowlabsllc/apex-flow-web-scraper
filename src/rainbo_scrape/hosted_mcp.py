@@ -140,6 +140,24 @@ async def npr_news(topic: Literal["news", "world", "business", "science", "polit
 
 
 @mcp.tool()
+async def track_store(store: str):
+    """Save a snapshot of a Shopify store's public catalog (every product, price and stock flag) and return what changed since this account's last snapshot of it: new products, price drops and rises, sold out, restocked, variant activity. One credit per catalog page read (250 products a page). A store can be read once an hour. Works only on stores that publish their catalog file; robots.txt is obeyed."""
+    return await request("/stores/track", {"store": store})
+
+
+@mcp.tool()
+async def rising_products(store: str, days: float = 7, limit: int = 20):
+    """Products in a tracked Shopify store ranked by the changes seen between this account's snapshots over the last `days`. A ranking of change signals, not a sales or revenue figure. Needs at least two snapshots taken at different times. Uses no credits."""
+    return await request("/stores/rising", {"store": store, "days": days, "limit": limit})
+
+
+@mcp.tool()
+async def tracked_stores():
+    """List the Shopify stores this account tracks, with snapshot count, last snapshot time and catalog size. Uses no credits."""
+    return await request("/stores")
+
+
+@mcp.tool()
 async def credit_balance():
     """Return remaining credits, plan, limits, renewal date, recent daily usage and the link for buying more."""
     return await request("/usage")

@@ -100,6 +100,22 @@ class Apex:
         """Latest NPR headlines for a topic, with links. 1 credit."""
         return self._call("POST", "/packages/npr", {"topic": topic, "limit": limit})
 
+    def track_store(self, store):
+        """Snapshot a Shopify store's public catalog and get what changed since the last snapshot. 1 credit per 250 products."""
+        return self._call("POST", "/stores/track", {"store": store})
+
+    def rising_products(self, store, days=7, limit=20):
+        """Products in a tracked store ranked by changes between snapshots. A change signal, not sales. Free."""
+        return self._call("POST", "/stores/rising", {"store": store, "days": days, "limit": limit})
+
+    def tracked_stores(self):
+        """The stores this account tracks. Free."""
+        return self._call("GET", "/stores")
+
+    def forget_store(self, store):
+        """Stop tracking a store and delete its saved data. Free."""
+        return self._call("POST", "/stores/forget", {"store": store})
+
     def start_crawl(self, url, limit=25, **options):
         return self._call("POST", "/crawl", {"url": url, "limit": limit, **options})
 

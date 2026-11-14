@@ -22,13 +22,14 @@ NOTE = ("Ranked by changes seen between snapshots of the store's public catalog.
         "not a sales count: a variant record changes on a sale and on any edit. Revenue is not known.")
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS stores(origin TEXT PRIMARY KEY, added REAL NOT NULL);
-CREATE TABLE IF NOT EXISTS snapshots(id INTEGER PRIMARY KEY, origin TEXT NOT NULL, ts REAL NOT NULL, products INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS items(snapshot INTEGER NOT NULL, product TEXT NOT NULL, handle TEXT, title TEXT, vendor TEXT,
+CREATE TABLE IF NOT EXISTS sw_stores(owner TEXT NOT NULL, origin TEXT NOT NULL, added REAL NOT NULL, PRIMARY KEY(owner, origin));
+CREATE TABLE IF NOT EXISTS sw_snapshots(id INTEGER PRIMARY KEY, owner TEXT NOT NULL, origin TEXT NOT NULL, ts REAL NOT NULL, products INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS sw_snapshots_by_store ON sw_snapshots(owner, origin, id);
+CREATE TABLE IF NOT EXISTS sw_items(snapshot INTEGER NOT NULL, product TEXT NOT NULL, handle TEXT, title TEXT, vendor TEXT,
     kind TEXT, created TEXT, price_min REAL, price_max REAL, compare_at REAL, in_stock INTEGER, variants TEXT,
     PRIMARY KEY(snapshot, product));
-CREATE TABLE IF NOT EXISTS events(origin TEXT NOT NULL, ts REAL NOT NULL, product TEXT NOT NULL, kind TEXT NOT NULL, detail TEXT);
-CREATE INDEX IF NOT EXISTS events_by_store ON events(origin, ts);
+CREATE TABLE IF NOT EXISTS sw_events(owner TEXT NOT NULL, origin TEXT NOT NULL, ts REAL NOT NULL, product TEXT NOT NULL, kind TEXT NOT NULL, detail TEXT);
+CREATE INDEX IF NOT EXISTS sw_events_by_store ON sw_events(owner, origin, ts);
 """
 
 
@@ -70,12 +71,12 @@ def parse_products(text):
                 variants[str(v["id"])] = [v.get("updated_at"), _money(v.get("price")), bool(v.get("available")),
                                           _money(v.get("compare_at_price"))]
         prices = [v[1] for v in variants.values() if v[1] is not None]
-        compare = [v[3] for v in variants.values() if v[3]]
+        compare_at = [v[3] for v in variants.values() if v[3]]
         out.append({"product": str(raw["id"]), "handle": raw.get("handle") or "", "title": (raw.get("title") or "").strip(),
                     "vendor": raw.get("vendor") or "", "kind": raw.get("product_type") or "",
                     "created": raw.get("created_at") or raw.get("published_at") or "",
                     "price_min": min(prices) if prices else None, "price_max": max(prices) if prices else None,
-                    "compare_at": max(compare) if compare else None,
+                    "compare_at": max(compare_at) if compare_at else None,
                     "in_stock": sum(1 for v in variants.values() if v[2]), "variants": variants})
     return out
 
@@ -106,33 +107,64 @@ def compare(before, after):
 
 
 class Watch:
-    """Snapshots and events in one SQLite file."""
+    """Snapshots and events in SQLite. `owner` keeps one account's stores apart from another's; the CLI uses "".
 
-    def __init__(self, path):
-        self.db = sqlite3.connect(str(path), isolation_level=None)
-        self.db.row_factory = sqlite3.Row
+    Only the newest snapshot of a store keeps its product rows; older snapshots keep their time and count,
+    and what changed lives on as events.
+    """
+
+    def __init__(self, target, owner=""):
+        self.owned = not isinstance(target, sqlite3.Connection)
+        self.db = sqlite3.connect(str(target), isolation_level=None) if self.owned else target
+        self.owner = owner
         self.db.executescript(SCHEMA)
 
     def close(self):
-        self.db.close()
+        if self.owned:
+            self.db.close()
+
+    def _rows(self, sql, args=()):
+        cursor = self.db.cursor()
+        cursor.row_factory = sqlite3.Row
+        return cursor.execute(sql, args)
 
     def stores(self):
-        rows = self.db.execute(
+        rows = self._rows(
             "SELECT s.origin, COUNT(n.id) AS snapshots, MAX(n.ts) AS last, "
-            "(SELECT products FROM snapshots WHERE origin=s.origin ORDER BY id DESC LIMIT 1) AS products "
-            "FROM stores s LEFT JOIN snapshots n ON n.origin=s.origin GROUP BY s.origin ORDER BY s.origin").fetchall()
+            "(SELECT products FROM sw_snapshots WHERE owner=s.owner AND origin=s.origin ORDER BY id DESC LIMIT 1) AS products "
+            "FROM sw_stores s LEFT JOIN sw_snapshots n ON n.owner=s.owner AND n.origin=s.origin WHERE s.owner=? "
+            "GROUP BY s.origin ORDER BY s.origin", (self.owner,)).fetchall()
         return [dict(r) for r in rows]
+
+    def tracked(self, origin):
+        return self._rows("SELECT 1 FROM sw_stores WHERE owner=? AND origin=?", (self.owner, origin)).fetchone() is not None
+
+    def forget(self, origin):
+        """Stop tracking a store and delete everything saved about it."""
+        ids = [r["id"] for r in self._rows("SELECT id FROM sw_snapshots WHERE owner=? AND origin=?", (self.owner, origin))]
+        known = self.tracked(origin)
+        self.db.execute("BEGIN")
+        try:
+            self.db.executemany("DELETE FROM sw_items WHERE snapshot=?", [(i,) for i in ids])
+            for table in ("sw_snapshots", "sw_events", "sw_stores"):
+                self.db.execute("DELETE FROM %s WHERE owner=? AND origin=?" % table, (self.owner, origin))
+            self.db.execute("COMMIT")
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
+        return known
 
     def _load(self, snapshot):
         out = {}
-        for r in self.db.execute("SELECT * FROM items WHERE snapshot=?", (snapshot,)):
+        for r in self._rows("SELECT * FROM sw_items WHERE snapshot=?", (snapshot,)):
             record = dict(r)
             record["variants"] = json.loads(record["variants"])
             out[record["product"]] = record
         return out
 
     def latest(self, origin):
-        row = self.db.execute("SELECT id, ts FROM snapshots WHERE origin=? ORDER BY id DESC LIMIT 1", (origin,)).fetchone()
+        row = self._rows("SELECT id, ts FROM sw_snapshots WHERE owner=? AND origin=? ORDER BY id DESC LIMIT 1",
+                         (self.owner, origin)).fetchone()
         return (row["id"], row["ts"], self._load(row["id"])) if row else (None, None, {})
 
     def record(self, origin, products, now=None):
@@ -142,15 +174,19 @@ class Watch:
         after = {p["product"]: p for p in products}
         self.db.execute("BEGIN")
         try:
-            self.db.execute("INSERT OR IGNORE INTO stores(origin, added) VALUES(?,?)", (origin, now))
-            snapshot = self.db.execute("INSERT INTO snapshots(origin, ts, products) VALUES(?,?,?)",
-                                       (origin, now, len(after))).lastrowid
+            self.db.execute("INSERT OR IGNORE INTO sw_stores(owner, origin, added) VALUES(?,?,?)", (self.owner, origin, now))
+            snapshot = self.db.execute("INSERT INTO sw_snapshots(owner, origin, ts, products) VALUES(?,?,?,?)",
+                                       (self.owner, origin, now, len(after))).lastrowid
             self.db.executemany(
-                "INSERT INTO items VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO sw_items VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 [(snapshot, p["product"], p["handle"], p["title"], p["vendor"], p["kind"], p["created"], p["price_min"],
                   p["price_max"], p["compare_at"], p["in_stock"], json.dumps(p["variants"])) for p in after.values()])
             events = compare(before, after) if previous else []
-            self.db.executemany("INSERT INTO events VALUES(?,?,?,?,?)", [(origin, now, pid, kind, detail) for pid, kind, detail in events])
+            self.db.executemany("INSERT INTO sw_events VALUES(?,?,?,?,?,?)",
+                                [(self.owner, origin, now, pid, kind, detail) for pid, kind, detail in events])
+            if previous:
+                self.db.execute("DELETE FROM sw_items WHERE snapshot=?", (previous,))
+            self.db.execute("DELETE FROM sw_events WHERE owner=? AND origin=? AND ts<?", (self.owner, origin, now - 366 * 86400))
             self.db.execute("COMMIT")
         except BaseException:
             self.db.execute("ROLLBACK")
@@ -173,10 +209,11 @@ class Watch:
         snapshot, last_ts, current = self.latest(origin)
         if snapshot is None:
             return {"store": origin, "snapshots": 0, "products": [], "note": "No snapshot yet. Track this store first."}
-        window = self.db.execute("SELECT COUNT(*) AS n, MIN(ts) AS first FROM snapshots WHERE origin=? AND ts>=?",
-                                 (origin, now - days * 86400)).fetchone()
+        since = now - days * 86400
+        window = self._rows("SELECT COUNT(*) AS n FROM sw_snapshots WHERE owner=? AND origin=? AND ts>=?",
+                            (self.owner, origin, since)).fetchone()
         tally = {}
-        for r in self.db.execute("SELECT product, kind FROM events WHERE origin=? AND ts>=?", (origin, now - days * 86400)):
+        for r in self._rows("SELECT product, kind FROM sw_events WHERE owner=? AND origin=? AND ts>=?", (self.owner, origin, since)):
             tally.setdefault(r["product"], {}).setdefault(r["kind"], 0)
             tally[r["product"]][r["kind"]] += 1
         ranked = []
@@ -219,16 +256,28 @@ async def collect(origin, get, max_pages=MAX_PAGES):
     return products
 
 
-async def track(value, path=None):
-    """Read one store's catalog now, save the snapshot, and return what changed since the last one."""
+async def read_catalog(origin, max_pages=MAX_PAGES):
+    """Read a store's catalog through the guarded fetcher. Returns (products, catalog pages read)."""
     from .network import Fetcher
     from .settings import Settings
     from .store import Store
-    origin = store_origin(value)
     settings = Settings().prepare()
+    pages = 0
+
     async with Fetcher(settings, Store(settings)) as fetcher:
-        products = await collect(origin, lambda url: fetcher.get(url, max_age=0))
-    watch = Watch(path or settings.data_dir / "storewatch.db")
+        async def get(url):
+            nonlocal pages
+            pages += 1
+            return await fetcher.get(url, max_age=0)
+        products = await collect(origin, get, max_pages)
+    return products, pages
+
+
+async def track(value, path=None):
+    """Read one store's catalog now, save the snapshot, and return what changed since the last one."""
+    origin = store_origin(value)
+    products, _ = await read_catalog(origin)
+    watch = open_watch(path)
     try:
         return watch.record(origin, products)
     finally:
