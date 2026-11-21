@@ -32,7 +32,7 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--v) 10%,var(--p) 
 /* Illustrative crawl theatre: the real URL entry point stays in the copy column. */
 .crawl-theatre{position:relative;isolation:isolate;overflow:hidden;aspect-ratio:1.32;border:1px solid rgba(54,224,247,.35);border-radius:24px;background:radial-gradient(ellipse at 50% 55%,#123442,#07131d 70%);box-shadow:0 30px 90px -45px rgba(15,213,242,.55),inset 0 0 50px rgba(10,207,238,.08);transform:perspective(1000px) rotateY(-3deg)}
 .crawl-art{width:100%;height:100%;display:block;object-fit:cover;object-position:center;mix-blend-mode:screen;opacity:.92;animation:crawl-art-drift 10s ease-in-out infinite}
-.crawl-swarm{position:absolute;inset:0;z-index:2;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen}
+.crawl-swarm{position:absolute;inset:0;z-index:2;width:100%;height:100%;pointer-events:none}
 .crawl-theatre::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(115deg,rgba(3,12,18,.18),transparent 48%,rgba(5,18,25,.25)),radial-gradient(ellipse at 50% 50%,transparent 50%,rgba(2,8,13,.48))}
 .crawl-scan{position:absolute;left:4%;right:4%;top:8%;height:2px;z-index:2;background:linear-gradient(90deg,transparent,var(--v),#e9feff,var(--v),transparent);box-shadow:0 0 18px 3px rgba(25,217,238,.78);opacity:.9;animation:crawl-sweep 5.8s cubic-bezier(.52,0,.35,1) infinite}
 .crawl-hud{position:absolute;z-index:3;left:16px;top:14px;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid rgba(74,220,240,.35);border-radius:999px;background:rgba(4,17,25,.74);backdrop-filter:blur(8px);font:600 10px ui-monospace,Consolas,monospace;letter-spacing:.13em;color:#b7f8ff;text-transform:uppercase}
@@ -146,7 +146,7 @@ button{font:inherit;cursor:pointer}.plan .btn{margin-top:22px;text-align:center;
 <p class="lede">Turn public web pages, PDFs and Word files into clean Markdown for your AI pipeline. Try the hosted API with 1,000 free credits. Pay $5 once for 35,000 pages, or $15 a month for 110,000.</p>
 <div class="cta"><a class="btn" href="/trial.html">Start free →</a><a class="btn ghost" href="#pricing">See pricing</a></div><p class="note">Start in your browser. No email or card required.</p><p class="checkout-feedback" role="status" aria-live="polite"></p>
 </div>
-<div class="crawl-theatre" role="img" aria-label="Illustration of crawler bots traversing a layered website, following links, scanning page content and sending extracted fields into a structured dataset.">
+<div class="crawl-theatre" role="img" aria-label="A 3D swarm of illuminated crawler robots moves across a layered website, scanning page content and sending extracted fields into a structured dataset.">
 <img class="crawl-art" src="/assets/crawler-swarm-hero.webp" alt="" fetchpriority="high" width="1536" height="1024">
 <canvas class="crawl-swarm" id="crawl-swarm" aria-hidden="true"></canvas><span class="crawl-scan" aria-hidden="true"></span><span class="crawl-hud" aria-hidden="true"><i></i> CRAWL PIPELINE</span><span class="crawl-footnote" aria-hidden="true">ILLUSTRATIVE CRAWL</span>
 <div class="crawl-stages" aria-hidden="true"><span><b>01</b> Discover</span><span>→</span><span><b>02</b> Crawl</span><span>→</span><span><b>03</b> Extract</span><span>→</span><span><b>04</b> Structure</span></div>
@@ -246,14 +246,7 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
   function onscroll(){var h=document.documentElement.scrollHeight-innerHeight;prog.style.transform='scaleX('+(h>0?scrollY/h:0)+')'}
   addEventListener('scroll',onscroll,{passive:true});onscroll();
   if(calm)return legacy();
-  /* Small cyan crawler lights move across the illustrative site plane. */
-  var theatre=document.querySelector('.crawl-theatre'),swarm=document.getElementById('crawl-swarm');
-  if(theatre&&swarm){
-    var swarmCtx=swarm.getContext('2d'),swarmW=0,swarmH=0,swarmD=1,agents=[],swarmRaf=0,swarmVisible=true;
-    function sizeSwarm(){var r=theatre.getBoundingClientRect();swarmW=r.width;swarmH=r.height;swarmD=Math.min(devicePixelRatio||1,1.25);swarm.width=Math.round(swarmW*swarmD);swarm.height=Math.round(swarmH*swarmD);swarmCtx.setTransform(swarmD,0,0,swarmD,0,0);var n=Math.min(360,Math.max(120,Math.round(swarmW*swarmH/1300)));agents=[];for(var i=0;i<n;i++){var z=.3+Math.random()*.7;agents.push({x:.035+Math.random()*.74,y:.14+Math.random()*.66,z:z,vx:(Math.random()-.5)*(.0005+z*.0008),vy:(Math.random()-.5)*(.00035+z*.00055),p:Math.random()*6.28})}}
-    function crawlFrame(){swarmCtx.clearRect(0,0,swarmW,swarmH);for(var i=0;i<agents.length;i++){var a=agents[i],px=a.x*swarmW,py=a.y*swarmH;a.x+=a.vx;a.y+=a.vy;a.p+=.12;if(a.x<.025||a.x>.79)a.vx*=-1;if(a.y<.13||a.y>.81)a.vy*=-1;var x=a.x*swarmW,y=a.y*swarmH,sz=.65+a.z*1.35,alpha=.18+a.z*.48;swarmCtx.strokeStyle='rgba(61,232,250,'+alpha+')';swarmCtx.lineWidth=.7+a.z*.35;swarmCtx.beginPath();swarmCtx.moveTo(px,py);swarmCtx.lineTo(x,y);swarmCtx.moveTo(x-sz*1.5,y-sz);swarmCtx.lineTo(x,y);swarmCtx.lineTo(x+sz*1.5,y-sz);swarmCtx.moveTo(x-sz*1.5,y+sz);swarmCtx.lineTo(x,y);swarmCtx.lineTo(x+sz*1.5,y+sz);swarmCtx.stroke();swarmCtx.fillStyle='rgba(205,252,255,'+alpha+')';swarmCtx.beginPath();swarmCtx.arc(x,y,sz,0,6.283);swarmCtx.fill()}if(swarmVisible&&!document.hidden)swarmRaf=requestAnimationFrame(crawlFrame)}
-    sizeSwarm();addEventListener('resize',sizeSwarm,{passive:true});document.addEventListener('visibilitychange',function(){if(document.hidden)cancelAnimationFrame(swarmRaf);else if(swarmVisible)crawlFrame()});if('IntersectionObserver' in window){var swarmIO=new IntersectionObserver(function(es){swarmVisible=es[0].isIntersecting;if(swarmVisible&&!document.hidden)crawlFrame();else cancelAnimationFrame(swarmRaf)},{threshold:0});swarmIO.observe(theatre)}else crawlFrame()
-  }
+  var theatre=document.querySelector('.crawl-theatre');
   var glow=document.getElementById('glow'),mx=innerWidth/2,my=innerHeight/3;
   addEventListener('pointermove',function(e){mx=e.clientX;my=e.clientY;glow.style.opacity=1;glow.style.transform='translate('+mx+'px,'+my+'px)'},{passive:true});
   /* living network: nodes drift, link when close, bend toward the pointer */
@@ -301,5 +294,6 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
   }
 })();
 </script>
+<script type="module" src="/assets/crawl-3d.js"></script>
 <script src="/checkout.js" defer></script></body>
 </html>
