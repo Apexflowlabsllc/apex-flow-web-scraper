@@ -96,7 +96,7 @@
   const vertices = [];
   const vtx = (p, n, color, leg = -1, stride = 0, shade = 0) => vertices.push(...p, ...n, ...color, leg, stride, shade);
   const colors = {
-    dark: [0.035, 0.085, 0.12, 0], steel: [0.34, 0.48, 0.57, 0], light: [0.72, 0.86, 0.9, 0], joint: [0.09, 0.22, 0.29, 0], cyan: [0.07, 0.78, 0.95, 1], lime: [0.55, 0.95, 0.33, 0.34]
+    dark: [0.055, 0.045, 0.075, 0], steel: [0.42, 0.37, 0.45, 0], light: [0.82, 0.76, 0.72, 0], joint: [0.16, 0.11, 0.2, 0], amber: [1, 0.28, 0.08, 1], violet: [0.58, 0.31, 1, 0.42]
   };
   function sphere(center, radius, color, leg = -1, stride = 0, rings = 5, sides = 8) {
     const point = (u, v) => {
@@ -144,8 +144,8 @@
   sphere([0, 0, 0.23], [0.47, 0.34, 0.24], colors.steel, -1, 0, 6, 10);
   box([-0.02, 0, 0.27], [0.32, 0.27, 0.15], colors.dark);
   sphere([0.3, 0, 0.32], [0.2, 0.19, 0.16], colors.dark, -1, 0, 5, 8);
-  sphere([0.43, -0.015, 0.34], [0.07, 0.105, 0.09], colors.cyan, -1, 0, 5, 8);
-  sphere([-0.25, 0.03, 0.44], [0.12, 0.105, 0.035], colors.lime, -1, 0, 4, 7);
+  sphere([0.43, -0.015, 0.34], [0.07, 0.105, 0.09], colors.amber, -1, 0, 5, 8);
+  sphere([-0.25, 0.03, 0.44], [0.12, 0.105, 0.035], colors.violet, -1, 0, 4, 7);
   for (let side = -1; side <= 1; side += 2) for (let row = 0; row < 4; row++) {
     const id = (side < 0 ? 0 : 4) + row;
     const x = -0.28 + row * 0.19, y = side * 0.2, hip = [x, y, 0.19];
