@@ -1,11 +1,23 @@
 {
   "name": "apex-flow-web-scraper",
   "version": "0.11.0",
-  "description": "Node client for a local Apex Flow Web Scraper workspace (rainbo-scrape web). Not published.",
+  "description": "Dependency-free Node.js clients for the hosted Apex Flow Web Scraper API and local workspace.",
   "type": "module",
-  "main": "index.mjs",
-  "engines": { "node": ">=20" },
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./hosted": "./hosted.mjs"
+  },
+  "files": ["index.mjs", "hosted.mjs", "README.md"],
+  "engines": { "node": ">=18" },
   "scripts": { "test": "node --test" },
   "license": "MIT",
-  "private": true
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git",
+    "directory": "sdk/node"
+  },
+  "homepage": "https://webscraper.apexflowlabs.com/docs.html#sdk",
+  "bugs": { "url": "https://github.com/Apexflowlabsllc/apex-flow-web-scraper/issues" },
+  "keywords": ["web-scraping", "web-crawler", "markdown", "mcp", "ai-agents", "apex-flow"]
 }

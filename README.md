@@ -3,11 +3,25 @@
 **Hosted API for developers and AI agents: scrape, crawl and monitor the public web as clean Markdown.** [Get 1,000 free credits](https://webscraper.apexflowlabs.com/trial.html) · [Docs](https://webscraper.apexflowlabs.com/docs.html) · [Pricing](https://webscraper.apexflowlabs.com/#pricing) · [OpenAPI](https://webscraper.apexflowlabs.com/openapi.json)
 
 ```python
-from rainbo_scrape.hosted_client import Apex   # pip install "git+https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git"
+from rainbo_scrape.hosted_client import Apex   # python -m pip install apex-flow-web-scraper
 apex = Apex()                                   # reads APEX_SCRAPER_API_KEY
 page = apex.scrape("https://example.com", outputs=["markdown"], max_tokens=4000)
 for page in apex.crawl("https://www.sqlite.org/docs.html", limit=25):
     print(page["url"], page["status"])
+```
+
+Node.js 18+:
+
+```bash
+npm install apex-flow-web-scraper
+```
+
+```js
+import { Apex } from "apex-flow-web-scraper/hosted";
+
+const apex = new Apex(); // reads APEX_SCRAPER_API_KEY
+const { result } = await apex.scrape("https://example.com", { outputs: ["markdown"] });
+console.log(result.markdown);
 ```
 
 ## Try it in 60 seconds
@@ -21,7 +35,9 @@ curl https://webscraper.apexflowlabs.com/v1/scrape \
   -d '{"url":"https://example.com","render":"never","outputs":["markdown"]}'
 ```
 
-3. Or give it to your agent (Claude Code, Codex, VS Code): [one-step MCP setup](https://webscraper.apexflowlabs.com/docs.html#agents).
+3. Or connect its hosted MCP server to an agent (Claude Code, Codex, VS Code and other MCP clients): [agent setup](https://webscraper.apexflowlabs.com/docs.html#agents).
+
+For an OpenAI Responses API app, use the [working remote-MCP example](examples/openai-responses-mcp.py). It keeps approval enabled and restricts access to page scraping.
 
 ## Price per page
 
@@ -52,7 +68,7 @@ Field extraction by CSS selector costs no extra credits. Failed and blocked page
 | Store watch (self-hosted) | `rainbo-scrape store-track example.com` saves a snapshot of a Shopify store's public catalog; `store-rising example.com --days 7` ranks products by what changed between snapshots (new, price change, sold out, restocked, variant activity); `store-list` shows tracked stores. Obeys robots.txt. A ranking of changes, not a sales or revenue figure. |
 | Agent-ready errors | A stable `code`, `retryable`, `retry_after`, a `hint`, and a `buy_url` when credits run out. |
 | MCP | Remote server at `https://webscraper.apexflowlabs.com/v1/mcp`, listed in the official MCP Registry. |
-| Clients | Python (`rainbo_scrape.hosted_client`) and Node (`sdk/node/hosted.mjs`), no dependencies. |
+| Clients | Python (`rainbo_scrape.hosted_client`) and Node (`apex-flow-web-scraper/hosted`). The client modules add no request-time dependencies; the PyPI distribution also includes the self-hosted engine. |
 | Self-host | MIT licensed engine in this repository. |
 
 
@@ -247,4 +263,4 @@ Not built: a whole-web search index of our own.
 - Every result carries a `receipt`: requested and final URL, status, fetch time, user agent, content hash, robots.txt decision.
 - `rainbo-scrape llms-txt https://your-site.com --pages 30 [--full]`: writes llms.txt / llms-full.txt for a site you operate.
 - `rainbo-scrape crawl-web <seed>`: open-web crawl, up to 1,000 pages a job, robots.txt obeyed. Built, not yet run at scale.
-- `sdk/node`: Node clients for a local workspace and the hosted API (in this repository, not yet on npm).
+- `sdk/node`: Node clients for the local workspace and hosted API, also available through the `apex-flow-web-scraper` npm package.

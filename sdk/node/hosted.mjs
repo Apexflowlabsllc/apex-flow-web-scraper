@@ -24,7 +24,7 @@ export class Apex {
     for (let attempt = 0; ; attempt++) {
       const res = await this.fetch(this.base + path, {
         method,
-        headers: { Authorization: "Bearer " + this.key, "Content-Type": "application/json", "User-Agent": "apex-scraper-node/0.9.0" },
+        headers: { Authorization: "Bearer " + this.key, "Content-Type": "application/json", "User-Agent": "apex-scraper-node/0.11.0" },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
