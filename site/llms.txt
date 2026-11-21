@@ -1,4 +1,4 @@
-# Apex Flow 3D Scraper
+# Apex Flow Web Scraper
 
 > Convert accessible public web pages, PDF and DOCX documents into clean Markdown. Hosted API with prepaid credits, or open-source self-hosting. Built by Apex Flow Labs. Engine version 0.2.0; hosted launch 6 November 2026.
 

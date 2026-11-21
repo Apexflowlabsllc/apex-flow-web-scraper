@@ -155,7 +155,7 @@ def summary(data):
 
 def write_reports(data):
     REPORTS.mkdir(parents=True, exist_ok=True)
-    text = "\n".join(["# Apex Flow 3D Scraper report", ""] + summary(data) + [""])
+    text = "\n".join(["# Apex Flow Web Scraper report", ""] + summary(data) + [""])
     for name, body in (("latest.md", text), ("latest.json", json.dumps(data, indent=2)),
                        ("report-%s.md" % time.strftime("%Y%m%d", time.gmtime()), text)):
         (REPORTS / name).write_text(body, encoding="utf-8")

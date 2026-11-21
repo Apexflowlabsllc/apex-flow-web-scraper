@@ -71,7 +71,7 @@ def build(page):
     name, slug = page["name"], page["slug"]
     faq = [
         (f"Is there a {name} alternative with a one-time price?",
-         f"Yes. Apex Flow 3D Scraper sells a $5 Project Pass with 35,000 credits valid for 30 days, with no subscription and no renewal. {name}'s public pricing page (read {READ}) lists monthly plans."),
+         f"Yes. Apex Flow Web Scraper sells a $5 Project Pass with 35,000 credits valid for 30 days, with no subscription and no renewal. {name}'s public pricing page (read {READ}) lists monthly plans."),
         (f"Is it cheaper than {name}?", page["cheaper"] + " Each vendor counts credits differently, so test your own workload."),
         (f"What does {name} do better?", " ".join(page["ahead"])),
         ("Are failed pages charged?", "No. Failed scrapes return the reserved credits, and there are no automatic overage charges."),
@@ -81,13 +81,13 @@ def build(page):
           "mainEntity": [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in faq]}
     differences = "".join(f"<li><b>{e(title)}</b> {body.format(rendered=e(page['rendered']))}</li>\n" for title, body in SHARED_DIFFERENCES)
     ahead = "".join(f"<li>{e(item)}</li>" for item in page["ahead"])
-    title = f"{name} alternative with a one-time price · Apex Flow 3D Scraper"
+    title = f"{name} alternative with a one-time price · Apex Flow Web Scraper"
     description = (f"An alternative to {name} for turning web pages into Markdown: a $5 one-time pass, $15 a month for 110,000 credits, "
                    f"failed pages refunded, no overage. Dated price comparison with honest tradeoffs.")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(title)}</title><meta name="description" content="{e(description)}"><link rel="canonical" href="{BASE}/{slug}.html"><meta property="og:title" content="{e(title)}"><meta property="og:description" content="{e(description)}"><meta property="og:url" content="{BASE}/{slug}.html"><meta property="og:type" content="article"><link rel="stylesheet" href="/app.css">
-<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script></head><body><nav><a href="/">APEX FLOW 3D SCRAPER</a><a href="/dashboard.html">Dashboard →</a></nav><main>
+<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script></head><body><nav><a href="/">APEX FLOW WEB SCRAPER</a><a href="/dashboard.html">Dashboard →</a></nav><main>
 <p class="eyebrow">Compared {READ}</p><h1>A {e(name)} alternative with a one-time price.</h1>
-<p class="lede">Apex Flow 3D Scraper turns public web pages, PDFs and Word files into clean Markdown. Start with 1,000 free credits, or buy a $5 pass for 35,000 credits with no subscription. Here is how it differs from {e(name)}, including where {e(name)} is ahead.</p>
+<p class="lede">Apex Flow Web Scraper turns public web pages, PDFs and Word files into clean Markdown. Start with 1,000 free credits, or buy a $5 pass for 35,000 credits with no subscription. Here is how it differs from {e(name)}, including where {e(name)} is ahead.</p>
 <div class="card"><h2 style="margin-top:0">Price per 1,000 plain pages (monthly billing)</h2>
 <table><thead><tr><th>Plan</th><th>Price</th><th>Credits</th><th>Per 1,000</th></tr></thead><tbody>
 {rows(APEX)}{rows(page["plans"])}</tbody></table>

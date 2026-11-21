@@ -205,7 +205,7 @@ class Hosted:
             form = {"mode": "payment" if plan == "pass" else "subscription",
                     "line_items[0][quantity]": "1", "line_items[0][price_data][currency]": "usd",
                     "line_items[0][price_data][unit_amount]": str(PLANS[plan]["price"]*100),
-                    "line_items[0][price_data][product_data][name]": f"Apex Flow 3D Scraper {plan.title()}",
+                    "line_items[0][price_data][product_data][name]": f"Apex Flow Web Scraper {plan.title()}",
                     "line_items[0][price_data][product_data][description]": f"{PLANS[plan]['credits']:,} credits. Plain pages: 1 credit; rendered pages: 3.",
                     "success_url": self.site + "/thanks.html?session_id={CHECKOUT_SESSION_ID}",
                     "cancel_url": self.site + "/#pricing", "metadata[product]": PRODUCT,
@@ -217,7 +217,7 @@ class Hosted:
                              "subscription_data[metadata][product]": PRODUCT, "subscription_data[metadata][plan]": plan})
             else:
                 form["customer_creation"] = "always"
-                form["line_items[0][price_data][product_data][name]"] = "Apex Flow 3D Scraper Project Pass"
+                form["line_items[0][price_data][product_data][name]"] = "Apex Flow Web Scraper Project Pass"
                 form["line_items[0][price_data][product_data][description]"] = "35,000 credits valid for 30 days from activation. One-time purchase."
             data = await self.stripe("POST", "checkout/sessions", form, "webscraper-" + digest)
             from .hosted_features import event

@@ -1,4 +1,4 @@
-// Client for the hosted Apex Flow 3D Scraper API. No dependencies; Node 18+.
+// Client for the hosted Apex Flow Web Scraper API. No dependencies; Node 18+.
 //   import { Apex } from "./hosted.mjs";
 //   const apex = new Apex();                       // reads APEX_SCRAPER_API_KEY
 //   const { result } = await apex.scrape("https://example.com", { outputs: ["markdown"] });

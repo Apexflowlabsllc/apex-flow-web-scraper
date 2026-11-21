@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Apex Flow 3D Scraper — web scraper API, URL to clean Markdown</title>
-<meta name="description" content="Apex Flow 3D Scraper turns any web page, PDF or DOCX into clean Markdown for AI and data teams. A hosted API from $15/month, a free 1,000-credit trial, and an open-source edition you can run yourself.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cdefs%3E%3ClinearGradient id=%27g%27 x1=%270%27 y1=%270%27 x2=%271%27 y2=%271%27%3E%3Cstop offset=%270%27 stop-color=%27%238b5cff%27/%3E%3Cstop offset=%271%27 stop-color=%27%23ff3df2%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2732%27 height=%2732%27 rx=%279%27 fill=%27url(%23g)%27/%3E%3C/svg%3E"><script>document.documentElement.className="js"</script><link rel="canonical" href="https://webscraper.apexflowlabs.com/"><meta property="og:url" content="https://webscraper.apexflowlabs.com/"><meta name="theme-color" content="#07060f"><meta property="og:title" content="Apex Flow 3D Scraper"><meta property="og:description" content="Web scraper API that turns any page, PDF or DOCX into clean Markdown. Measured benchmark, cheaper than Firecrawl."><meta property="og:type" content="website"><script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Apex Flow 3D Scraper","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","description":"Web scraper that converts web pages, PDFs and DOCX files to clean Markdown.","publisher":{"@type":"Organization","name":"Apex Flow Labs"}}</script>
+<title>Apex Flow Web Scraper — public web data, cleanly extracted</title>
+<meta name="description" content="Apex Flow Web Scraper turns public web pages, PDFs and DOCX files into clean Markdown and structured data. Try the hosted API with 1,000 free credits or run the open-source edition yourself.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cdefs%3E%3ClinearGradient id=%27g%27 x1=%270%27 y1=%270%27 x2=%271%27 y2=%271%27%3E%3Cstop offset=%270%27 stop-color=%27%2319d9ee%27/%3E%3Cstop offset=%271%27 stop-color=%27%2338a9ff%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2732%27 height=%2732%27 rx=%279%27 fill=%27url(%23g)%27/%3E%3C/svg%3E"><script>document.documentElement.className="js"</script><link rel="canonical" href="https://webscraper.apexflowlabs.com/"><meta property="og:url" content="https://webscraper.apexflowlabs.com/"><meta name="theme-color" content="#06131b"><meta property="og:title" content="Apex Flow Web Scraper"><meta property="og:description" content="Web scraper API that turns public pages, PDF and DOCX files into clean Markdown and structured data."><meta property="og:type" content="website"><script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Apex Flow Web Scraper","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","description":"Web scraper that converts public web pages, PDFs and DOCX files to clean Markdown and structured data.","publisher":{"@type":"Organization","name":"Apex Flow Labs"}}</script>
 <style>
-:root{--bg:#07060f;--bg2:#0d0b1a;--card:#110e22;--line:#241f3d;--ink:#f4f1ff;--mute:#9d97bd;--v:#7a45ff;--p:#ff3df2;--o:#ffb23d;color-scheme:dark}
+:root{--bg:#061018;--bg2:#091923;--card:#0b1c27;--line:#163440;--ink:#f2fbff;--mute:#9eb9c5;--v:#19d9ee;--p:#38a9ff;--o:#d7f75d;color-scheme:dark}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
 body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(60vw 50vh at 85% -5%,rgba(139,92,255,.32),transparent 70%),radial-gradient(50vw 45vh at 0% 30%,rgba(255,61,242,.16),transparent 70%),radial-gradient(40vw 40vh at 100% 90%,rgba(255,178,61,.07),transparent 70%)}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(60vw 50vh at 85% -5%,rgba(25,217,238,.19),transparent 70%),radial-gradient(50vw 45vh at 0% 30%,rgba(56,169,255,.11),transparent 70%),radial-gradient(40vw 40vh at 100% 90%,rgba(215,247,93,.045),transparent 70%)}
 a{color:inherit}.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
 .skip{position:absolute;left:-999px}.skip:focus{left:12px;top:12px;background:var(--v);color:#fff;padding:8px 12px;z-index:99;border-radius:8px}
 :focus-visible{outline:3px solid var(--o);outline-offset:3px;border-radius:6px}
@@ -19,18 +19,33 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:22px 0
 .logo{font-weight:800;letter-spacing:.04em;text-decoration:none;display:flex;align-items:center;gap:10px}
 .logo i{width:22px;height:22px;border-radius:7px;background:conic-gradient(from 200deg,var(--v),var(--p),var(--o),var(--v));display:block}
 nav .links{display:flex;gap:22px;align-items:center;font-size:14px;color:var(--mute)}nav .links a{text-decoration:none}nav .links a:hover{color:var(--ink)}
-.btn{display:inline-block;background:linear-gradient(100deg,var(--v),var(--p));color:#fff;font-weight:700;padding:13px 22px;border-radius:999px;text-decoration:none;box-shadow:0 8px 32px -8px rgba(139,92,255,.7);transition:transform .15s,box-shadow .15s}
-.btn:hover{transform:translateY(-2px);box-shadow:0 14px 40px -8px rgba(255,61,242,.55)}
+.btn{display:inline-block;background:linear-gradient(100deg,var(--v),var(--p));color:#fff;font-weight:700;padding:13px 22px;border-radius:999px;text-decoration:none;box-shadow:0 8px 32px -8px rgba(25,217,238,.7);transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 14px 40px -8px rgba(56,169,255,.55)}
 .btn.ghost{background:rgba(255,255,255,.04);border:1px solid var(--line);box-shadow:none;color:var(--ink)}
 .eyebrow{font:600 12.5px/1 ui-monospace,Consolas,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--p)}
 h1{font-size:clamp(46px,9.5vw,118px);line-height:.92;letter-spacing:-.045em;margin:18px 0 24px;max-width:11ch}
 h1 em{font-style:normal;background:linear-gradient(100deg,var(--v) 10%,var(--p) 60%,var(--o));-webkit-background-clip:text;background-clip:text;color:transparent}
 .lede{font-size:clamp(18px,2.3vw,22px);color:var(--mute);max-width:48ch}
 .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
-.hero{display:grid;grid-template-columns:1.05fr 1fr;gap:40px;align-items:center;padding:48px 0 30px}
-@media (max-width:920px){.hero{grid-template-columns:1fr}nav .links a.hide{display:none}}
+.hero{display:grid;grid-template-columns:.82fr 1.18fr;gap:30px;align-items:center;padding:34px 0 24px}
+@media (max-width:920px){.hero{grid-template-columns:1fr;min-height:0;padding-top:38px}nav .links a.hide{display:none}}
+/* Illustrative crawl theatre: the real URL entry point stays in the copy column. */
+.crawl-theatre{position:relative;isolation:isolate;overflow:hidden;aspect-ratio:1.32;border:1px solid rgba(54,224,247,.35);border-radius:24px;background:radial-gradient(ellipse at 50% 55%,#123442,#07131d 70%);box-shadow:0 30px 90px -45px rgba(15,213,242,.55),inset 0 0 50px rgba(10,207,238,.08);transform:perspective(1000px) rotateY(-3deg)}
+.crawl-art{width:100%;height:100%;display:block;object-fit:cover;object-position:center;mix-blend-mode:screen;opacity:.92;animation:crawl-art-drift 10s ease-in-out infinite}
+.crawl-swarm{position:absolute;inset:0;z-index:2;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen}
+.crawl-theatre::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(115deg,rgba(3,12,18,.18),transparent 48%,rgba(5,18,25,.25)),radial-gradient(ellipse at 50% 50%,transparent 50%,rgba(2,8,13,.48))}
+.crawl-scan{position:absolute;left:4%;right:4%;top:8%;height:2px;z-index:2;background:linear-gradient(90deg,transparent,var(--v),#e9feff,var(--v),transparent);box-shadow:0 0 18px 3px rgba(25,217,238,.78);opacity:.9;animation:crawl-sweep 5.8s cubic-bezier(.52,0,.35,1) infinite}
+.crawl-hud{position:absolute;z-index:3;left:16px;top:14px;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid rgba(74,220,240,.35);border-radius:999px;background:rgba(4,17,25,.74);backdrop-filter:blur(8px);font:600 10px ui-monospace,Consolas,monospace;letter-spacing:.13em;color:#b7f8ff;text-transform:uppercase}
+.crawl-hud i{width:7px;height:7px;border-radius:50%;background:var(--o);box-shadow:0 0 12px var(--o);animation:apex-pulse 1.4s infinite}
+.crawl-stages{position:absolute;z-index:3;left:14px;right:14px;bottom:13px;display:flex;justify-content:space-between;gap:5px;padding:9px 12px;border:1px solid rgba(65,210,232,.22);border-radius:12px;background:rgba(3,13,20,.82);backdrop-filter:blur(10px);font:600 9px ui-monospace,Consolas,monospace;letter-spacing:.12em;color:#c2e8ef;text-transform:uppercase}
+.crawl-stages span{display:flex;align-items:center;gap:6px}.crawl-stages b{color:var(--v);font-size:11px}
+.crawl-footnote{position:absolute;right:15px;top:16px;z-index:3;font:10px ui-monospace,Consolas,monospace;color:rgba(221,247,252,.66)}
+@keyframes crawl-sweep{0%{top:8%;opacity:0}8%{opacity:1}84%{top:88%;opacity:.9}100%{top:90%;opacity:0}}
+@keyframes crawl-art-drift{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(0,-5px,0) scale(1.018)}}
+@media(max-width:920px){.crawl-theatre{transform:none;order:2}.hero>div:first-child{order:1}}
+@media(max-width:520px){.crawl-theatre{aspect-ratio:1.05;border-radius:18px}.crawl-stages{left:8px;right:8px;bottom:8px;padding:8px 7px;font-size:7px;letter-spacing:.06em}.crawl-hud{left:9px;top:9px;font-size:8px}.crawl-footnote{right:9px;top:12px;font-size:8px}}
 /* live transform demo */
-.demo{position:relative;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));padding:14px;box-shadow:0 40px 80px -30px rgba(139,92,255,.5)}
+.demo{position:relative;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));padding:14px;box-shadow:0 40px 80px -30px rgba(25,217,238,.5)}
 .demo .bar{display:flex;gap:7px;padding:2px 4px 12px}.demo .bar b{width:10px;height:10px;border-radius:50%;background:var(--line)}
 .panes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:520px){.panes{grid-template-columns:1fr}}
@@ -39,16 +54,16 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--v) 10%,var(--p) 
 .pane .l{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#9d97bd}
 .raw .junk{animation:kill 9s infinite both}
 .raw .keep{color:#b9b2e6}
-.beam{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--p),var(--v),transparent);box-shadow:0 0 18px 3px rgba(255,61,242,.65);top:34px;animation:sweep 9s infinite both}
+.beam{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--p),var(--v),transparent);box-shadow:0 0 18px 3px rgba(56,169,255,.65);top:34px;animation:sweep 9s infinite both}
 .out .l{color:var(--ink);animation:show 9s infinite both;animation-delay:calc(var(--i)*.35s)}
 .out .h{color:var(--p);font-weight:700}.out .t{color:var(--o)}
 @keyframes sweep{0%{top:34px;opacity:0}5%{opacity:1}62%{top:92%;opacity:1}68%,100%{top:92%;opacity:0}}
-@keyframes kill{0%,12%{text-decoration:none}30%,92%{text-decoration:line-through;text-decoration-color:#ff3df2;text-decoration-thickness:2px}100%{text-decoration:none}}
+@keyframes kill{0%,12%{text-decoration:none}30%,92%{text-decoration:line-through;text-decoration-color:#38a9ff;text-decoration-thickness:2px}100%{text-decoration:none}}
 @keyframes show{0%,14%{clip-path:inset(0 100% 0 0)}24%,90%{clip-path:inset(0 0 0 0)}100%{clip-path:inset(0 100% 0 0)}}
 .caption{display:flex;justify-content:space-between;color:var(--mute);font-size:13px;padding:10px 4px 0}
 /* stats */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:36px 0 10px}
-.stat{padding:26px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(139,92,255,.12),rgba(17,14,34,.4) 60%)}
+.stat{padding:26px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(25,217,238,.12),rgba(17,14,34,.4) 60%)}
 .stat b{display:block;font-size:clamp(38px,5.4vw,60px);letter-spacing:-.04em;line-height:1;background:linear-gradient(100deg,#fff,#cdb8ff);-webkit-background-clip:text;background-clip:text;color:transparent}
 .stat span{color:var(--mute);font-size:14px;display:block;margin-top:8px}
 section{padding:72px 0 8px}
@@ -59,7 +74,7 @@ pre .c{color:#6f6a93}pre .k{color:var(--p)}pre .s{color:var(--o)}
 /* bento */
 .bento{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
 .cell{position:relative;grid-column:span 2;border:1px solid var(--line);border-radius:18px;padding:24px;background:var(--card);overflow:hidden;--x:50%;--y:0%}
-.cell::before{content:"";position:absolute;inset:0;background:radial-gradient(260px circle at var(--x) var(--y),rgba(139,92,255,.28),transparent 70%);opacity:0;transition:opacity .25s}
+.cell::before{content:"";position:absolute;inset:0;background:radial-gradient(260px circle at var(--x) var(--y),rgba(25,217,238,.28),transparent 70%);opacity:0;transition:opacity .25s}
 .cell:hover::before{opacity:1}.cell>*{position:relative}
 .cell.w{grid-column:span 3}
 .cell h3{margin:0 0 8px;font-size:19px;letter-spacing:-.01em}.cell p{margin:0;color:var(--mute);font-size:15.5px}
@@ -80,7 +95,7 @@ tr:last-child td{border-bottom:0}td.win{color:var(--p);font-weight:700}
 /* pricing */
 .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:12px}
 .plan{border:1px solid var(--line);border-radius:20px;padding:26px;background:var(--card);display:flex;flex-direction:column}
-.plan.hot{background:linear-gradient(170deg,rgba(139,92,255,.3),rgba(255,61,242,.12) 70%,var(--card));border-color:rgba(255,61,242,.5);box-shadow:0 30px 60px -30px rgba(255,61,242,.5)}
+.plan.hot{background:linear-gradient(170deg,rgba(25,217,238,.3),rgba(56,169,255,.12) 70%,var(--card));border-color:rgba(56,169,255,.5);box-shadow:0 30px 60px -30px rgba(56,169,255,.5)}
 .plan h3{margin:0;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
 .plan .pr{font-size:46px;font-weight:800;letter-spacing:-.04em;margin:10px 0 2px}.plan .pr small{font-size:15px;color:var(--mute);font-weight:500;letter-spacing:0}
 .plan ul{list-style:none;margin:16px 0 0;padding:0;color:var(--mute);font-size:15px;display:grid;gap:8px}
@@ -94,7 +109,7 @@ footer{margin-top:80px;padding:40px 0 64px;color:var(--mute);font-size:14px;bord
 @media (prefers-reduced-motion:reduce){.js .rv{opacity:1;transform:none}.js .fill{width:var(--w)}}
 #net{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 #prog{position:fixed;left:0;top:0;height:3px;width:100%;transform-origin:0 50%;transform:scaleX(0);background:linear-gradient(90deg,var(--v),var(--p),var(--o));z-index:60}
-#glow{position:fixed;left:0;top:0;width:360px;height:360px;margin:-180px 0 0 -180px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,255,.22),transparent 65%);pointer-events:none;z-index:0;will-change:transform;opacity:0;transition:opacity .4s}
+#glow{position:fixed;left:0;top:0;width:360px;height:360px;margin:-180px 0 0 -180px;border-radius:50%;background:radial-gradient(circle,rgba(25,217,238,.22),transparent 65%);pointer-events:none;z-index:0;will-change:transform;opacity:0;transition:opacity .4s}
 .wrap{position:relative;z-index:1}
 h1 em{background-size:220% 100%;animation:shine 6s linear infinite}
 @keyframes shine{to{background-position:220% 0}}
@@ -109,52 +124,32 @@ h1 em{background-size:220% 100%;animation:shine 6s linear infinite}
 @keyframes float{50%{transform:translateY(-10px)}}
 .logo i{animation:spin 9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 .plan.hot{position:relative;overflow:hidden}
-.plan.hot::after{content:"";position:absolute;inset:-60%;background:conic-gradient(from 0deg,transparent 0 70%,rgba(255,61,242,.35) 85%,transparent);animation:spin 6s linear infinite;pointer-events:none}
+.plan.hot::after{content:"";position:absolute;inset:-60%;background:conic-gradient(from 0deg,transparent 0 70%,rgba(56,169,255,.35) 85%,transparent);animation:spin 6s linear infinite;pointer-events:none}
 .plan.hot>*{position:relative;z-index:1}
-.stat{transition:border-color .3s,transform .2s ease-out}.stat:hover{border-color:rgba(255,61,242,.55)}
+.stat{transition:border-color .3s,transform .2s ease-out}.stat:hover{border-color:rgba(56,169,255,.55)}
 @media (hover:none){#glow{display:none}}
-@media (prefers-reduced-motion:reduce){#net,#glow{display:none}.demo,.logo i,.marquee .tr,h1 em,.plan.hot::after{animation:none!important}}
-button{font:inherit;cursor:pointer}.plan .btn{margin-top:22px;text-align:center;justify-content:center}.btn:disabled{opacity:.65;cursor:wait}.checkout-feedback{color:#ffb23d;font-size:15px}.checkout-feedback:empty{display:none}details{border-bottom:1px solid var(--line);padding:22px 0;max-width:850px}summary{cursor:pointer;font-size:19px;font-weight:600}details p{color:var(--mute);max-width:70ch}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #ffb23d;outline-offset:5px}
+@media (prefers-reduced-motion:reduce){#net,#glow{display:none}.demo,.crawl-art,.crawl-scan,.crawl-hud i,.logo i,.marquee .tr,h1 em,.plan.hot::after{animation:none!important}}
+button{font:inherit;cursor:pointer}.plan .btn{margin-top:22px;text-align:center;justify-content:center}.btn:disabled{opacity:.65;cursor:wait}.checkout-feedback{color:#d7f75d;font-size:15px}.checkout-feedback:empty{display:none}details{border-bottom:1px solid var(--line);padding:22px 0;max-width:850px}summary{cursor:pointer;font-size:19px;font-weight:600}details p{color:var(--mute);max-width:70ch}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #d7f75d;outline-offset:5px}
 </style>
 <link rel="service-desc" type="application/vnd.oai.openapi+json" href="/openapi.json"></head>
 <body>
 <canvas id="net" aria-hidden="true"></canvas><div id="prog" aria-hidden="true"></div><div id="glow" aria-hidden="true"></div>
 <a class="skip" href="#main">Skip to content</a>
 <div class="wrap">
-<nav aria-label="Primary"><a class="logo" href="#"><i></i>APEX FLOW 3D SCRAPER</a>
+<nav aria-label="Primary"><a class="logo" href="#"><i></i>APEX FLOW WEB SCRAPER</a>
 <div class="links"><a class="hide" href="#features">Features</a><a class="hide" href="/compare.html">Compare</a><a class="hide" href="#pricing">Pricing</a><a class="hide" href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper" rel="noopener">GitHub</a><a class="btn ghost" href="/dashboard.html" style="padding:9px 16px">Dashboard</a></div></nav>
 
 <header class="hero">
 <div>
-<p class="eyebrow">Clean web data for AI &amp; data teams</p>
-<h1>The web, read <em>cleanly.</em></h1>
+<p class="eyebrow">PUBLIC WEB DATA · BUILT FOR DEVELOPERS AND AI AGENTS</p>
+<h1>Turn the web into <em>clean data.</em></h1>
 <p class="lede">Turn public web pages, PDFs and Word files into clean Markdown for your AI pipeline. Try the hosted API with 1,000 free credits. Pay $5 once for 35,000 pages, or $15 a month for 110,000.</p>
 <div class="cta"><a class="btn" href="/trial.html">Start free →</a><a class="btn ghost" href="#pricing">See pricing</a></div><p class="note">Start in your browser. No email or card required.</p><p class="checkout-feedback" role="status" aria-live="polite"></p>
 </div>
-<div class="demo" role="img" aria-label="Animation: a noisy HTML page on the left is cleaned into Markdown on the right">
-<div class="bar"><b></b><b></b><b></b></div>
-<div class="panes">
-<div class="pane raw"><span class="ph">Raw HTML</span><span class="beam"></span>
-<span class="l junk">&lt;div class="cookie-banner"&gt;Accept all&lt;/div&gt;</span>
-<span class="l junk">&lt;nav&gt;Home · Login · Cart&lt;/nav&gt;</span>
-<span class="l keep">&lt;h1&gt;Pricing&lt;/h1&gt;</span>
-<span class="l junk">&lt;script&gt;track(user)&lt;/script&gt;</span>
-<span class="l keep">&lt;table&gt;&lt;tr&gt;&lt;td&gt;Pro&lt;/td&gt;&lt;td&gt;$49&lt;/td&gt;</span>
-<span class="l junk">&lt;aside&gt;Sponsored links&lt;/aside&gt;</span>
-<span class="l keep">&lt;pre lang="py"&gt;scrape(url)&lt;/pre&gt;</span>
-<span class="l junk">&lt;footer&gt;© Terms Privacy&lt;/footer&gt;</span></div>
-<div class="pane out"><span class="ph">Markdown</span>
-<span class="l h" style="--i:1"># Pricing</span>
-<span class="l" style="--i:2">&nbsp;</span>
-<span class="l t" style="--i:3">| Plan | Price |</span>
-<span class="l t" style="--i:4">|------|-------|</span>
-<span class="l t" style="--i:5">| Pro  | $49   |</span>
-<span class="l" style="--i:6">&nbsp;</span>
-<span class="l" style="--i:7">```py</span>
-<span class="l" style="--i:8">scrape(url)</span>
-<span class="l" style="--i:9">```</span></div>
-</div>
-<div class="caption"><span>noise removed</span><span>structure kept</span></div>
+<div class="crawl-theatre" role="img" aria-label="Illustration of crawler bots traversing a layered website, following links, scanning page content and sending extracted fields into a structured dataset.">
+<img class="crawl-art" src="/assets/crawler-swarm-hero.webp" alt="" fetchpriority="high" width="1536" height="1024">
+<canvas class="crawl-swarm" id="crawl-swarm" aria-hidden="true"></canvas><span class="crawl-scan" aria-hidden="true"></span><span class="crawl-hud" aria-hidden="true"><i></i> CRAWL PIPELINE</span><span class="crawl-footnote" aria-hidden="true">ILLUSTRATIVE CRAWL</span>
+<div class="crawl-stages" aria-hidden="true"><span><b>01</b> Discover</span><span>→</span><span><b>02</b> Crawl</span><span>→</span><span><b>03</b> Extract</span><span>→</span><span><b>04</b> Structure</span></div>
 </div>
 </header>
 
@@ -222,8 +217,8 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
 <h3 style="margin:40px 0 0;font-size:22px">Head to head with Firecrawl</h3>
 <p class="note">24 URLs with hand-checked references, Firecrawl's free keyless tier, scored with the same checks.</p>
 <div class="tablewrap"><table>
-<caption class="skip">Apex Flow 3D Scraper versus Firecrawl on 24 pages</caption>
-<thead><tr><th>Measure</th><th>Apex Flow 3D Scraper</th><th>Firecrawl</th></tr></thead>
+<caption class="skip">Apex Flow Web Scraper versus Firecrawl on 24 pages</caption>
+<thead><tr><th>Measure</th><th>Apex Flow Web Scraper</th><th>Firecrawl</th></tr></thead>
 <tbody>
 <tr><td>Fidelity checks passed</td><td class="win">91 / 93</td><td>85 / 93</td></tr>
 <tr><td>Pages where we score higher</td><td class="win">6</td><td>0</td></tr>
@@ -236,13 +231,13 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
 
 <section id="honest" class="rv"><p class="eyebrow">Straight talk</p><h2>What we do not claim.</h2>
 <div class="honest"><p>We do not solve CAPTCHAs or evade bot walls. Sites behind bot walls, such as glassdoor.com, still block live reads; we return a dated Internet Archive copy instead, and it can be days or years old. Our search covers the pages you have read, not the whole web. Rendered pages take 4 to 5 seconds. AI extraction returns valid JSON but can get a field wrong, so check results. The Python and Node clients are in the GitHub repository and are not yet on PyPI or npm. Every number on this page comes from <code>BENCHMARK-2026-11-05.md</code>.</p></div></section>
-<section id="faq" class="rv"><p class="eyebrow">Questions</p><h2>Answers before you sign up.</h2><details><summary>What is Apex Flow 3D Scraper?</summary><p>A hosted API and MCP server that turns public web pages, PDFs and DOCX files into clean Markdown for developers and AI agents. It can read one page, a batch, or crawl a whole site, and it reports what changed since your last read.</p></details><details><summary>How much does it cost?</summary><p>You start with 1,000 free credits. After that it is $5 once for 35,000 credits, or $15, $79 or $299 a month for 110,000, 850,000 or 3,750,000 credits. A plain page costs 1 credit and a rendered page costs 3. Failed and blocked pages cost nothing and there are no automatic overage charges.</p></details><details><summary>How is it different from Firecrawl?</summary><p>It has a $5 one-time option, reports change status on every read, splits pages to fit a token budget, and returns a dated archive copy when a live site refuses. It does not disguise requests or use proxies to get past bot walls, so Firecrawl reads some live pages that we do not; for those we return a labelled archive copy.</p></details><details><summary>Can my AI agent use it?</summary><p>Yes. Connect any MCP client to https://webscraper.apexflowlabs.com/v1/mcp with your API key. There are eight tools for scraping, batches, change checks, site maps, crawls, saved-page search and credits. Errors tell the agent whether to retry and where to add credits.</p></details><details><summary>Does it get past CAPTCHAs and bot walls?</summary><p>No. It does not solve CAPTCHAs, disguise requests or rotate addresses. When a live site refuses, you can ask for the most recent Internet Archive copy, which is labelled with its capture time.</p></details><details><summary>What happens when I run out of credits?</summary><p>Requests return an error with a link to buy more. Nothing is charged automatically. The one-time pass and the monthly plans are on the pricing section of this page.</p></details></section>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is Apex Flow 3D Scraper?", "acceptedAnswer": {"@type": "Answer", "text": "A hosted API and MCP server that turns public web pages, PDFs and DOCX files into clean Markdown for developers and AI agents. It can read one page, a batch, or crawl a whole site, and it reports what changed since your last read."}}, {"@type": "Question", "name": "How much does it cost?", "acceptedAnswer": {"@type": "Answer", "text": "You start with 1,000 free credits. After that it is $5 once for 35,000 credits, or $15, $79 or $299 a month for 110,000, 850,000 or 3,750,000 credits. A plain page costs 1 credit and a rendered page costs 3. Failed and blocked pages cost nothing and there are no automatic overage charges."}}, {"@type": "Question", "name": "How is it different from Firecrawl?", "acceptedAnswer": {"@type": "Answer", "text": "It has a $5 one-time option, reports change status on every read, splits pages to fit a token budget, and returns a dated archive copy when a live site refuses. It does not disguise requests or use proxies to get past bot walls, so Firecrawl reads some live pages that we do not; for those we return a labelled archive copy."}}, {"@type": "Question", "name": "Can my AI agent use it?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Connect any MCP client to https://webscraper.apexflowlabs.com/v1/mcp with your API key. There are eight tools for scraping, batches, change checks, site maps, crawls, saved-page search and credits. Errors tell the agent whether to retry and where to add credits."}}, {"@type": "Question", "name": "Does it get past CAPTCHAs and bot walls?", "acceptedAnswer": {"@type": "Answer", "text": "No. It does not solve CAPTCHAs, disguise requests or rotate addresses. When a live site refuses, you can ask for the most recent Internet Archive copy, which is labelled with its capture time."}}, {"@type": "Question", "name": "What happens when I run out of credits?", "acceptedAnswer": {"@type": "Answer", "text": "Requests return an error with a link to buy more. Nothing is charged automatically. The one-time pass and the monthly plans are on the pricing section of this page."}}]}</script>
+<section id="faq" class="rv"><p class="eyebrow">Questions</p><h2>Answers before you sign up.</h2><details><summary>What is Apex Flow Web Scraper?</summary><p>A hosted API and MCP server that turns public web pages, PDFs and DOCX files into clean Markdown for developers and AI agents. It can read one page, a batch, or crawl a whole site, and it reports what changed since your last read.</p></details><details><summary>How much does it cost?</summary><p>You start with 1,000 free credits. After that it is $5 once for 35,000 credits, or $15, $79 or $299 a month for 110,000, 850,000 or 3,750,000 credits. A plain page costs 1 credit and a rendered page costs 3. Failed and blocked pages cost nothing and there are no automatic overage charges.</p></details><details><summary>How is it different from Firecrawl?</summary><p>It has a $5 one-time option, reports change status on every read, splits pages to fit a token budget, and returns a dated archive copy when a live site refuses. It does not disguise requests or use proxies to get past bot walls, so Firecrawl reads some live pages that we do not; for those we return a labelled archive copy.</p></details><details><summary>Can my AI agent use it?</summary><p>Yes. Connect any MCP client to https://webscraper.apexflowlabs.com/v1/mcp with your API key. There are eight tools for scraping, batches, change checks, site maps, crawls, saved-page search and credits. Errors tell the agent whether to retry and where to add credits.</p></details><details><summary>Does it get past CAPTCHAs and bot walls?</summary><p>No. It does not solve CAPTCHAs, disguise requests or rotate addresses. When a live site refuses, you can ask for the most recent Internet Archive copy, which is labelled with its capture time.</p></details><details><summary>What happens when I run out of credits?</summary><p>Requests return an error with a link to buy more. Nothing is charged automatically. The one-time pass and the monthly plans are on the pricing section of this page.</p></details></section>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is Apex Flow Web Scraper?", "acceptedAnswer": {"@type": "Answer", "text": "A hosted API and MCP server that turns public web pages, PDFs and DOCX files into clean Markdown for developers and AI agents. It can read one page, a batch, or crawl a whole site, and it reports what changed since your last read."}}, {"@type": "Question", "name": "How much does it cost?", "acceptedAnswer": {"@type": "Answer", "text": "You start with 1,000 free credits. After that it is $5 once for 35,000 credits, or $15, $79 or $299 a month for 110,000, 850,000 or 3,750,000 credits. A plain page costs 1 credit and a rendered page costs 3. Failed and blocked pages cost nothing and there are no automatic overage charges."}}, {"@type": "Question", "name": "How is it different from Firecrawl?", "acceptedAnswer": {"@type": "Answer", "text": "It has a $5 one-time option, reports change status on every read, splits pages to fit a token budget, and returns a dated archive copy when a live site refuses. It does not disguise requests or use proxies to get past bot walls, so Firecrawl reads some live pages that we do not; for those we return a labelled archive copy."}}, {"@type": "Question", "name": "Can my AI agent use it?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Connect any MCP client to https://webscraper.apexflowlabs.com/v1/mcp with your API key. There are eight tools for scraping, batches, change checks, site maps, crawls, saved-page search and credits. Errors tell the agent whether to retry and where to add credits."}}, {"@type": "Question", "name": "Does it get past CAPTCHAs and bot walls?", "acceptedAnswer": {"@type": "Answer", "text": "No. It does not solve CAPTCHAs, disguise requests or rotate addresses. When a live site refuses, you can ask for the most recent Internet Archive copy, which is labelled with its capture time."}}, {"@type": "Question", "name": "What happens when I run out of credits?", "acceptedAnswer": {"@type": "Answer", "text": "Requests return an error with a link to buy more. Nothing is charged automatically. The one-time pass and the monthly plans are on the pricing section of this page."}}]}</script>
 <section id="go" class="rv" style="text-align:center;padding-bottom:40px"><h2 style="margin-inline:auto">Your next pipeline starts with a URL.</h2>
 <p class="lede" style="margin:0 auto">Try your sources with 1,000 free credits. Upgrade when your pipeline is ready.</p>
 <div class="cta" style="justify-content:center"><a class="btn" href="/trial.html">Get started free →</a><a class="btn ghost" href="/docs.html">Explore the docs</a></div></section>
 </main>
-<footer><div>Apex Flow 3D Scraper · by Apex Flow Labs · Owned infrastructure, no hosted scraping calls.</div><div><a href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper" rel="noopener">GitHub</a> · <a href="/docs.html">Docs</a> · <a href="/docs.html#agents">Connect an AI agent</a> · <a href="/openapi.json">OpenAPI</a> · <a href="/compare.html">Compare</a> · <a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a> · <a href="mailto:apexflowlabs@gmail.com">Support</a> · <a href="https://www.apexflowlabs.com">Apex Flow Labs</a></div></footer>
+<footer><div>Apex Flow Web Scraper · by Apex Flow Labs · Owned infrastructure, no hosted scraping calls.</div><div><a href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper" rel="noopener">GitHub</a> · <a href="/docs.html">Docs</a> · <a href="/docs.html#agents">Connect an AI agent</a> · <a href="/openapi.json">OpenAPI</a> · <a href="/compare.html">Compare</a> · <a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a> · <a href="mailto:apexflowlabs@gmail.com">Support</a> · <a href="https://www.apexflowlabs.com">Apex Flow Labs</a></div></footer>
 </div>
 <script>
 (function(){
@@ -251,6 +246,14 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
   function onscroll(){var h=document.documentElement.scrollHeight-innerHeight;prog.style.transform='scaleX('+(h>0?scrollY/h:0)+')'}
   addEventListener('scroll',onscroll,{passive:true});onscroll();
   if(calm)return legacy();
+  /* Small cyan crawler lights move across the illustrative site plane. */
+  var theatre=document.querySelector('.crawl-theatre'),swarm=document.getElementById('crawl-swarm');
+  if(theatre&&swarm){
+    var swarmCtx=swarm.getContext('2d'),swarmW=0,swarmH=0,swarmD=1,agents=[],swarmRaf=0,swarmVisible=true;
+    function sizeSwarm(){var r=theatre.getBoundingClientRect();swarmW=r.width;swarmH=r.height;swarmD=Math.min(devicePixelRatio||1,1.25);swarm.width=Math.round(swarmW*swarmD);swarm.height=Math.round(swarmH*swarmD);swarmCtx.setTransform(swarmD,0,0,swarmD,0,0);var n=Math.min(360,Math.max(120,Math.round(swarmW*swarmH/1300)));agents=[];for(var i=0;i<n;i++){var z=.3+Math.random()*.7;agents.push({x:.035+Math.random()*.74,y:.14+Math.random()*.66,z:z,vx:(Math.random()-.5)*(.0005+z*.0008),vy:(Math.random()-.5)*(.00035+z*.00055),p:Math.random()*6.28})}}
+    function crawlFrame(){swarmCtx.clearRect(0,0,swarmW,swarmH);for(var i=0;i<agents.length;i++){var a=agents[i],px=a.x*swarmW,py=a.y*swarmH;a.x+=a.vx;a.y+=a.vy;a.p+=.12;if(a.x<.025||a.x>.79)a.vx*=-1;if(a.y<.13||a.y>.81)a.vy*=-1;var x=a.x*swarmW,y=a.y*swarmH,sz=.65+a.z*1.35,alpha=.18+a.z*.48;swarmCtx.strokeStyle='rgba(61,232,250,'+alpha+')';swarmCtx.lineWidth=.7+a.z*.35;swarmCtx.beginPath();swarmCtx.moveTo(px,py);swarmCtx.lineTo(x,y);swarmCtx.moveTo(x-sz*1.5,y-sz);swarmCtx.lineTo(x,y);swarmCtx.lineTo(x+sz*1.5,y-sz);swarmCtx.moveTo(x-sz*1.5,y+sz);swarmCtx.lineTo(x,y);swarmCtx.lineTo(x+sz*1.5,y+sz);swarmCtx.stroke();swarmCtx.fillStyle='rgba(205,252,255,'+alpha+')';swarmCtx.beginPath();swarmCtx.arc(x,y,sz,0,6.283);swarmCtx.fill()}if(swarmVisible&&!document.hidden)swarmRaf=requestAnimationFrame(crawlFrame)}
+    sizeSwarm();addEventListener('resize',sizeSwarm,{passive:true});document.addEventListener('visibilitychange',function(){if(document.hidden)cancelAnimationFrame(swarmRaf);else if(swarmVisible)crawlFrame()});if('IntersectionObserver' in window){var swarmIO=new IntersectionObserver(function(es){swarmVisible=es[0].isIntersecting;if(swarmVisible&&!document.hidden)crawlFrame();else cancelAnimationFrame(swarmRaf)},{threshold:0});swarmIO.observe(theatre)}else crawlFrame()
+  }
   var glow=document.getElementById('glow'),mx=innerWidth/2,my=innerHeight/3;
   addEventListener('pointermove',function(e){mx=e.clientX;my=e.clientY;glow.style.opacity=1;glow.style.transform='translate('+mx+'px,'+my+'px)'},{passive:true});
   /* living network: nodes drift, link when close, bend toward the pointer */
@@ -260,8 +263,8 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
   function tick(){cx.clearRect(0,0,W,H);
     for(var i=0;i<pts.length;i++){var p=pts[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>W)p.vx*=-1;if(p.y<0||p.y>H)p.vy*=-1;
       var dx=mx-p.x,dy=my-p.y,d=Math.hypot(dx,dy);if(d<160&&d>1){p.x+=dx/d*.6;p.y+=dy/d*.6}
-      cx.fillStyle='rgba(190,160,255,.7)';cx.beginPath();cx.arc(p.x,p.y,1.4,0,6.3);cx.fill();
-      for(var j=i+1;j<pts.length;j++){var q=pts[j],ax=p.x-q.x,ay=p.y-q.y,dd=ax*ax+ay*ay;if(dd<14400){cx.strokeStyle='rgba(139,92,255,'+(.28*(1-dd/14400))+')';cx.beginPath();cx.moveTo(p.x,p.y);cx.lineTo(q.x,q.y);cx.stroke()}}}
+      cx.fillStyle='rgba(105,238,250,.7)';cx.beginPath();cx.arc(p.x,p.y,1.4,0,6.3);cx.fill();
+      for(var j=i+1;j<pts.length;j++){var q=pts[j],ax=p.x-q.x,ay=p.y-q.y,dd=ax*ax+ay*ay;if(dd<14400){cx.strokeStyle='rgba(25,217,238,'+(.28*(1-dd/14400))+')';cx.beginPath();cx.moveTo(p.x,p.y);cx.lineTo(q.x,q.y);cx.stroke()}}}
     raf=requestAnimationFrame(tick)}
   size();tick();addEventListener('resize',function(){size()});
   document.addEventListener('visibilitychange',function(){cancelAnimationFrame(raf);if(!document.hidden)tick()});
@@ -275,6 +278,7 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
   document.querySelectorAll('[data-to]').forEach(function(n){cn.observe(n)});
   if(!touch){
     /* 3D tilt and magnetic buttons */
+    if(theatre){theatre.addEventListener('pointermove',function(e){var r=theatre.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;theatre.style.transform='perspective(1000px) rotateY('+(-3+x*5)+'deg) rotateX('+(-y*3)+'deg)'});theatre.addEventListener('pointerleave',function(){theatre.style.transform=''})}
     document.querySelectorAll('.tilt,.plan').forEach(function(c){
       c.addEventListener('pointermove',function(e){var r=c.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(900px) rotateY('+x*8+'deg) rotateX('+-y*8+'deg) translateZ(0)'});
       c.addEventListener('pointerleave',function(){c.style.transform=''})});
