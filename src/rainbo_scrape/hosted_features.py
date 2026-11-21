@@ -158,9 +158,10 @@ def install(h, app):
     async def funnel(request):
         h.limit(request,"funnel",120)
         body=await request.json()
-        if not isinstance(body,dict) or body.get("event")!="page_view":
+        allowed={"page_view","trial_view","trial_submit"}
+        if not isinstance(body,dict) or body.get("event") not in allowed:
             raise ValueError("Unsupported event")
-        event(h,"page_view")
+        event(h,body["event"])
         return web.json_response({"ok":True})
 
     app.router.add_post('/v1/map',map_site)

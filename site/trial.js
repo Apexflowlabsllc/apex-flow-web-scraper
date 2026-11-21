@@ -1,6 +1,8 @@
 const trialForm = document.getElementById('trial');
+fetch('/api/event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'trial_view'}),keepalive:true}).catch(()=>{});
 trialForm.addEventListener('submit', async event => {
   event.preventDefault();
+  fetch('/api/event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'trial_submit'}),keepalive:true}).catch(()=>{});
   const button = trialForm.querySelector('button');
   const message = document.getElementById('message');
   button.disabled = true;
