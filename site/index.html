@@ -30,8 +30,8 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--v) 10%,var(--p) 
 .hero{display:grid;grid-template-columns:.82fr 1.18fr;gap:30px;align-items:center;padding:34px 0 24px}
 @media (max-width:920px){.hero{grid-template-columns:1fr;min-height:0;padding-top:38px}nav .links a.hide{display:none}}
 /* Illustrative crawl theatre: the real URL entry point stays in the copy column. */
-.crawl-theatre{position:relative;isolation:isolate;overflow:hidden;aspect-ratio:1.32;border:1px solid rgba(54,224,247,.35);border-radius:24px;background:radial-gradient(ellipse at 50% 55%,#123442,#07131d 70%);box-shadow:0 30px 90px -45px rgba(15,213,242,.55),inset 0 0 50px rgba(10,207,238,.08);transform:perspective(1000px) rotateY(-3deg)}
-.crawl-art{width:100%;height:100%;display:block;object-fit:cover;object-position:center;mix-blend-mode:screen;opacity:.92;animation:crawl-art-drift 10s ease-in-out infinite}
+.crawl-theatre{position:relative;isolation:isolate;overflow:hidden;aspect-ratio:1.56;border:1px solid rgba(54,224,247,.35);border-radius:24px;background:radial-gradient(ellipse at 50% 55%,#123442,#07131d 70%);box-shadow:0 30px 90px -45px rgba(15,213,242,.55),inset 0 0 50px rgba(10,207,238,.08);transform:perspective(1000px) rotateY(-3deg)}
+.crawl-art{width:100%;height:100%;display:block;object-fit:cover;object-position:53% center;mix-blend-mode:screen;opacity:.92;animation:crawl-art-drift 10s ease-in-out infinite}
 .crawl-swarm{position:absolute;inset:0;z-index:2;width:100%;height:100%;pointer-events:none}
 .crawl-theatre::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(115deg,rgba(3,12,18,.18),transparent 48%,rgba(5,18,25,.25)),radial-gradient(ellipse at 50% 50%,transparent 50%,rgba(2,8,13,.48))}
 .crawl-scan{position:absolute;left:4%;right:4%;top:8%;height:2px;z-index:2;background:linear-gradient(90deg,transparent,var(--v),#e9feff,var(--v),transparent);box-shadow:0 0 18px 3px rgba(25,217,238,.78);opacity:.9;animation:crawl-sweep 5.8s cubic-bezier(.52,0,.35,1) infinite}
@@ -39,11 +39,14 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--v) 10%,var(--p) 
 .crawl-hud i{width:7px;height:7px;border-radius:50%;background:var(--o);box-shadow:0 0 12px var(--o);animation:apex-pulse 1.4s infinite}
 .crawl-stages{position:absolute;z-index:3;left:14px;right:14px;bottom:13px;display:flex;justify-content:space-between;gap:5px;padding:9px 12px;border:1px solid rgba(65,210,232,.22);border-radius:12px;background:rgba(3,13,20,.82);backdrop-filter:blur(10px);font:600 9px ui-monospace,Consolas,monospace;letter-spacing:.12em;color:#c2e8ef;text-transform:uppercase}
 .crawl-stages span{display:flex;align-items:center;gap:6px}.crawl-stages b{color:var(--v);font-size:11px}
+.crawl-stages span:nth-child(odd){animation:crawl-stage-focus 6s ease-in-out infinite}
+.crawl-stages span:nth-child(3){animation-delay:1.5s}.crawl-stages span:nth-child(5){animation-delay:3s}.crawl-stages span:nth-child(7){animation-delay:4.5s}
 .crawl-footnote{position:absolute;right:15px;top:16px;z-index:3;font:10px ui-monospace,Consolas,monospace;color:rgba(221,247,252,.66)}
 @keyframes crawl-sweep{0%{top:8%;opacity:0}8%{opacity:1}84%{top:88%;opacity:.9}100%{top:90%;opacity:0}}
 @keyframes crawl-art-drift{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(0,-5px,0) scale(1.018)}}
+@keyframes crawl-stage-focus{0%,18%{color:#f2ffff;text-shadow:0 0 15px rgba(25,217,238,.78);transform:translateY(-1px)}20%,100%{color:#c2e8ef;text-shadow:none;transform:none}}
 @media(max-width:920px){.crawl-theatre{transform:none;order:2}.hero>div:first-child{order:1}}
-@media(max-width:520px){.crawl-theatre{aspect-ratio:1.05;border-radius:18px}.crawl-stages{left:8px;right:8px;bottom:8px;padding:8px 7px;font-size:7px;letter-spacing:.06em}.crawl-hud{left:9px;top:9px;font-size:8px}.crawl-footnote{right:9px;top:12px;font-size:8px}}
+@media(max-width:520px){.crawl-theatre{aspect-ratio:1.18;border-radius:18px}.crawl-art{object-position:53% center}.crawl-stages{left:8px;right:8px;bottom:8px;padding:8px 7px;font-size:7px;letter-spacing:.06em}.crawl-hud{left:9px;top:9px;font-size:8px}.crawl-footnote{right:9px;top:12px;font-size:8px}}
 /* live transform demo */
 .demo{position:relative;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));padding:14px;box-shadow:0 40px 80px -30px rgba(25,217,238,.5)}
 .demo .bar{display:flex;gap:7px;padding:2px 4px 12px}.demo .bar b{width:10px;height:10px;border-radius:50%;background:var(--line)}
@@ -147,7 +150,7 @@ button{font:inherit;cursor:pointer}.plan .btn{margin-top:22px;text-align:center;
 <div class="cta"><a class="btn" href="/trial.html">Start free →</a><a class="btn ghost" href="#pricing">See pricing</a></div><p class="note">Start in your browser. No email or card required.</p><p class="checkout-feedback" role="status" aria-live="polite"></p>
 </div>
 <div class="crawl-theatre" role="img" aria-label="A 3D swarm of illuminated crawler robots moves across a layered website, scanning page content and sending extracted fields into a structured dataset.">
-<img class="crawl-art" src="/assets/crawler-swarm-hero.webp" alt="" fetchpriority="high" width="1536" height="1024">
+<img class="crawl-art" src="/assets/crawler-swarm-hero-v2.webp" alt="" fetchpriority="high" width="1672" height="941">
 <canvas class="crawl-swarm" id="crawl-swarm" aria-hidden="true"></canvas><span class="crawl-scan" aria-hidden="true"></span><span class="crawl-hud" aria-hidden="true"><i></i> CRAWL PIPELINE</span><span class="crawl-footnote" aria-hidden="true">ILLUSTRATIVE CRAWL</span>
 <div class="crawl-stages" aria-hidden="true"><span><b>01</b> Discover</span><span>→</span><span><b>02</b> Crawl</span><span>→</span><span><b>03</b> Extract</span><span>→</span><span><b>04</b> Structure</span></div>
 </div>

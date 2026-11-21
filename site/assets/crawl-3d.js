@@ -28,10 +28,10 @@
     void main() {
       vec3 p = aPosition;
       if (aLeg >= 0.0) {
-        float step = uTime * 6.4 + aLeg * 1.63 + uPhase;
-        p.x += sin(step) * 0.11 * aStride;
-        p.y += cos(step) * 0.075 * aStride;
-        p.z += max(0.0, sin(step + 1.2)) * 0.16 * aStride;
+        float legPhase = uTime * 6.4 + aLeg * 1.63 + uPhase;
+        p.x += sin(legPhase) * 0.11 * aStride;
+        p.y += cos(legPhase) * 0.075 * aStride;
+        p.z += max(0.0, sin(legPhase + 1.2)) * 0.16 * aStride;
       } else {
         p.z += sin(uTime * 4.1 + uPhase) * 0.018;
       }
@@ -186,7 +186,7 @@
     [[0.62,0.27],[0.75,0.22],[0.9,0.42],[0.95,0.51]],
     [[0.53,0.39],[0.71,0.33],[0.86,0.59],[0.94,0.68]]
   ];
-  let width = 0, height = 0, visible = true, raf = 0, previous = 0;
+  let width = 0, height = 0, visible = true, raf = 0, previous = 0, pointer = null;
   const bots = [];
   function resize() {
     const rect = stage.getBoundingClientRect(); width = rect.width; height = rect.height;
@@ -206,6 +206,17 @@
     const dy = 3*m*m*(p1[1]-p0[1])+6*m*t*(p2[1]-p1[1])+3*t*t*(p3[1]-p2[1]);
     return [x,y,Math.atan2(-dy,dx)];
   }
+  function sample(bot) {
+    const point = curve(paths[bot.path], bot.t);
+    if (pointer) {
+      const dx = pointer[0] - point[0], dy = pointer[1] - point[1], distance = Math.hypot(dx, dy);
+      if (distance < 0.24) {
+        const pull = (0.24 - distance) * 0.9;
+        point[0] += dx * pull; point[1] += dy * pull;
+      }
+    }
+    return point;
+  }
   function bind(bufferId) {
     gl.bindBuffer(gl.ARRAY_BUFFER, bufferId);
     Object.keys(attr).forEach((key) => gl.vertexAttribPointer(attr[key], sizes[key], gl.FLOAT, false, stride * 4, offsets[key] * 4));
@@ -221,7 +232,7 @@
     // Soft contact shadows sit on the imagined glass; the bodies are true shaded 3D meshes.
     bind(shadowBuffer); gl.uniform1f(uni.uShadow, 1);
     for (const bot of bots) {
-      const [x,y,yaw] = curve(paths[bot.path], bot.t);
+      const [x,y,yaw] = sample(bot);
       gl.uniform3f(uni.uCenter, x * width, y * height + 8, bot.depth);
       gl.uniform1f(uni.uScale, 10 + bot.scale * 7);
       gl.uniform1f(uni.uYaw, yaw); gl.uniform1f(uni.uPhase, bot.phase);
@@ -230,7 +241,7 @@
     bind(buffer); gl.uniform1f(uni.uShadow, 0);
     for (const bot of bots) {
       bot.t = (bot.t + bot.speed * dt) % 1;
-      const [x,y,yaw] = curve(paths[bot.path], bot.t);
+      const [x,y,yaw] = sample(bot);
       gl.uniform3f(uni.uCenter, x * width, y * height, bot.depth);
       gl.uniform1f(uni.uScale, 10 + bot.scale * 7);
       gl.uniform1f(uni.uYaw, yaw); gl.uniform1f(uni.uPhase, bot.phase);
@@ -240,6 +251,11 @@
   }
   resize();
   addEventListener('resize', resize, { passive: true });
+  stage.addEventListener('pointermove', (event) => {
+    const rect = stage.getBoundingClientRect();
+    pointer = [(event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height];
+  }, { passive: true });
+  stage.addEventListener('pointerleave', () => { pointer = null; }, { passive: true });
   document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(raf); else if (visible) { previous = 0; raf = requestAnimationFrame(frame); } });
   if ('IntersectionObserver' in window) {
     const observer = new IntersectionObserver((entries) => {
