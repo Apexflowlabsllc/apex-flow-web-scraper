@@ -12,17 +12,49 @@
     }
   }
 }</pre></details>
-<details><summary>VS Code with GitHub Copilot</summary><p>Merge the entry below into the servers section of your user MCP configuration. Launch the client with the key available in its environment. See the <a href="https://code.visualstudio.com/docs/agents/reference/mcp-configuration">VS Code configuration reference</a> for editor and Copilot harness settings.</p><pre>{
-  "servers": {
+<details><summary>VS Code with GitHub Copilot</summary><p>Merge this entry into the portable <code>mcpServers</code> section of Copilot user <code>mcp-config.json</code> or workspace <code>.mcp.json</code>. Set <code>APEX_SCRAPER_API_KEY</code> in the agent host environment. See the <a href="https://code.visualstudio.com/docs/agents/reference/mcp-configuration">VS Code configuration reference</a>.</p><pre>{
+  "mcpServers": {
     "apex-scraper": {
       "type": "http",
       "url": "https://webscraper.apexflowlabs.com/v1/mcp",
       "headers": {
         "Authorization": "Bearer ${APEX_SCRAPER_API_KEY}"
-      }
+      },
+      "tools": ["scrape_page", "scrape_batch", "check_changes", "map_site", "crawl_site", "crawl_status", "search_saved", "credit_balance"]
     }
   }
 }</pre></details>
+<details><summary>Cursor</summary><p>Add this entry to <code>.cursor/mcp.json</code> for the project or <code>~/.cursor/mcp.json</code> for your user. Cursor resolves the key from your shell environment.</p><pre>{
+  "mcpServers": {
+    "apex-scraper": {
+      "url": "https://webscraper.apexflowlabs.com/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:APEX_SCRAPER_API_KEY}"
+      }
+    }
+  }
+}</pre><p><a href="https://cursor.com/docs/mcp">Cursor MCP configuration</a></p></details>
+<details><summary>Gemini CLI</summary><p>Add this entry to your personal <code>~/.gemini/settings.json</code>. Replace <code>YOUR_API_KEY</code> there; do not commit the personal settings file.</p><pre>{
+  "mcpServers": {
+    "apex-scraper": {
+      "httpUrl": "https://webscraper.apexflowlabs.com/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY"
+      },
+      "includeTools": ["scrape_page", "scrape_batch", "check_changes", "map_site", "crawl_site", "crawl_status", "search_saved", "credit_balance"]
+    }
+  }
+}</pre><p><a href="https://geminicli.com/docs/tools/mcp-server/">Gemini CLI MCP setup</a></p></details>
+<details><summary>Cascade / Windsurf</summary><p>Open Cascade's MCP configuration and add this server entry. Set <code>APEX_SCRAPER_API_KEY</code> in your environment.</p><pre>{
+  "mcpServers": {
+    "apex-scraper": {
+      "serverUrl": "https://webscraper.apexflowlabs.com/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:APEX_SCRAPER_API_KEY}"
+      }
+    }
+  }
+}</pre><p><a href="https://docs.devin.ai/windsurf/plugins/cascade/mcp">Cascade MCP configuration</a></p></details>
 <h3>Other MCP clients</h3><p>For a client with local MCP server support, install the adapter in a Python 3.11+ environment:</p><pre>python -m pip install apex-flow-web-scraper</pre><p>Set <code>APEX_SCRAPER_API_KEY</code> in your client’s secret environment. Configure a stdio server with the command <code>apex-scraper-mcp</code> from that environment. The hosted service runs the browser. The hosted server and the adapter expose eight tools:</p><ul><li><code>scrape_page</code> returns Markdown, source receipts, optional CSS fields and RAG chunks.</li><li><code>scrape_batch</code> reads up to ten URLs in parallel and reports which succeeded.</li><li><code>check_changes</code> re-reads up to ten URLs and returns only what changed since your last read.</li><li><code>map_site</code> discovers public sitemap URLs.</li><li><code>crawl_site</code> starts a background crawl of one site and <code>crawl_status</code> reads its pages.</li><li><code>search_saved</code> finds text in the pages you have already scraped: the latest 100 on a trial, 1,000 on paid plans.</li><li><code>credit_balance</code> returns credits, plan limits, renewal date and recent usage.</li></ul><p>Start by asking the agent to check its credit balance, then scrape one public page. Standard API credits and limits apply.</p><p><strong>OpenAI API apps:</strong> connect the remote MCP endpoint with the Responses API. Start with <a href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper/blob/main/examples/openai-responses-mcp.py">this Python example</a>; it keeps approval enabled and allows only page scraping.</p></section><h2>1. Authenticate</h2><p>Send your key in the <code>Authorization: Bearer YOUR_API_KEY</code> header. Keep it on your server. Do not embed it in a public website or mobile app.</p><h2>2. Scrape a page</h2><pre>curl https://webscraper.apexflowlabs.com/v1/scrape \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \

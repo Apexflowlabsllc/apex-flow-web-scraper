@@ -35,7 +35,7 @@ curl https://webscraper.apexflowlabs.com/v1/scrape \
   -d '{"url":"https://example.com","render":"never","outputs":["markdown"]}'
 ```
 
-3. Or connect its hosted MCP server to an agent (Claude Code, Codex, VS Code and other MCP clients): [agent setup](https://webscraper.apexflowlabs.com/docs.html#agents).
+3. Or connect its hosted MCP server to Claude Code, Codex, VS Code Copilot, Cursor, Gemini CLI, Cascade/Windsurf, or another MCP client: [copy-paste setup guides](https://webscraper.apexflowlabs.com/docs.html#agents).
 
 For an OpenAI Responses API app, use the [working remote-MCP example](examples/openai-responses-mcp.py). It keeps approval enabled and restricts access to page scraping.
 
