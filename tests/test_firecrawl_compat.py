@@ -4,9 +4,12 @@ import json
 import time
 import pytest
 from aiohttp import FormData
+from aiohttp.test_utils import TestClient, TestServer
 from pypdf import PdfWriter
 
+from rainbo_scrape.api import make_app
 from rainbo_scrape.billing import _hash
+from rainbo_scrape.hosted_firecrawl_compat import _claim_firecrawl_batch
 from test_hosted import hosted
 
 
@@ -355,6 +358,94 @@ async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hoste
                                     json={"url": "https://example.com", "mobile": True})
     assert unsupported.status == 400
     assert (await unsupported.json())["code"] == "unsupported_option"
+
+
+def test_firecrawl_batch_claim_is_atomic_and_stale_owners_are_fenced():
+    import secrets
+    import sqlite3
+    from concurrent.futures import ThreadPoolExecutor
+    from pathlib import Path
+    from threading import Barrier
+
+    work_dir = Path(__file__).resolve().parents[1] / "work"
+    work_dir.mkdir(exist_ok=True)
+    db_path = work_dir / f"firecrawl-batch-claim-{secrets.token_hex(8)}.sqlite3"
+    db = sqlite3.connect(db_path, isolation_level=None, timeout=10)
+    try:
+        db.execute("CREATE TABLE firecrawl_batch_jobs(id TEXT PRIMARY KEY,status TEXT,lease_until REAL,lease_token TEXT)")
+        db.execute("INSERT INTO firecrawl_batch_jobs VALUES('batch','scraping',NULL,NULL)")
+        now = time.time()
+        barrier = Barrier(2)
+
+        def compete():
+            connection = sqlite3.connect(db_path, isolation_level=None, timeout=10)
+            try:
+                barrier.wait()
+                return _claim_firecrawl_batch(connection, "batch", now)
+            finally:
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            claims = list(pool.map(lambda _: compete(), range(2)))
+        winners = [token for token in claims if token]
+        assert len(winners) == 1
+        first = winners[0]
+        second = _claim_firecrawl_batch(db, "batch", now + 31)
+        assert second and second != first
+        assert db.execute(
+            "UPDATE firecrawl_batch_jobs SET status='completed' WHERE id='batch' AND lease_token=?",
+            (first,),
+        ).rowcount == 0
+        assert db.execute("SELECT status,lease_token FROM firecrawl_batch_jobs WHERE id='batch'").fetchone() == (
+            "scraping", second
+        )
+    finally:
+        db.close()
+        db_path.unlink(missing_ok=True)
+
+
+async def test_firecrawl_batch_resumes_saved_pages_after_service_restart(hosted):
+    h, old_client, _, _, _, _ = hosted
+    _, old_client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    job = "batch_restart_fixture"
+    urls = ["https://example.com/saved", "https://example.com/pending"]
+    now = time.time()
+    await old_client.close()
+    h.billing.charge(account, "page", 1)
+    h.db.execute(
+        "INSERT INTO firecrawl_batch_jobs(id,account,status,urls,options,total,completed,credits,created,finished,lease_until,lease_token) "
+        "VALUES(?,?,'scraping',?,?,2,1,1,?,NULL,?,?)",
+        (job, account, json.dumps(urls), json.dumps({"outputs": ["markdown"], "_compat_formats": ["markdown"]}),
+         now - 20, now - 1, "stale-worker"),
+    )
+    h.db.execute("INSERT INTO firecrawl_batch_pages(job,seq,url,status,payload,credits) VALUES(?,?,?,200,?,1)",
+                 (job, 0, urls[0], json.dumps({"metadata": {"url": urls[0], "sourceURL": urls[0]}, "markdown": "# Saved"})))
+    calls = []
+
+    async def scrape(url, **options):
+        calls.append(url)
+        return {"markdown": "# Recovered", "rendered": False, "url": url,
+                "receipt": {"final_url": url, "status": 200}, "kind": "text"}
+
+    client = TestClient(TestServer(make_app(h.billing, scrape, hosted=h)))
+    await client.start_server()
+    try:
+        payload = None
+        for _ in range(200):
+            response = await client.get(f"/v2/batch/scrape/{job}", headers=headers)
+            payload = await response.json()
+            if payload.get("status") == "completed":
+                break
+            await asyncio.sleep(0.01)
+        assert response.status == 200
+        assert payload["status"] == "completed"
+        assert payload["completed"] == payload["total"] == 2
+        assert payload["creditsUsed"] == 2
+        assert [row["markdown"] for row in payload["data"]] == ["# Saved", "# Recovered"]
+        assert calls == [urls[1]]
+    finally:
+        await client.close()
 
 
 async def test_v2_batch_reports_per_url_errors_and_supports_cancel(hosted, monkeypatch):

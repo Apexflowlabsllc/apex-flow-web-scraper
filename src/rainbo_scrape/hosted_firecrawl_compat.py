@@ -17,6 +17,20 @@ from .billing import public_usage_key_id
 from .policy import ScrapeError
 
 INTERACT_SERVICE_KEY = web.AppKey("interact_service", object)
+BATCH_LEASE_SECONDS = 30
+BATCH_LEASE_RENEW_SECONDS = 8
+
+
+def _claim_firecrawl_batch(db, job, now, lease_seconds=BATCH_LEASE_SECONDS):
+    """Claim or recover one persisted compatibility batch across service workers."""
+    token = secrets.token_urlsafe(18)
+    claimed = db.execute(
+        "UPDATE firecrawl_batch_jobs SET status='scraping',lease_until=?,lease_token=? "
+        "WHERE id=? AND status IN ('queued','scraping') "
+        "AND (lease_until IS NULL OR lease_until<=?)",
+        (now + lease_seconds, token, job, now),
+    ).rowcount
+    return token if claimed else None
 
 
 def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_for, crawl_cancel_for,
@@ -30,13 +44,19 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         CREATE TABLE IF NOT EXISTS firecrawl_batch_jobs(
             id TEXT PRIMARY KEY, account TEXT NOT NULL, status TEXT NOT NULL, urls TEXT NOT NULL,
             options TEXT NOT NULL, total INTEGER NOT NULL, completed INTEGER NOT NULL DEFAULT 0,
-            credits INTEGER NOT NULL DEFAULT 0, created REAL NOT NULL, finished REAL);
+            credits INTEGER NOT NULL DEFAULT 0, created REAL NOT NULL, finished REAL,
+            lease_until REAL, lease_token TEXT);
         CREATE TABLE IF NOT EXISTS firecrawl_batch_pages(
             job TEXT NOT NULL, seq INTEGER NOT NULL, url TEXT NOT NULL, status INTEGER NOT NULL,
             payload TEXT NOT NULL, credits INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(job,seq));
         CREATE INDEX IF NOT EXISTS firecrawl_batch_account ON firecrawl_batch_jobs(account,created);
     """)
-    hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='failed',finished=? WHERE status='scraping'", (time.time(),))
+    batch_columns = {row[1] for row in hosted.db.execute("PRAGMA table_info(firecrawl_batch_jobs)")}
+    if "lease_until" not in batch_columns:
+        hosted.db.execute("ALTER TABLE firecrawl_batch_jobs ADD COLUMN lease_until REAL")
+    if "lease_token" not in batch_columns:
+        hosted.db.execute("ALTER TABLE firecrawl_batch_jobs ADD COLUMN lease_token TEXT")
+    hosted.db.execute("CREATE INDEX IF NOT EXISTS firecrawl_batch_claim ON firecrawl_batch_jobs(status,lease_until,created)")
     def error(message, code="unsupported_option", status=400):
         return web.json_response({"success": False, "error": message, "code": code}, status=status)
 
@@ -664,7 +684,36 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             raise web.HTTPNotFound(text=json.dumps({"error": "Batch scrape job not found."}), content_type="application/json")
         return row
 
-    async def run_batch(job, account, urls, options):
+    async def run_batch(job):
+        claimed = _claim_firecrawl_batch(hosted.db, job, time.time())
+        if not claimed:
+            batch_tasks.pop(job, None)
+            return
+        lease_token = claimed
+        row = hosted.db.execute(
+            "SELECT account,urls,options FROM firecrawl_batch_jobs WHERE id=? AND status='scraping' AND lease_token=?",
+            (job, lease_token),
+        ).fetchone()
+        if not row:
+            hosted.db.execute("UPDATE firecrawl_batch_jobs SET lease_until=NULL,lease_token=NULL WHERE id=? AND lease_token=?",
+                              (job, lease_token))
+            batch_tasks.pop(job, None)
+            return
+        account, raw_urls, raw_options = row
+        urls, options = json.loads(raw_urls), json.loads(raw_options)
+
+        async def renew_lease():
+            while True:
+                await asyncio.sleep(BATCH_LEASE_RENEW_SECONDS)
+                renewed = hosted.db.execute(
+                    "UPDATE firecrawl_batch_jobs SET lease_until=? WHERE id=? AND status='scraping' AND lease_token=?",
+                    (time.time() + BATCH_LEASE_SECONDS, job, lease_token),
+                ).rowcount
+                if not renewed:
+                    return
+
+        heartbeat = asyncio.create_task(renew_lease(), name=f"firecrawl-batch-lease-{job}")
+
         def save_page(index, url, item):
             status = item.get("status", 502)
             credits = item.get("credits_used", 0) if status == 200 else 0
@@ -682,21 +731,51 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             else:
                 result = {"metadata": {"url": url, "sourceURL": url, "statusCode": status,
                                        "error": item.get("error", "Scrape failed")}}
-            hosted.db.execute("INSERT OR REPLACE INTO firecrawl_batch_pages VALUES(?,?,?,?,?,?)",
-                              (job, index, url, status, json.dumps(result), credits))
-            hosted.db.execute("UPDATE firecrawl_batch_jobs SET completed=completed+1,credits=credits+? WHERE id=?",
-                              (credits, job))
+            saved = hosted.db.execute(
+                "INSERT OR IGNORE INTO firecrawl_batch_pages(job,seq,url,status,payload,credits) "
+                "SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM firecrawl_batch_jobs "
+                "WHERE id=? AND status='scraping' AND lease_token=?)",
+                (job, index, url, status, json.dumps(result), credits, job, lease_token),
+            ).rowcount
+            if saved:
+                hosted.db.execute(
+                    "UPDATE firecrawl_batch_jobs SET "
+                    "completed=(SELECT COUNT(*) FROM firecrawl_batch_pages WHERE job=?), "
+                    "credits=(SELECT COALESCE(SUM(credits),0) FROM firecrawl_batch_pages WHERE job=?) "
+                    "WHERE id=? AND status='scraping' AND lease_token=?",
+                    (job, job, job, lease_token),
+                )
 
         try:
+            # Reconcile counters from persisted URL rows before resuming a job
+            # that may have stopped between storing a result and updating totals.
+            hosted.db.execute(
+                "UPDATE firecrawl_batch_jobs SET "
+                "completed=(SELECT COUNT(*) FROM firecrawl_batch_pages WHERE job=?), "
+                "credits=(SELECT COALESCE(SUM(credits),0) FROM firecrawl_batch_pages WHERE job=?) "
+                "WHERE id=? AND status='scraping' AND lease_token=?",
+                (job, job, job, lease_token),
+            )
             for start in range(0, len(urls), 10):
-                state = hosted.db.execute("SELECT status FROM firecrawl_batch_jobs WHERE id=?", (job,)).fetchone()
-                if not state or state[0] != "scraping":
+                state = hosted.db.execute(
+                    "SELECT status,lease_token FROM firecrawl_batch_jobs WHERE id=?", (job,)
+                ).fetchone()
+                if not state or state != ("scraping", lease_token):
                     return
-                pending = [(start + offset, url) for offset, url in enumerate(urls[start:start + 10])]
+                existing = {row[0] for row in hosted.db.execute(
+                    "SELECT seq FROM firecrawl_batch_pages WHERE job=? AND seq>=? AND seq<?",
+                    (job, start, min(start + 10, len(urls))),
+                )}
+                pending = [(index, url) for index, url in enumerate(urls[start:start + 10], start)
+                           if index not in existing]
+                if not pending:
+                    continue
                 attempt = 0
                 while pending:
-                    state = hosted.db.execute("SELECT status FROM firecrawl_batch_jobs WHERE id=?", (job,)).fetchone()
-                    if not state or state[0] != "scraping":
+                    state = hosted.db.execute(
+                        "SELECT status,lease_token FROM firecrawl_batch_jobs WHERE id=?", (job,)
+                    ).fetchone()
+                    if not state or state != ("scraping", lease_token):
                         return
                     chunk = [url for _, url in pending]
                     call_options = {key: value for key, value in options.items() if not key.startswith("_")}
@@ -747,18 +826,49 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                     pending = retry
                     await asyncio.sleep(min(15, 2 ** attempt))
                     attempt += 1
-            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='completed',finished=? WHERE id=? AND status='scraping'",
-                              (time.time(), job))
+            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='completed',finished=?,lease_until=NULL,lease_token=NULL WHERE id=? AND status='scraping' AND lease_token=?",
+                              (time.time(), job, lease_token))
         except asyncio.CancelledError:
-            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='cancelled',finished=? WHERE id=? AND status='scraping'",
-                              (time.time(), job))
+            # Service shutdown releases work for another process. Explicit API
+            # cancellation changes status first and therefore remains cancelled.
+            hosted.db.execute("UPDATE firecrawl_batch_jobs SET lease_until=NULL,lease_token=NULL WHERE id=? AND status='scraping' AND lease_token=?",
+                              (job, lease_token))
             raise
         except Exception:
             logging.exception("Firecrawl-compatible batch failed job=%s", job)
-            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='failed',finished=? WHERE id=? AND status='scraping'",
-                              (time.time(), job))
+            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='failed',finished=?,lease_until=NULL,lease_token=NULL WHERE id=? AND status='scraping' AND lease_token=?",
+                              (time.time(), job, lease_token))
         finally:
+            heartbeat.cancel()
+            await asyncio.gather(heartbeat, return_exceptions=True)
             batch_tasks.pop(job, None)
+
+    async def dispatch_batches():
+        while True:
+            due = hosted.db.execute(
+                "SELECT id FROM firecrawl_batch_jobs WHERE status IN ('queued','scraping') "
+                "AND (lease_until IS NULL OR lease_until<=?) ORDER BY created LIMIT 8",
+                (time.time(),),
+            ).fetchall()
+            for (job,) in due:
+                if len(batch_tasks) >= 4:
+                    break
+                if job not in batch_tasks:
+                    batch_tasks[job] = asyncio.create_task(run_batch(job), name=f"firecrawl-batch-{job}")
+            await asyncio.sleep(1)
+
+    async def batch_worker(app):
+        dispatcher = asyncio.create_task(dispatch_batches(), name="firecrawl-batch-dispatcher")
+        yield
+        dispatcher.cancel()
+        await asyncio.gather(dispatcher, return_exceptions=True)
+        active = list(batch_tasks.values())
+        for task in active:
+            task.cancel()
+        if active:
+            await asyncio.gather(*active, return_exceptions=True)
+
+    app.cleanup_ctx.append(batch_worker)
 
     async def batch_scrape(request):
         body = await request.json()
@@ -841,7 +951,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         created = time.time()
         hosted.db.execute("INSERT INTO firecrawl_batch_jobs(id,account,status,urls,options,total,created) VALUES(?,?, 'scraping', ?,?,?,?)",
                           (job, request["account"], json.dumps(urls), json.dumps(apex_options), len(urls), created))
-        batch_tasks[job] = asyncio.create_task(run_batch(job, request["account"], urls, apex_options))
+        batch_tasks[job] = asyncio.create_task(run_batch(job), name=f"firecrawl-batch-{job}")
         return web.json_response({"success": True, "id": job,
                                   "url": f"/v2/batch/scrape/{job}",
                                   "status": "scraping"}, status=200)
@@ -881,7 +991,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         row = batch_status(request.match_info["job"], request["account"])
         if row[1] == "scraping":
             task = batch_tasks.get(row[0])
-            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='cancelled',finished=? WHERE id=? AND status='scraping'",
+            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='cancelled',finished=?,lease_until=NULL,lease_token=NULL WHERE id=? AND status='scraping'",
                               (time.time(), row[0]))
             if task:
                 task.cancel()
