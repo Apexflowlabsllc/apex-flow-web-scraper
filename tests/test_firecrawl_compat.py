@@ -628,6 +628,42 @@ async def test_v2_search_pdf_category_uses_operator_and_filters_non_pdf_results(
     assert unsupported.status == 400
 
 
+async def test_current_langchain_mcp_client_discovers_and_calls_hosted_scraper(hosted):
+    import os
+
+    client_python = os.environ.get("APEX_LANGCHAIN_CLIENT_PYTHON")
+    if not client_python:
+        pytest.skip("set APEX_LANGCHAIN_CLIENT_PYTHON to test the current LangChain MCP client")
+
+    h, client, headers = await _auth(hosted)
+    child_env = {name: os.environ[name] for name in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP")
+                 if name in os.environ}
+    child_env["APEX_SCRAPER_API_KEY"] = headers["Authorization"][7:]
+    child_env["APEX_LANGCHAIN_MCP_URL"] = str(client.make_url("/v1/mcp"))
+    child_env["APEX_LANGCHAIN_TEST_URL"] = "https://example.com/langchain"
+    script = """
+import asyncio, os
+from fastmcp import Client
+from langchain.mcp import MCPAdapter
+
+async def main():
+    async with MCPAdapter(Client(os.environ['APEX_LANGCHAIN_MCP_URL'], auth=os.environ['APEX_SCRAPER_API_KEY'])) as adapter:
+        tools = await adapter.list_tools()
+        scrape = next(tool for tool in tools if tool.name == 'scrape_page')
+        result = await scrape.ainvoke({'url': os.environ['APEX_LANGCHAIN_TEST_URL']})
+        assert '# Fixture' in str(result), str(result)
+
+asyncio.run(main())
+"""
+    process = await asyncio.create_subprocess_exec(
+        client_python, "-c", script, env=child_env,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=45)
+    assert process.returncode == 0, (stdout + stderr).decode("utf-8", errors="replace")
+    assert h.scrape_calls[-1][0] == "https://example.com/langchain"
+
+
 async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hosted, monkeypatch):
     import rainbo_scrape.hosted_search as hosted_search
     Firecrawl = pytest.importorskip("firecrawl").Firecrawl

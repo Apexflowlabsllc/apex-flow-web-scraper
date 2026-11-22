@@ -81,6 +81,7 @@ Developer API examples are available for:
 - [Anthropic Messages](examples/anthropic-messages-mcp.py)
 - [Google ADK](examples/google-adk-mcp.py)
 - [xAI/Grok's native Python SDK](examples/xai-native-mcp.py) and [Responses API](examples/xai-responses-mcp.py)
+- [LangChain MCPAdapter](examples/langchain_mcp.py) using the current `langchain[mcp]` integration, Streamable HTTP, and bearer auth. LangChain currently marks `langchain.mcp` as beta.
 - [Vercel AI SDK 7](sdk/node/examples/vercel-ai-sdk-mcp.mjs) with the official `@ai-sdk/mcp` client and Streamable HTTP
 - Private, unpublished [n8n community node](integrations/n8n/README.md) for scrape, map, web search, crawl lifecycle and batch creation. It passes the official CLI lint/build and 8 contract tests; its node and credential appeared in a local n8n 2.48.7 catalog check. Workflow execution and credential use still need validation.
 
