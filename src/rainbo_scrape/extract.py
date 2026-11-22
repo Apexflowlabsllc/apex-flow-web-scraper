@@ -91,7 +91,7 @@ def _recipe(soup, recipe, url):
     return data, evidence, errors
 
 
-def extract(body, url, content_type="text/html", recipe=None):
+def extract(body, url, content_type="text/html", recipe=None, include_html=False, include_raw_html=False):
     if recipe:
         validate_recipe(recipe)
     sha = hashlib.sha256(body).hexdigest()
@@ -186,7 +186,16 @@ def extract(body, url, content_type="text/html", recipe=None):
         common["warnings"].append("Low text yield; page may need browser rendering")
     if errors:
         common["warnings"].append("Extraction did not satisfy all requested fields")
+    main_html = str(main) if include_html else None
+    retained_html = main_html[:500000] if main_html is not None else None
+    raw_html = decoded[:500000] if include_raw_html else None
+    if include_html and len(main_html) > 500000:
+        common["warnings"].append("Main-content HTML truncated at 500000 characters")
+    if include_raw_html and len(decoded) > 500000:
+        common["warnings"].append("Raw HTML truncated at 500000 characters")
     return {**common, "kind": "html", "title": title, "text": text, "markdown": markdown,
+            **({"html": retained_html} if include_html else {}),
+            **({"raw_html": raw_html} if include_raw_html else {}),
             "metadata": metadata, "links": links, "headings": headings, "tables": tables,
             "structured_data": structured, "data": data, "evidence": evidence, "validation_errors": errors,
             "quality": {"text_chars": len(text), "field_count": len(data), "validation_passed": not errors,

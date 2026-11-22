@@ -129,7 +129,9 @@ async def scrape(fetcher, url, options):
     if response["status"] >= 400:
         raise ScrapeError("http_error", f"Site returned HTTP {response['status']}")
     result = await parse(response["body"], response["url"],
-                                    response["headers"].get("content-type", "text/html"), options.get("recipe"))
+                         response["headers"].get("content-type", "text/html"), options.get("recipe"),
+                         include_html=options.get("include_html", False),
+                         include_raw_html=options.get("include_raw_html", False))
     mode = options.get("render", "auto")
     rendered = False
     shot = None
@@ -137,7 +139,9 @@ async def scrape(fetcher, url, options):
         response = await render(fetcher, response["url"], options.get("wait_selector"), options.get("scrolls", 0),
                                 screenshot=bool(options.get("screenshot")), actions=options.get("actions"))
         shot = response.pop("screenshot", None)
-        result = await parse(response["body"], response["url"], "text/html", options.get("recipe"))
+        result = await parse(response["body"], response["url"], "text/html", options.get("recipe"),
+                             include_html=options.get("include_html", False),
+                             include_raw_html=options.get("include_raw_html", False))
         result["browser"] = response["browser"]
         rendered = True
     result.update(url=response["url"], status=response["status"], cache=response["cache"], rendered=rendered,

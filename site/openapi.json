@@ -411,7 +411,7 @@
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 8,
+                    "maxItems": 11,
                     "items": {
                       "type": "string",
                       "enum": [
@@ -422,7 +422,10 @@
                         "chunks",
                         "links",
                         "structured_data",
-                        "diff"
+                        "diff",
+                        "html",
+                        "raw_html",
+                        "screenshot"
                       ]
                     },
                     "description": "Return selected content with available source receipt and validation warnings. Selecting chunks defaults to a 1,500-character target. Select diff to receive change.diff, the lines that changed since this account last read the URL."
@@ -631,7 +634,7 @@
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 8,
+                    "maxItems": 11,
                     "items": {
                       "type": "string",
                       "enum": [
@@ -642,7 +645,10 @@
                         "chunks",
                         "links",
                         "structured_data",
-                        "diff"
+                        "diff",
+                        "html",
+                        "raw_html",
+                        "screenshot"
                       ]
                     },
                     "description": "Return selected content with available source receipt and validation warnings. Selecting chunks defaults to a 1,500-character target. Select diff to receive change.diff, the lines that changed since this account last read the URL."
@@ -2230,6 +2236,865 @@
             }
           }
         }
+      }
+    },
+    "/v2/scrape": {
+      "post": {
+        "operationId": "firecrawlCompatScrape",
+        "summary": "Firecrawl-compatible scrape",
+        "description": "Supported formats: markdown, links, screenshot. Unsupported formats/options return an explicit error. Apex credit costs and receipts apply.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Firecrawl-style success/data envelope with Apex credit extension",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or unsupported request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Apex credits or entitlement required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "formats": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "markdown",
+                            "html",
+                            "rawHtml",
+                            "links",
+                            "screenshot"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "markdown",
+                                "html",
+                                "rawHtml",
+                                "links",
+                                "screenshot"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "json"
+                            },
+                            "schema": {
+                              "type": "object",
+                              "description": "JSON Schema Draft 2020-12. Required unless prompt is provided."
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "description": "Extraction instruction; required when schema is omitted."
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "anyOf": [
+                            {
+                              "required": [
+                                "schema"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "prompt"
+                              ]
+                            }
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "onlyMainContent": {
+                    "type": "boolean"
+                  },
+                  "maxAge": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31536000000
+                  },
+                  "screenshot": {
+                    "type": "boolean"
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/map": {
+      "post": {
+        "operationId": "firecrawlCompatMap",
+        "summary": "Firecrawl-compatible map",
+        "description": "Sitemap-based URL discovery. Supported inputs are url, optional search, limit, and sitemap='include'. Apex's plan limit applies.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "search": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "sitemap": {
+                    "type": "string",
+                    "enum": [
+                      "include"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/search": {
+      "post": {
+        "operationId": "firecrawlCompatSearch",
+        "summary": "Firecrawl-compatible web search",
+        "description": "Requires an operator-configured web search provider. Supports query, limit, and sources=[{type:web}]. Does not call Apex saved-page search.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Search provider is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "query": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "sources": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "type"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "web"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/crawl": {
+      "post": {
+        "operationId": "firecrawlCompatStartCrawl",
+        "summary": "Firecrawl-compatible crawl",
+        "description": "Starts a durable same-site crawl. Apex obeys robots.txt, enforces account limits, and rejects external-link, subdomain, path-pattern, and unsupported scrape options.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Crawl job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or unsupported request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Apex credits or entitlement required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "maxDiscoveryDepth": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10
+                  },
+                  "includePaths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "excludePaths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "ignoreRobotsTxt": {
+                    "type": "boolean"
+                  },
+                  "allowExternalLinks": {
+                    "type": "boolean"
+                  },
+                  "allowSubdomains": {
+                    "type": "boolean"
+                  },
+                  "sitemap": {
+                    "type": "string",
+                    "enum": [
+                      "include"
+                    ]
+                  },
+                  "scrapeOptions": {
+                    "type": "object",
+                    "properties": {
+                      "formats": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "markdown",
+                                "html",
+                                "rawHtml",
+                                "links",
+                                "screenshot"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "markdown",
+                                    "html",
+                                    "rawHtml",
+                                    "links",
+                                    "screenshot"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "json"
+                                },
+                                "schema": {
+                                  "type": "object",
+                                  "description": "JSON Schema Draft 2020-12. Required unless prompt is provided."
+                                },
+                                "prompt": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "description": "Extraction instruction; required when schema is omitted."
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "schema"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "prompt"
+                                  ]
+                                }
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "onlyMainContent": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/crawl/{job}": {
+      "get": {
+        "operationId": "firecrawlCompatCrawlStatus",
+        "summary": "Get crawl status",
+        "description": "Reads a crawl job and a page of results. Results are account-scoped.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Crawl status and result page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such crawl for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "firecrawlCompatCancelCrawl",
+        "summary": "Cancel crawl",
+        "description": "Requests cancellation of an active account-owned crawl.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such crawl for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v2/batch/scrape": {
+      "post": {
+        "operationId": "firecrawlCompatBatchScrape",
+        "summary": "Start an asynchronous batch scrape",
+        "description": "Creates an account-scoped asynchronous batch job. Supports markdown, links and screenshot formats, maxAge, and bounded read-only browser actions. URL count follows the account plan. Custom concurrency and webhooks are not supported.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or unsupported option",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Batch exceeds the account plan limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "urls"
+                ],
+                "properties": {
+                  "urls": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "formats": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "markdown",
+                            "html",
+                            "rawHtml",
+                            "links",
+                            "screenshot"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "markdown",
+                                "html",
+                                "rawHtml",
+                                "links",
+                                "screenshot"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "json"
+                            },
+                            "schema": {
+                              "type": "object",
+                              "description": "JSON Schema Draft 2020-12. Required unless prompt is provided."
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "description": "Extraction instruction; required when schema is omitted."
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "anyOf": [
+                            {
+                              "required": [
+                                "schema"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "prompt"
+                              ]
+                            }
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "onlyMainContent": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "maxAge": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31536000000
+                  },
+                  "screenshot": {
+                    "type": "boolean"
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/batch/scrape/{job}": {
+      "get": {
+        "operationId": "firecrawlCompatBatchStatus",
+        "summary": "Get batch status and results",
+        "description": "Returns account-scoped batch status and a page of completed results. Use next to retrieve subsequent result pages.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch status and results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such batch job for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "firecrawlCompatCancelBatch",
+        "summary": "Cancel batch",
+        "description": "Cancels an active account-owned batch job. Completed page results are retained.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such batch job for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v2/batch/scrape/{job}/errors": {
+      "get": {
+        "operationId": "firecrawlCompatBatchErrors",
+        "summary": "Get batch errors",
+        "description": "Returns per-URL errors for an account-owned batch job.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-URL batch errors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such batch job for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     }
   }

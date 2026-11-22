@@ -68,7 +68,7 @@ def install(h, app, perform, map_urls=None):
     async def run(job, account, start, limit, options, include, max_depth):
         host = _site(start)
         queue, seen, seq, active = [(start, 0)], {start}, 0, 0
-        scrape_options = {k: options[k] for k in ("render", "fallback", "recipe") if k in options}
+        scrape_options = {k: options[k] for k in ("render", "fallback", "recipe", "extract") if k in options}
         wanted = options.get("outputs") or ["markdown"]
         note = None
 
@@ -156,7 +156,7 @@ def install(h, app, perform, map_urls=None):
                          (status, time.time(), note, job))
 
     async def start_for(account, body):
-        allowed = {"url", "limit", "render", "outputs", "include", "max_depth", "fallback", "recipe"}
+        allowed = {"url", "limit", "render", "outputs", "include", "max_depth", "fallback", "recipe", "extract"}
         if not isinstance(body, dict) or set(body) - allowed:
             raise ValueError("Use url with optional " + ", ".join(sorted(allowed - {"url"})))
         try:
@@ -183,7 +183,7 @@ def install(h, app, perform, map_urls=None):
         if h.billing.remaining(account) < 1:
             return web.json_response({"error": "Not enough credits", "code": "insufficient_credits", "retryable": False,
                                       "credits_left": 0, "buy_url": h.site + "/#pricing"}, status=402)
-        options = {"render": body.get("render", "never"), **{k: body[k] for k in ("outputs", "fallback", "recipe") if k in body}}
+        options = {"render": body.get("render", "never"), **{k: body[k] for k in ("outputs", "fallback", "recipe", "extract") if k in body}}
         job = "crawl_" + secrets.token_hex(12)
         h.db.execute("DELETE FROM crawl_pages WHERE job IN (SELECT id FROM crawl_jobs WHERE created<?)", (time.time() - KEEP_SECONDS,))
         h.db.execute("DELETE FROM crawl_jobs WHERE created<?", (time.time() - KEEP_SECONDS,))
