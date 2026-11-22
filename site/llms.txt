@@ -48,6 +48,12 @@ Official MCP Registry entry: https://registry.modelcontextprotocol.io/v0.1/serve
 Set up Codex CLI, Claude Code or VS Code: https://webscraper.apexflowlabs.com/docs.html#agents
 Remote MCP: https://webscraper.apexflowlabs.com/v1/mcp (Streamable HTTP, Authorization: Bearer YOUR_API_KEY). Core tools: scrape_page, scrape_batch, check_changes, map_site, crawl_site, crawl_status, search_saved and credit_balance. Additional tools include house_prices, npr_news, track_store, rising_products and tracked_stores. web_search is available only when the service operator configures a search provider. Stdio clients: https://webscraper.apexflowlabs.com/docs.html#agents. Enrollment requires a human. A portable Agent Skill with a standard-library Python CLI is being prepared in the GitHub repository; its one-command install becomes available after merge to the public default branch: npx skills add Apexflowlabsllc/apex-flow-web-scraper --skill apex-flow-web-scraper. The npm multi-client installer also requires package publication.
 
+## Direct AI API integrations
+- OpenAI Responses API with remote MCP: https://github.com/Apexflowlabsllc/apex-flow-web-scraper/blob/main/examples/openai-responses-mcp.py
+- Anthropic Messages API with remote MCP: https://github.com/Apexflowlabsllc/apex-flow-web-scraper/blob/main/examples/anthropic-messages-mcp.py
+- Google ADK / Gemini with remote MCP: https://github.com/Apexflowlabsllc/apex-flow-web-scraper/blob/main/examples/google-adk-mcp.py
+- xAI / Grok Responses API with remote MCP: https://github.com/Apexflowlabsllc/apex-flow-web-scraper/blob/main/examples/xai-responses-mcp.py. The Grok example allows only scrape_page and keeps both API keys in the caller's environment. xAI's Responses API currently does not support require_approval; a call can consume xAI tokens and Apex credits. xAI Remote MCP reference: https://docs.x.ai/developers/tools/remote-mcp
+
 ## Usage
 Python: `from rainbo_scrape import scrape; scrape("https://example.com").markdown`
 CLI: `rainbo-scrape fetch https://example.com`
