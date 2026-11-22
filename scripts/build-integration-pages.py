@@ -93,6 +93,16 @@ PAGES = [
          steps=[("Open the Program tab, Install, Edit mcp.json, and add this", "json",
                  J({"mcpServers": {"apex-scraper": {"url": MCP, "headers": {"Authorization": "Bearer YOUR_API_KEY"}}}}))],
          note="Your model runs on your machine; only the page requests go to the scraper."),
+    dict(slug="roo-code", name="Roo Code", mark="RC", group="Coding assistants", doc="https://docs.roocode.com/features/mcp/using-mcp-in-roo", checked="22 November 2026",
+         blurb="One entry in Roo Code's MCP settings, for one project or all of them.",
+         steps=[("Open the MCP panel, choose Edit Project MCP (.roo/mcp.json) or Edit Global MCP (mcp_settings.json), and add this", "json",
+                 J({"mcpServers": {"apex-scraper": {"type": "streamable-http", "url": MCP, "headers": {"Authorization": "Bearer YOUR_API_KEY"}}}}))],
+         note="Keep a project file that holds a real key out of version control, or use the global file."),
+    dict(slug="warp", name="Warp", mark="WP", group="Coding assistants", doc="https://docs.warp.dev/agent-platform/capabilities/mcp", checked="22 November 2026",
+         blurb="Give Warp's agents the live web: paste one server into its MCP settings.",
+         steps=[("Open Settings, Agents, MCP servers, choose + Add, and paste this (or save it as .warp/.mcp.json in a project)", "json",
+                 J({"mcpServers": {"apex-scraper": {"url": MCP, "headers": {"Authorization": "Bearer YOUR_API_KEY"}}}}))],
+         note="Warp also picks up servers already configured for Claude Code and Codex in the same project."),
     # ---- model APIs and agent frameworks ------------------------------------------------------------------------
     dict(slug="claude-api", name="Claude API", mark="AN", group="APIs and agent frameworks", doc="https://platform.claude.com/docs/en/agents-and-tools/mcp-connector",
          blurb="Pass the scraper to a Messages API call; Claude calls the tools itself.",
@@ -136,6 +146,28 @@ PAGES = [
                  f"    url: '{MCP}',\n    headers: {{ Authorization: `Bearer ${{process.env.{KEY}}}` }},\n  }},\n}});\n\n"
                  "const tools = await scraper.tools();\n// pass tools to generateText or streamText, then:\nawait scraper.close();")],
          note="Close the client when your request is finished."),
+    dict(slug="pydantic-ai", name="Pydantic AI", mark="PY", group="APIs and agent frameworks", doc="https://ai.pydantic.dev/mcp/client/", checked="22 November 2026",
+         blurb="Hand the scraper to an agent as an MCP toolset, with your key as the bearer token.",
+         steps=[("Python", "python",
+                 f'import os\nfrom pydantic_ai import Agent\nfrom pydantic_ai.mcp import MCPToolset\n\ntoolset = MCPToolset("{MCP}", auth=os.environ["{KEY}"])\n'
+                 'agent = Agent("openai:gpt-6.1-sol", toolsets=[toolset])\n\nasync def main():\n'
+                 '    result = await agent.run("Read https://example.com and summarise it in three points.")\n    print(result.output)')],
+         note="MCPToolset takes a bearer token string in auth for HTTP servers; any model Pydantic AI supports works."),
+    dict(slug="google-adk", name="Google Agent Development Kit", mark="GK", group="APIs and agent frameworks", doc="https://google.github.io/adk-docs/tools-custom/mcp-tools/", checked="22 November 2026",
+         blurb="Add the scraper to an ADK agent as a Streamable HTTP toolset.",
+         steps=[("Python", "python",
+                 'import os\nfrom google.adk.agents import LlmAgent\nfrom google.adk.tools.mcp_tool import McpToolset\n'
+                 'from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams\n\nroot_agent = LlmAgent(\n    model="gemini-flash-latest",\n'
+                 '    name="web_reader",\n    instruction="Use the web tools to read pages and answer with sources.",\n    tools=[McpToolset(connection_params=StreamableHTTPConnectionParams(\n'
+                 f'        url="{MCP}",\n        headers={{"Authorization": f"Bearer {{os.environ[\'{KEY}\']}}"}},\n    ))],\n)')],
+         note="Run it with adk web or adk run like any other ADK agent."),
+    dict(slug="mastra", name="Mastra", mark="MA", group="APIs and agent frameworks", doc="https://mastra.ai/reference/tools/mcp-client", checked="22 November 2026",
+         blurb="Register the scraper in an MCPClient and give its tools to your agents.",
+         steps=[("TypeScript", "ts",
+                 "import { MCPClient } from '@mastra/mcp';\n\nexport const mcp = new MCPClient({\n  servers: {\n    apexScraper: {\n"
+                 f"      url: new URL('{MCP}'),\n      requestInit: {{ headers: {{ Authorization: `Bearer ${{process.env.{KEY}}}` }} }},\n    }},\n  }},\n}});\n\n"
+                 "// give these to an Agent's tools\nconst tools = await mcp.listTools();")],
+         note="listTools returns tools named by server, so they never clash with your own."),
     # ---- everything else ------------------------------------------------------------------------------------------
     dict(slug="rest-api", name="REST API: curl, Python, Node", mark="{}", group="Any language or tool", doc=BASE + "/docs.html",
          blurb="No SDK needed. One POST returns a page as Markdown.",
@@ -205,7 +237,7 @@ def build_page(p):
     faq = "".join(f"<details><summary>{e(q)}</summary><p>{e(a)}</p></details>" for q, a in FAQ)
     own = p["doc"].startswith(BASE)
     checked = (f'Setup follows <a href="{e(p["doc"])}">our API reference</a>.' if own else
-               f'Checked against <a href="{e(p["doc"])}" rel="noopener">the {e(p["name"])} documentation</a> on {CHECKED}. If your version differs, follow its documentation and use the address and header shown here.')
+               f'Checked against <a href="{e(p["doc"])}" rel="noopener">the {e(p["name"])} documentation</a> on {p.get("checked", CHECKED)}. If your version differs, follow its documentation and use the address and header shown here.')
     return (head(title, description, path, f'<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>') + f'''<main>
 <p class="eyebrow"><a href="/integrations/">Integrations</a> / {e(p["group"])}</p>
 <h1>Web scraping for <em>{e(p["name"])}</em>.</h1>
