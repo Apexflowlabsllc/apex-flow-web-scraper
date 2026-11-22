@@ -61,6 +61,20 @@ test("Zed context_servers format keeps unrelated settings and never embeds a key
   assert.doesNotMatch(JSON.stringify(value), /API_KEY|Bearer/);
 });
 
+test("Kiro remote MCP setup preserves existing servers and uses an approved environment reference", () => {
+  const target = getClientTargets({ home: "E:/fixture-home", os: "win32" }).find((item) => item.id === "kiro");
+  const source = '{\n  "theme": "dark",\n  "mcpServers": {"existing": {"url": "https://example.com/mcp"}}\n}\n';
+  const result = jsoncWithMcpServer(source, { rootKey: target.rootKey, entry: target.entryFactory() });
+  const value = JSON.parse(result.text);
+  assert.equal(value.theme, "dark");
+  assert.deepEqual(value.mcpServers.existing, { url: "https://example.com/mcp" });
+  assert.deepEqual(value.mcpServers[SERVER_NAME], {
+    url: "https://webscraper.apexflowlabs.com/v1/mcp",
+    headers: { Authorization: "Bearer ${APEX_SCRAPER_API_KEY}" },
+  });
+  assert.doesNotMatch(JSON.stringify(value), /rs_live_|your-api-key/i);
+});
+
 test("target registry includes individually selectable Cline, Roo Code, Continue, OpenCode, Amazon Q, JetBrains Air, Zed and Kiro installs", () => {
   const home = "E:/fixture-home";
   const cwd = "E:/fixture-project";
