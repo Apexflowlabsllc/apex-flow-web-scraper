@@ -2677,7 +2677,7 @@
       "post": {
         "operationId": "firecrawlCompatSearch",
         "summary": "Firecrawl-compatible web, news, and image search",
-        "description": "Requires an operator-configured web search provider. Supports query, limit, one source per request: web, news, or images (string and {type:...} forms), the pdf category, and mutually exclusive includeDomains/excludeDomains arrays of 1–50 hostnames. The pdf category appends the filetype:pdf query operator and retains only results whose URL path ends in .pdf; this is not a dedicated PDF index. News uses Tavily or Exa; images use Brave's dedicated index with strict SafeSearch. Optional web/news scrapeOptions support markdown, html, rawHtml, links, images, screenshot and bounded actions/waitFor. Each returned page uses Apex safety checks and metering; creditsUsed aggregates search and successful page scrapes, with failures reported on individual results. Image scraping, JSON extraction and summary formats are not supported. Returns Firecrawl-shaped results with position. Firecrawl SDK origin telemetry is accepted but not recorded. Does not call Apex saved-page search.",
+        "description": "Requires an operator-configured web search provider. Supports query, limit, one or more distinct sources per request: web, news, and/or images (string and {type:...} forms), the pdf category with web as the sole source, and mutually exclusive includeDomains/excludeDomains arrays of 1–50 hostnames. Multi-source results are grouped under matching data keys, with limit applying per source and creditsUsed aggregating successful search and page-scrape charges; partial provider failures appear in sourceErrors alongside successful results. News uses Tavily or Exa; images use Brave's dedicated index with strict SafeSearch. The configured provider must support every requested source. The pdf category appends the filetype:pdf query operator and retains only results whose URL path ends in .pdf; this is not a dedicated PDF index. Optional web/news scrapeOptions support markdown, html, rawHtml, links, images, screenshot and bounded actions/waitFor; it cannot be combined with images. Each returned page uses Apex safety checks and metering, with failures reported on individual results. Image scraping, JSON extraction and summary formats are not supported. Returns Firecrawl-shaped results with position. Firecrawl SDK origin telemetry is accepted but not recorded. Does not call Apex saved-page search.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -2727,7 +2727,7 @@
                   "sources": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 1,
+                    "maxItems": 3,
                     "items": {
                       "oneOf": [
                         {"type": "string", "enum": ["web", "news", "images"]},

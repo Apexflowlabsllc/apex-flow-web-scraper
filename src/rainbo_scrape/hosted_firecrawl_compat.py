@@ -20,7 +20,7 @@ import aiohttp
 from aiohttp import web
 from .billing import public_usage_key_id
 from .extract import validate_attribute_selectors
-from .hosted_search import normalize_domain_filters
+from .hosted_search import normalize_domain_filters, provider_name
 from .policy import PublicResolver, ScrapeError, check_url
 
 INTERACT_SERVICE_KEY = web.AppKey("interact_service", object)
@@ -679,8 +679,15 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                     source_types.append(source["type"])
                 else:
                     return error("sources must contain 'web', 'news', or 'images' (string or {type: ...})")
-        if len(source_types) != 1 or source_types[0] not in ("web", "news", "images"):
-            return error("This adapter supports one Firecrawl source per request: web, news, or images")
+        if not source_types or any(source not in ("web", "news", "images") for source in source_types):
+            return error("sources must contain one or more of web, news, or images")
+        if len(set(source_types)) != len(source_types):
+            return error("sources must not contain duplicate source types")
+        configured_provider = provider_name()
+        if configured_provider is not None and "images" in source_types and configured_provider != "brave":
+            return error("Image search requires the configured Brave provider's dedicated image index")
+        if configured_provider == "brave" and "news" in source_types:
+            return error("The configured Brave provider does not expose a dedicated news source; use Tavily or Exa")
         categories = body.get("categories", [])
         if not isinstance(categories, list) or len(categories) > 1:
             return error("This adapter supports at most one search category: pdf")
@@ -691,13 +698,13 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if any(category != "pdf" for category in categories):
             return error("This adapter currently supports only the pdf search category")
         pdf_category = categories == ["pdf"]
-        if pdf_category and source_types[0] != "web":
-            return error("The pdf category can only be used with the web source")
+        if pdf_category and source_types != ["web"]:
+            return error("The pdf category can only be used with web as the sole source")
         scrape_options = body.get("scrapeOptions")
         scrape_actions = []
         if scrape_options is not None:
-            if source_types[0] == "images":
-                return error("scrapeOptions is supported for web and news search results, not image results")
+            if "images" in source_types:
+                return error("scrapeOptions is supported for web and news search results, not when images are requested")
             if not isinstance(scrape_options, dict):
                 return error("scrapeOptions must be an object")
             extra_scrape = set(scrape_options) - {"formats", "onlyMainContent", "waitFor", "actions"}
@@ -720,7 +727,6 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 scrape_actions = translate_wait_for(scrape_options.get("actions"), scrape_options.get("waitFor", 0))
             except ValueError as exc:
                 return error(str(exc))
-        topic = source_types[0] if source_types[0] in ("news", "images") else "general"
         origin = body.get("origin")
         if origin is not None and (not isinstance(origin, str) or len(origin) > 200):
             return error("origin must be a string no longer than 200 characters")
@@ -729,47 +735,69 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 body.get("includeDomains"), body.get("excludeDomains"))
         except ValueError as exc:
             return error(str(exc), code="invalid_search_filter")
-        request_body = {key: body[key] for key in ("query", "limit") if key in body}
-        if pdf_category:
-            query = request_body.get("query")
-            if not isinstance(query, str) or len(query) > 288:
-                return error("query must be at most 288 characters when using categories=['pdf']")
-            request_body["query"] = query + " filetype:pdf"
-        if topic in ("news", "images"):
-            request_body["topic"] = topic
-        if include_domains is not None:
-            request_body["include_domains"] = include_domains
-        if exclude_domains is not None:
-            request_body["exclude_domains"] = exclude_domains
-        response = await websearch_for(request["account"], request_body)
-        payload = unpack(response)
-        failure = forwarded(response, payload)
-        if failure:
-            return failure
-        key = "news" if topic == "news" else "images" if topic == "images" else "web"
-        if topic == "news":
-            results = [{"url": item.get("url"), "title": item.get("title"),
-                        "snippet": item.get("snippet"), "date": item.get("date"), "position": index}
-                       for index, item in enumerate(payload.get("results", []), start=1)]
-        elif topic == "images":
-            results = [{"title": item.get("title"), "imageUrl": item.get("imageUrl"),
-                        "imageWidth": item.get("imageWidth"), "imageHeight": item.get("imageHeight"),
-                        "url": item.get("url"), "position": index}
-                       for index, item in enumerate(payload.get("results", []), start=1)]
-        else:
-            provider_results = payload.get("results", [])
+        data = {}
+        total_credits = 0
+        source_errors = {}
+        first_source_failure = None
+        for source_type in source_types:
+            topic = source_type if source_type in ("news", "images") else "general"
+            request_body = {key: body[key] for key in ("query", "limit") if key in body}
             if pdf_category:
-                provider_results = [item for item in provider_results if isinstance(item, dict)
-                                    and isinstance(item.get("url"), str)
-                                    and urlsplit(item["url"]).path.lower().endswith(".pdf")]
-                if isinstance(body.get("limit", 10), int) and not isinstance(body.get("limit", 10), bool):
-                    provider_results = provider_results[:body.get("limit", 10)]
-            results = [{"url": item.get("url"), "title": item.get("title"),
-                        "description": item.get("snippet"), "position": index,
-                        **({"category": "pdf"} if pdf_category else {})}
-                       for index, item in enumerate(provider_results, start=1)]
-        search_credits = payload.get("credits_used", 0)
-        total_credits = search_credits if isinstance(search_credits, int) else 0
+                query = request_body.get("query")
+                if not isinstance(query, str) or len(query) > 288:
+                    return error("query must be at most 288 characters when using categories=['pdf']")
+                request_body["query"] = query + " filetype:pdf"
+            if topic != "general":
+                request_body["topic"] = topic
+            if include_domains is not None:
+                request_body["include_domains"] = include_domains
+            if exclude_domains is not None:
+                request_body["exclude_domains"] = exclude_domains
+            try:
+                response = await websearch_for(request["account"], request_body)
+            except Exception:
+                source_errors[source_type] = {
+                    "statusCode": 503,
+                    "error": "Search provider request failed",
+                    "code": "search_failed",
+                }
+                continue
+            payload = unpack(response)
+            failure = forwarded(response, payload)
+            if failure:
+                source_errors[source_type] = {
+                    "statusCode": response.status,
+                    "error": payload.get("error", "Search source failed"),
+                    "code": payload.get("code", "request_failed"),
+                }
+                first_source_failure = first_source_failure or failure
+                continue
+            provider_credits = payload.get("credits_used", 0)
+            if isinstance(provider_credits, int) and not isinstance(provider_credits, bool):
+                total_credits += provider_credits
+            provider_results = payload.get("results", [])
+            if source_type == "news":
+                data["news"] = [{"url": item.get("url"), "title": item.get("title"),
+                                 "snippet": item.get("snippet"), "date": item.get("date"), "position": index}
+                                for index, item in enumerate(provider_results, start=1)]
+            elif source_type == "images":
+                data["images"] = [{"title": item.get("title"), "imageUrl": item.get("imageUrl"),
+                                   "imageWidth": item.get("imageWidth"), "imageHeight": item.get("imageHeight"),
+                                   "url": item.get("url"), "position": index}
+                                  for index, item in enumerate(provider_results, start=1)]
+            else:
+                if pdf_category:
+                    provider_results = [item for item in provider_results if isinstance(item, dict)
+                                        and isinstance(item.get("url"), str)
+                                        and urlsplit(item["url"]).path.lower().endswith(".pdf")]
+                    if isinstance(body.get("limit", 10), int) and not isinstance(body.get("limit", 10), bool):
+                        provider_results = provider_results[:body.get("limit", 10)]
+                data["web"] = [{"url": item.get("url"), "title": item.get("title"),
+                                "description": item.get("snippet"), "position": index,
+                                **({"category": "pdf"} if pdf_category else {})}
+                               for index, item in enumerate(provider_results, start=1)]
+        if not data and source_errors:
+            return first_source_failure or error("Search provider request failed", "search_failed", 503)
         if scrape_options is not None:
             semaphore = asyncio.Semaphore(3)
 
@@ -811,8 +839,12 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 item.update(data)
                 return item
 
-            results = await asyncio.gather(*(scrape_result(item) for item in results))
-        reply = {"success": True, "data": {key: results}, "creditsUsed": total_credits}
+            for result_key in ("web", "news"):
+                if result_key in data:
+                    data[result_key] = await asyncio.gather(*(scrape_result(item) for item in data[result_key]))
+        reply = {"success": True, "data": data, "creditsUsed": total_credits}
+        if source_errors:
+            reply["sourceErrors"] = source_errors
         if origin:
             reply["warning"] = "Search SDK origin telemetry is accepted but not recorded by Apex."
         return web.json_response(reply)

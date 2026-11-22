@@ -565,6 +565,57 @@ async def test_v2_search_maps_brave_images_source(hosted, monkeypatch):
     }]
 
 
+async def test_v2_search_supports_multiple_sources_and_aggregates_credits(hosted, monkeypatch):
+    import rainbo_scrape.hosted_search as hosted_search
+
+    _, client, headers = await _auth(hosted)
+    monkeypatch.setenv("TAVILY_API_KEY", "fixture-search-key")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "tavily")
+    calls = []
+
+    async def fixture_search(query, count, include_domains=None, exclude_domains=None, topic="general"):
+        calls.append(topic)
+        if topic == "news":
+            return [{"url": "https://example.com/news", "title": "News", "snippet": "Current", "date": "today"}]
+        return [{"url": "https://example.com/page", "title": "Page", "snippet": "Web result"}]
+
+    monkeypatch.setattr(hosted_search, "tavily", fixture_search)
+    response = await client.post("/v2/search", headers=headers, json={
+        "query": "scraping API", "limit": 5, "sources": ["web", {"type": "news"}],
+    })
+    payload = await response.json()
+    assert response.status == 200 and payload["success"] is True
+    assert calls == ["general", "news"]
+    assert payload["data"]["web"][0]["description"] == "Web result"
+    assert payload["data"]["news"][0]["snippet"] == "Current"
+    assert payload["creditsUsed"] == 420
+
+    unsupported_mix = await client.post("/v2/search", headers=headers, json={
+        "query": "scraping API", "sources": ["web", "images"],
+    })
+    assert unsupported_mix.status == 400
+    assert calls == ["general", "news"]
+
+    async def partial_search(query, count, include_domains=None, exclude_domains=None, topic="general"):
+        if topic == "news":
+            raise RuntimeError("fixture news outage")
+        return [{"url": "https://example.com/page", "title": "Page", "snippet": "Web result"}]
+
+    monkeypatch.setattr(hosted_search, "tavily", partial_search)
+    partial = await client.post("/v2/search", headers=headers, json={
+        "query": "scraping API", "sources": ["web", "news"],
+    })
+    partial_payload = await partial.json()
+    assert partial.status == 200 and partial_payload["success"] is True
+    assert partial_payload["data"]["web"][0]["title"] == "Page"
+    assert partial_payload["sourceErrors"]["news"]["statusCode"] == 503
+
+    duplicate = await client.post("/v2/search", headers=headers, json={
+        "query": "scraping API", "sources": ["web", "web"],
+    })
+    assert duplicate.status == 400
+
+
 async def test_v2_search_scrape_options_scrapes_results_and_counts_page_credits(hosted, monkeypatch):
     import rainbo_scrape.hosted_search as hosted_search
 
