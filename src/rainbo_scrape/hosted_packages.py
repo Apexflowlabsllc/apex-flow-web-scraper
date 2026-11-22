@@ -31,7 +31,8 @@ PACKAGES = [
 
 def _more_packages():
     from .hosted_datapacks import PACKAGES as MORE
-    return MORE
+    from .hosted_jobs import PACKAGE as JOBS
+    return MORE + [JOBS]
 
 
 def _matches(wanted_city, wanted_state, name):
@@ -200,4 +201,6 @@ def install(h, app, loader=None):
     async def prices_for(region):
         return house_prices(await source(FHFA_METRO), region, 8)
     more = hosted_datapacks.install(h, app, prices_for, source)
+    from . import hosted_jobs
+    more.update(hosted_jobs.install(h, app, source))
     return {"/packages": listing_for, "/packages/housing": housing_for, "/packages/npr": npr_for, **more}

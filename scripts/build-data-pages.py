@@ -35,6 +35,19 @@ PAGES = [
          faq=[("Is this the same as Glassdoor salaries?", "No. Glassdoor collects reports from employees; this is a survey of about 1.1 million employers run by the U.S. Bureau of Labor Statistics. It covers every metro and is not limited by how many people posted."),
               ("How current is it?", "May 2024, the latest release. The government publishes a new year every spring and we update the table when it does."),
               ("What does it cost?", "One credit an answer. A list of possible metro names, when your question matches more than one, is free.")]),
+    dict(slug="company-jobs-api", title="Company jobs API: open roles from a company's own job board",
+         h1="Every open job at a company, <em>straight from its own board.</em>",
+         lede="LinkedIn and Indeed wall off their listings and forbid scraping. Most tech companies publish their open roles on a Greenhouse or Lever job board that is offered as a public feed for anyone to read, and the jobs package reads that feed: title, team, location, link, and pay where the company lists it.",
+         call=('curl https://webscraper.apexflowlabs.com/v1/packages/jobs \\\n  -H "Authorization: Bearer $APEX_SCRAPER_API_KEY" -H "Content-Type: application/json" \\\n  -d \'{"company":"stripe","query":"engineer","location":"New York"}\''),
+         sample={"company": "stripe", "board": "greenhouse", "open_jobs_total": 777, "jobs": [{"title": "Abuse Investigator", "location": "Seattle, San Francisco, New York City", "url": "https://stripe.com/jobs/search?gh_jid=8172510"}]},
+         sample_label="Part of the reply (real board, read 22 November 2026)",
+         rows=[("Open jobs", "Title, team, location and the company's own link", "The company's Greenhouse or Lever board"),
+               ("Pay", "Range and currency where the company publishes it (Lever boards often do)", "The company's board"),
+               ("Filters", "Words in the title and a location", "Applied by us; the full count is reported")],
+         endpoints="Endpoint: <code>/v1/packages/jobs</code> with <code>company</code> and optional <code>query</code>, <code>location</code>, <code>limit</code> (up to 100). MCP tool: <code>company_jobs</code>. Pair it with <a href=\"/glassdoor-salary-api.html\">the pay package</a> for what the job pays in that city.",
+         faq=[("Which companies work?", "Any company whose careers page runs on Greenhouse or Lever, which covers a large share of tech companies. Use the name in the board address, such as \"stripe\" in boards.greenhouse.io/stripe."),
+              ("Does it read LinkedIn or Indeed?", "No. Those sites forbid scraping. This reads the company's own public board, which is where those sites copy listings from."),
+              ("What does it cost?", "One credit when jobs come back. A name with no board, or a filter with no matches, costs nothing.")]),
 ]
 
 

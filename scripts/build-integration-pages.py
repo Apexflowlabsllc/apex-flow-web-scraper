@@ -25,6 +25,7 @@ TOOLS = [
     ("home_report", "House price trend, rent by bedroom count and mortgage rates for a US metro, in one answer."),
     ("rent_prices", "Monthly rent for a studio to a 4-bedroom in any US metro or county."),
     ("job_pay", "Pay for a job in a US metro: median, mean and 10th to 90th percentile."),
+    ("company_jobs", "A company's open jobs from its own public job board, with pay where published."),
     ("mortgage_rates", "This week's 30- and 15-year fixed mortgage rates."),
     ("npr_news", "Latest NPR headlines for a topic, with links."),
     ("track_store", "Snapshot a Shopify store's public catalog and report what changed."),

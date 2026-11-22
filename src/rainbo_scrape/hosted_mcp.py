@@ -152,6 +152,17 @@ async def job_pay(job: str, region: str, limit: int = 5):
 
 
 @mcp.tool()
+async def company_jobs(company: str, query: str | None = None, location: str | None = None, limit: int = 25):
+    """A company's open jobs from its own public job board on Greenhouse or Lever, for example company="stripe", query="engineer", location="New York": title, team, location, link and pay where published. One credit; nothing is charged when no board or no matching job is found."""
+    payload = {"company": company, "limit": limit}
+    if query:
+        payload["query"] = query
+    if location:
+        payload["location"] = location
+    return await request("/packages/jobs", payload)
+
+
+@mcp.tool()
 async def mortgage_rates():
     """This week's national average 30- and 15-year fixed mortgage rates, the rate a year ago and the last 8 weeks, from Freddie Mac's Primary Mortgage Market Survey. One credit."""
     return await request("/packages/mortgage-rates", {})
