@@ -39,12 +39,17 @@ async def local_search(query, count, include_domains=None, exclude_domains=None,
     fetch = {"brave": brave, "tavily": tavily, "exa": exa}.get(name)
     if fetch is None:
         raise ValueError("Configure exactly one local provider key (BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, or EXA_API_KEY); set APEX_SEARCH_PROVIDER when more than one is present.")
-    if topic not in ("general", "news"):
-        raise ValueError("topic must be 'general' or 'news'")
+    if topic not in ("general", "news", "images"):
+        raise ValueError("topic must be 'general', 'news', or 'images'")
+    if topic == "images" and name != "brave":
+        raise ValueError("Image search requires the configured Brave provider's dedicated image index")
     if topic == "news" and name == "brave":
         raise ValueError("The configured Brave provider does not expose a dedicated news source; use Tavily or Exa")
     include_domains, exclude_domains = normalize_domain_filters(include_domains, exclude_domains)
-    results = await fetch(query, count, include_domains, exclude_domains, topic) if topic == "news" else await fetch(query, count, include_domains, exclude_domains)
+    if topic == "images":
+        results = await brave_images(query, count, include_domains, exclude_domains)
+    else:
+        results = await fetch(query, count, include_domains, exclude_domains, topic) if topic == "news" else await fetch(query, count, include_domains, exclude_domains)
     if include_domains is not None or exclude_domains is not None:
         results = [item for item in results if _domain_allowed(item["url"], include_domains, exclude_domains)]
     return results[:count]
@@ -166,6 +171,44 @@ async def brave(query, count, include_domains=None, exclude_domains=None, topic=
     return _normalize(data.get("web", {}).get("results", []), "description", count)
 
 
+async def brave_images(query, count, include_domains=None, exclude_domains=None):
+    """Search Brave's dedicated image index; returns image and source-page URLs."""
+    headers = {"X-Subscription-Token": os.environ["BRAVE_SEARCH_API_KEY"], "Accept": "application/json"}
+    query = _brave_query(query, include_domains, exclude_domains)
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as client:
+        async with client.get("https://api.search.brave.com/res/v1/images/search",
+                              params={"q": query, "count": str(min(count, 200)), "safesearch": "strict"},
+                              headers=headers) as response:
+            if response.status != 200:
+                raise aiohttp.ClientError("search provider returned HTTP %s" % response.status)
+            data = await response.json()
+    normalized = []
+    for result in data.get("results", []):
+        if not isinstance(result, dict):
+            continue
+        properties = result.get("properties") if isinstance(result.get("properties"), dict) else {}
+        thumbnail = result.get("thumbnail") if isinstance(result.get("thumbnail"), dict) else {}
+        image_url = properties.get("url") or thumbnail.get("src")
+        page_url = result.get("url")
+        if not isinstance(image_url, str) or not isinstance(page_url, str):
+            continue
+        try:
+            image_parsed, page_parsed = urlsplit(image_url), urlsplit(page_url)
+        except ValueError:
+            continue
+        if image_parsed.scheme not in ("http", "https") or not image_parsed.hostname:
+            continue
+        if page_parsed.scheme not in ("http", "https") or not page_parsed.hostname:
+            continue
+        normalized.append({"title": result.get("title") or "", "imageUrl": image_url,
+                           "imageWidth": properties.get("width") or thumbnail.get("width"),
+                           "imageHeight": properties.get("height") or thumbnail.get("height"),
+                           "url": page_url})
+        if len(normalized) >= count:
+            break
+    return normalized
+
+
 async def tavily(query, count, include_domains=None, exclude_domains=None, topic="general"):
     headers = {"Authorization": "Bearer " + os.environ["TAVILY_API_KEY"], "Content-Type": "application/json"}
     payload = {"query": query, "topic": topic, "search_depth": "basic", "max_results": count,
@@ -233,13 +276,17 @@ async def search(query, count, options=None):
         raise aiohttp.ClientError("search provider is not configured unambiguously")
     options = options or {}
     topic = options.get("topic", "general")
-    if topic not in ("general", "news"):
-        raise ValueError("topic must be 'general' or 'news'")
+    if topic not in ("general", "news", "images"):
+        raise ValueError("topic must be 'general', 'news', or 'images'")
+    if topic == "images" and name != "brave":
+        raise ValueError("Image search requires the configured Brave provider's dedicated image index")
     if topic == "news" and name == "brave":
         raise ValueError("The configured Brave provider does not expose a dedicated news source; use Tavily or Exa")
     include_domains, exclude_domains = normalize_domain_filters(
         options.get("include_domains"), options.get("exclude_domains"))
-    if topic == "news":
+    if topic == "images":
+        results = await brave_images(query, count, include_domains, exclude_domains)
+    elif topic == "news":
         results = await fetch(query, count, include_domains, exclude_domains, topic)
     else:
         results = await fetch(query, count, include_domains, exclude_domains)
@@ -264,12 +311,14 @@ def install(h, app, provider=None):
             raise ValueError("limit must be 1–20")
         include_domains, exclude_domains = normalize_domain_filters(body.get("include_domains"), body.get("exclude_domains"))
         topic = body.get("topic", "general")
-        if topic not in ("general", "news"):
-            raise ValueError("topic must be 'general' or 'news'")
+        if topic not in ("general", "news", "images"):
+            raise ValueError("topic must be 'general', 'news', or 'images'")
         if topic == "news" and selected_provider == "brave":
             raise ValueError("The configured Brave provider does not expose a dedicated news source; use Tavily or Exa")
+        if topic == "images" and selected_provider != "brave":
+            raise ValueError("Image search requires the configured Brave provider's dedicated image index")
         search_options = {"include_domains": include_domains, "exclude_domains": exclude_domains}
-        if topic == "news":
+        if topic in ("news", "images"):
             search_options["topic"] = topic
         reserved = credit_reservation(selected_provider, limit)
         try:

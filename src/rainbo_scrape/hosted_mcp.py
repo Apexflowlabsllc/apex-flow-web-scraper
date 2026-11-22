@@ -163,8 +163,8 @@ async def crawl_status(job_id: str, offset: int = 0):
 
 @mcp.tool()
 async def web_search(query: str, limit: int = 10, include_domains: list[str] | None = None,
-                     exclude_domains: list[str] | None = None, topic: str = "general"):
-    """Search the web or news with optional mutually exclusive hostname filters. News requires a Tavily or Exa provider. Pass a result url to scrape_page to read it."""
+                     exclude_domains: list[str] | None = None, topic: Literal["general", "news", "images"] = "general"):
+    """Search web, news, or Brave's dedicated image index with optional mutually exclusive hostname filters. News requires Tavily or Exa; images require Brave. Pass a result URL to scrape_page to read its page."""
     payload = {"query": query, "limit": limit}
     if include_domains is not None:
         payload["include_domains"] = include_domains
@@ -176,7 +176,7 @@ async def web_search(query: str, limit: int = 10, include_domains: list[str] | N
 
 
 async def web_search_byok(query: str, limit: int = 10, include_domains: list[str] | None = None,
-                          exclude_domains: list[str] | None = None, topic: str = "general"):
+                          exclude_domains: list[str] | None = None, topic: Literal["general", "news", "images"] = "general"):
     """Search directly through the provider configured in this local MCP process. Requires your own provider key in its environment; provider bills you directly, and the key is never sent to Apex. Pass result URLs to scrape_page; scraping still uses Apex credits."""
     if not isinstance(query, str) or not 1 <= len(query) <= 300:
         raise ValueError("query must be 1–300 characters")

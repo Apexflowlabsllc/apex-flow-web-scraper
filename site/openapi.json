@@ -797,7 +797,7 @@
       "post": {
         "operationId": "searchPublicWeb",
         "summary": "Search the public web when the operator enables a provider",
-        "description": "Requires one service-level search provider: Brave Search, Tavily Search, or Exa Search. Returns 503 not_configured when none is configured or provider selection is ambiguous. Successful searches cost 130 credits with Brave, 210 with Tavily basic search, or 180 with Exa for up to 10 requested results plus 25 per requested result above 10. Successful empty results are billed; failed provider calls refund the reservation. Optional include_domains or exclude_domains filters accept 1–50 hostnames (mutually exclusive). topic=news is supported with Tavily or Exa; Brave does not provide a dedicated news source.",
+        "description": "Requires one service-level search provider: Brave Search, Tavily Search, or Exa Search. Returns 503 not_configured when none is configured or provider selection is ambiguous. Successful searches cost 130 credits with Brave, 210 with Tavily basic search, or 180 with Exa for up to 10 requested results plus 25 per requested result above 10. Successful empty results are billed; failed provider calls refund the reservation. Optional include_domains or exclude_domains filters accept 1–50 hostnames (mutually exclusive). topic=news is supported with Tavily or Exa; topic=images uses Brave's dedicated image index with strict SafeSearch; those topics require a matching configured provider.",
         "requestBody": {
           "required": true,
           "content": {
@@ -819,9 +819,9 @@
                   },
                   "topic": {
                     "type": "string",
-                    "enum": ["general", "news"],
+                    "enum": ["general", "news", "images"],
                     "default": "general",
-                    "description": "Select general web results or a dedicated news source. News requires Tavily or Exa; Brave is general-web only."
+                    "description": "Select general web results, dedicated news, or dedicated image search. News requires Tavily or Exa; images require Brave and use strict SafeSearch."
                   },
                   "include_domains": {
                     "type": "array",
@@ -846,7 +846,7 @@
         },
         "responses": {
           "200": {
-            "description": "Search results. Empty result sets use no credits.",
+            "description": "Search results. Successful empty results are billed as provider calls; failed provider calls refund the reservation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -872,6 +872,19 @@
                           },
                           "snippet": {
                             "type": "string"
+                          },
+                          "imageUrl": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "Direct image URL for topic=images."
+                          },
+                          "imageWidth": {
+                            "type": ["integer", "null"],
+                            "description": "Image width when supplied by the index."
+                          },
+                          "imageHeight": {
+                            "type": ["integer", "null"],
+                            "description": "Image height when supplied by the index."
                           }
                         }
                       }
@@ -2663,8 +2676,8 @@
     "/v2/search": {
       "post": {
         "operationId": "firecrawlCompatSearch",
-        "summary": "Firecrawl-compatible web and news search",
-        "description": "Requires an operator-configured web search provider. Supports query, limit, one source per request: web or news (string and {type:...} forms), and mutually exclusive includeDomains/excludeDomains arrays of 1–50 hostnames. News uses Tavily or Exa; Brave has no dedicated news source. Returns Firecrawl-shaped results with position. Firecrawl SDK origin telemetry is accepted but not recorded. Does not call Apex saved-page search.",
+        "summary": "Firecrawl-compatible web, news, and image search",
+        "description": "Requires an operator-configured web search provider. Supports query, limit, one source per request: web, news, or images (string and {type:...} forms), and mutually exclusive includeDomains/excludeDomains arrays of 1–50 hostnames. News uses Tavily or Exa; images use Brave's dedicated index with strict SafeSearch. Returns Firecrawl-shaped results with position. Firecrawl SDK origin telemetry is accepted but not recorded. Does not call Apex saved-page search.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -2717,8 +2730,8 @@
                     "maxItems": 1,
                     "items": {
                       "oneOf": [
-                        {"type": "string", "enum": ["web", "news"]},
-                        {"type": "object", "required": ["type"], "properties": {"type": {"type": "string", "enum": ["web", "news"]}}, "additionalProperties": false}
+                        {"type": "string", "enum": ["web", "news", "images"]},
+                        {"type": "object", "required": ["type"], "properties": {"type": {"type": "string", "enum": ["web", "news", "images"]}}, "additionalProperties": false}
                       ]
                     }
                   },

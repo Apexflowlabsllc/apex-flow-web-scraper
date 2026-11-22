@@ -678,10 +678,10 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 elif isinstance(source, dict) and set(source) == {"type"}:
                     source_types.append(source["type"])
                 else:
-                    return error("sources must contain 'web' or 'news' (string or {type: ...})")
-        if len(source_types) != 1 or source_types[0] not in ("web", "news"):
-            return error("This adapter supports one Firecrawl source per request: web or news")
-        topic = "news" if source_types[0] == "news" else "general"
+                    return error("sources must contain 'web', 'news', or 'images' (string or {type: ...})")
+        if len(source_types) != 1 or source_types[0] not in ("web", "news", "images"):
+            return error("This adapter supports one Firecrawl source per request: web, news, or images")
+        topic = source_types[0] if source_types[0] in ("news", "images") else "general"
         origin = body.get("origin")
         if origin is not None and (not isinstance(origin, str) or len(origin) > 200):
             return error("origin must be a string no longer than 200 characters")
@@ -691,8 +691,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         except ValueError as exc:
             return error(str(exc), code="invalid_search_filter")
         request_body = {key: body[key] for key in ("query", "limit") if key in body}
-        if topic == "news":
-            request_body["topic"] = "news"
+        if topic in ("news", "images"):
+            request_body["topic"] = topic
         if include_domains is not None:
             request_body["include_domains"] = include_domains
         if exclude_domains is not None:
@@ -702,10 +702,15 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         failure = forwarded(response, payload)
         if failure:
             return failure
-        key = "news" if topic == "news" else "web"
+        key = "news" if topic == "news" else "images" if topic == "images" else "web"
         if topic == "news":
             results = [{"url": item.get("url"), "title": item.get("title"),
                         "snippet": item.get("snippet"), "date": item.get("date"), "position": index}
+                       for index, item in enumerate(payload.get("results", []), start=1)]
+        elif topic == "images":
+            results = [{"title": item.get("title"), "imageUrl": item.get("imageUrl"),
+                        "imageWidth": item.get("imageWidth"), "imageHeight": item.get("imageHeight"),
+                        "url": item.get("url"), "position": index}
                        for index, item in enumerate(payload.get("results", []), start=1)]
         else:
             results = [{"url": item.get("url"), "title": item.get("title"),

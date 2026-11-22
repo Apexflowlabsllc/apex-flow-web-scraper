@@ -145,3 +145,24 @@ test("BYOK Tavily and Exa requests use direct vendor contracts", async () => {
     assert.deepEqual(Object.keys(request.options.headers).sort(), ["Content-Type", expectedHeader].sort());
   }
 });
+
+test("BYOK Brave image search uses the image index and returns source metadata", async () => {
+  const env = { BRAVE_SEARCH_API_KEY: "local-secret" };
+  let request;
+  const result = await localByokSearch("apex logo", 2, {
+    env,
+    fetchImpl: async (url, options) => {
+      request = { url: String(url), options };
+      return { ok: true, json: async () => ({ results: [{
+        title: "Apex logo", url: "https://example.com/about",
+        properties: { url: "https://cdn.example.com/logo.png", width: 640, height: 320 },
+      }] }) };
+    },
+  }, { topic: "images", includeDomains: ["example.com"] });
+  assert.match(request.url, /^https:\/\/api\.search\.brave\.com\/res\/v1\/images\/search\?/);
+  assert.match(request.url, /safesearch=strict/);
+  assert.equal(request.options.headers["X-Subscription-Token"], "local-secret");
+  assert.deepEqual(result.results, [{ title: "Apex logo", imageUrl: "https://cdn.example.com/logo.png",
+    imageWidth: 640, imageHeight: 320, url: "https://example.com/about" }]);
+  await assert.rejects(localByokSearch("apex", 2, { env: { TAVILY_API_KEY: "t" }, fetchImpl: async () => {} }, { topic: "images" }), /requires the configured Brave provider/);
+});

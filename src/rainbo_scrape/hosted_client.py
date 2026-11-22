@@ -102,8 +102,10 @@ class Apex:
         """Search pages this account has already scraped. Free."""
         return self._call("POST", "/search", {"query": query, "limit": limit})
 
-    def web_search(self, query, limit=10, include_domains=None, exclude_domains=None):
+    def web_search(self, query, limit=10, include_domains=None, exclude_domains=None, topic="general"):
         payload = {"query": query, "limit": limit}
+        if topic != "general":
+            payload["topic"] = topic
         if include_domains is not None:
             payload["include_domains"] = include_domains
         if exclude_domains is not None:

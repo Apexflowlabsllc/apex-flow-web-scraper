@@ -538,6 +538,33 @@ async def test_v2_search_domain_filters_match_firecrawl_request_and_response(hos
     assert calls[-1] == ("scraping API", 10, None, None, "news")
 
 
+async def test_v2_search_maps_brave_images_source(hosted, monkeypatch):
+    import rainbo_scrape.hosted_search as hosted_search
+
+    _, client, headers = await _auth(hosted)
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "fixture-image-key")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "brave")
+    calls = []
+
+    async def fixture_images(query, count, include_domains=None, exclude_domains=None):
+        calls.append((query, count, include_domains, exclude_domains))
+        return [{"title": "Apex logo", "imageUrl": "https://cdn.example.com/logo.png",
+                 "imageWidth": 640, "imageHeight": 320, "url": "https://example.com/about"}]
+
+    monkeypatch.setattr(hosted_search, "brave_images", fixture_images)
+    response = await client.post("/v2/search", headers=headers, json={
+        "query": "Apex logo", "limit": 3, "sources": [{"type": "images"}],
+        "includeDomains": ["example.com"],
+    })
+    payload = await response.json()
+    assert response.status == 200 and payload["success"] is True
+    assert calls == [("Apex logo", 3, ["example.com"], None)]
+    assert payload["data"]["images"] == [{
+        "title": "Apex logo", "imageUrl": "https://cdn.example.com/logo.png",
+        "imageWidth": 640, "imageHeight": 320, "url": "https://example.com/about", "position": 1,
+    }]
+
+
 async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hosted, monkeypatch):
     import rainbo_scrape.hosted_search as hosted_search
     Firecrawl = pytest.importorskip("firecrawl").Firecrawl

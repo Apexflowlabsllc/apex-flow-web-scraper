@@ -124,6 +124,43 @@ async def test_failed_invoice_does_not_grant_new_period(hosted):
     assert not h.entitled(a) and h.billing.remaining(a)==109990
 
 
+async def test_brave_image_search_uses_dedicated_endpoint_and_normalizes_results(monkeypatch):
+    from rainbo_scrape import hosted_search
+
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "fixture-key")
+    calls = []
+
+    class Response:
+        status = 200
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return None
+        async def json(self):
+            return {"results": [
+                {"title": "A red fox", "url": "https://photos.example.com/fox",
+                 "properties": {"url": "https://cdn.example.com/fox.jpg", "width": 1200, "height": 800}},
+                {"title": "Unsafe URL", "url": "javascript:alert(1)",
+                 "properties": {"url": "https://cdn.example.com/bad.jpg"}},
+            ]}
+
+    class Session:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return None
+        def get(self, url, *, params, headers):
+            calls.append((url, params, headers))
+            return Response()
+
+    monkeypatch.setattr(hosted_search.aiohttp, "ClientSession", Session)
+    results = await hosted_search.brave_images("red fox", 5, ["example.com"], None)
+    assert calls[0][0] == "https://api.search.brave.com/res/v1/images/search"
+    assert "site:example.com" in calls[0][1]["q"]
+    assert calls[0][1]["safesearch"] == "strict"
+    assert calls[0][2]["X-Subscription-Token"] == "fixture-key"
+    assert results == [{"title": "A red fox", "imageUrl": "https://cdn.example.com/fox.jpg",
+                        "imageWidth": 1200, "imageHeight": 800,
+                        "url": "https://photos.example.com/fox"}]
+
+
 async def test_webhook_signature_rejects_forgery_and_accepts_signed_event(hosted):
     h,c,s,_,_,_=hosted
     raw=json.dumps({"type":"checkout.session.completed","data":{"object":s}}).encode()
