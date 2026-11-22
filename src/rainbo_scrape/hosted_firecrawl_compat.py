@@ -526,6 +526,23 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             reply["warning"] = payload["note"]
         return web.json_response(reply)
 
+    async def crawl_active(request):
+        rows = hosted.db.execute(
+            "SELECT id,url,page_limit,created,done,failed,credits,options FROM crawl_jobs "
+            "WHERE account=? AND status='running' ORDER BY created DESC LIMIT 100",
+            (request["account"],)).fetchall()
+        crawls = []
+        for ident, url, limit, created, done, failed, credits, raw_options in rows:
+            options = json.loads(raw_options or "{}")
+            formats = options.get("outputs") or ["markdown"]
+            formats = [{"type": "rawHtml" if item == "raw_html" else item} for item in formats]
+            crawls.append({"id": ident, "url": url, "status": "scraping",
+                           "createdAt": datetime.fromtimestamp(created, timezone.utc).isoformat().replace("+00:00", "Z"),
+                           "completed": done, "failed": failed, "total": limit, "creditsUsed": credits,
+                           "options": {"limit": limit,
+                                       "scrapeOptions": {"formats": formats, "onlyMainContent": True}}})
+        return web.json_response({"success": True, "crawls": crawls})
+
     async def crawl_cancel(request):
         response = await crawl_cancel_for(request["account"], {"id": request.match_info["job"]})
         payload = unpack(response)
@@ -810,6 +827,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
     app.router.add_post("/v2/map", wrap(map_route))
     app.router.add_post("/v2/search", wrap(search))
     app.router.add_post("/v2/crawl", wrap(crawl))
+    app.router.add_get("/v2/crawl/active", wrap(crawl_active))
     app.router.add_get("/v2/crawl/{job}", wrap(crawl_status))
     app.router.add_delete("/v2/crawl/{job}", wrap(crawl_cancel))
     app.router.add_get("/v2/crawl/{job}/errors", wrap(crawl_errors))

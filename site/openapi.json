@@ -2629,6 +2629,15 @@
         "responses": {"200": {"description": "Session destroyed"}, "404": {"description": "Session is not owned by this account"}}
       }
     },
+    "/v2/crawl/active": {
+      "get": {
+        "operationId": "firecrawlCompatListActiveCrawls",
+        "summary": "List active account crawls",
+        "description": "Lists up to 100 running crawl jobs owned by the authenticated account. This endpoint is read-only and does not consume credits.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "responses": {"200": {"description": "Active crawls owned by this API account", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
     "/v2/crawl": {
       "post": {
         "operationId": "firecrawlCompatStartCrawl",

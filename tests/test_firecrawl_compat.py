@@ -1,6 +1,7 @@
 import asyncio
 import io
 import json
+import time
 from aiohttp import FormData
 from pypdf import PdfWriter
 
@@ -124,6 +125,29 @@ async def test_v2_parse_refunds_credit_when_document_parser_fails(hosted, monkey
     assert response.status == 400
     assert payload["code"] == "pdf_invalid"
     assert h.billing.remaining(account) == 110000
+
+
+async def test_v2_active_crawls_lists_only_current_accounts_running_jobs(hosted):
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    other = h.billing.create_account("other-crawl@example.com")
+    created = time.time()
+    h.db.execute("INSERT INTO crawl_jobs(id,account,url,status,page_limit,created,options,done,failed,credits) "
+                 "VALUES(?,?,?,'running',?,?,?,?,?,?)",
+                 ("crawl_owned", account, "https://example.com/", 25, created,
+                  json.dumps({"outputs": ["markdown", "raw_html"]}), 3, 1, 4))
+    h.db.execute("INSERT INTO crawl_jobs(id,account,url,status,page_limit,created,options) "
+                 "VALUES(?,?,?,'running',?,?,?)",
+                 ("crawl_other", other, "https://private.example/", 10, created, "{}"))
+    response = await client.get("/v2/crawl/active", headers=headers)
+    payload = await response.json()
+    assert response.status == 200
+    assert payload["success"] is True
+    assert [crawl["id"] for crawl in payload["crawls"]] == ["crawl_owned"]
+    assert payload["crawls"][0]["completed"] == 3
+    assert payload["crawls"][0]["failed"] == 1
+    assert payload["crawls"][0]["options"]["scrapeOptions"]["formats"] == [
+        {"type": "markdown"}, {"type": "rawHtml"}]
 
 
 async def test_v2_json_format_maps_schema_prompt_and_paid_metering(hosted, monkeypatch):
