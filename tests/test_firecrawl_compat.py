@@ -732,6 +732,7 @@ async def test_v2_search_research_category_uses_academic_domains_and_combines_pd
 async def test_firecrawl_research_paper_search_and_read_use_cached_crossref_metadata(hosted, monkeypatch):
     import rainbo_scrape.hosted_research as hosted_research
 
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
     h, client, headers = await _auth(hosted)
     calls = []
 
@@ -790,6 +791,7 @@ async def test_firecrawl_research_paper_search_and_read_use_cached_crossref_meta
 async def test_firecrawl_research_provider_failures_refund_reserved_credits(hosted, monkeypatch):
     import rainbo_scrape.hosted_research as hosted_research
 
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
     h, client, headers = await _auth(hosted)
     account = h.billing.account_for(headers["Authorization"][7:])
     before = h.billing.remaining(account)
@@ -804,6 +806,110 @@ async def test_firecrawl_research_provider_failures_refund_reserved_credits(host
     assert payload["code"] == "research_provider_unavailable"
     assert response.headers["Retry-After"] == "2"
     assert h.billing.remaining(account) == before
+
+
+async def test_openalex_research_rate_limit_refunds_reserved_credits(hosted, monkeypatch):
+    import rainbo_scrape.hosted_research as hosted_research
+
+    monkeypatch.setenv("OPENALEX_API_KEY", "fixture-key")
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    before = h.billing.remaining(account)
+
+    async def limited_openalex(*args, **kwargs):
+        raise hosted_research.ResearchProviderError(429)
+
+    async def limited_crossref(*args, **kwargs):
+        raise hosted_research.ResearchProviderError(429)
+
+    monkeypatch.setattr(hosted_research, "_fetch_openalex", limited_openalex)
+    monkeypatch.setattr(hosted_research, "_fetch_crossref", limited_crossref)
+    response = await client.get("/v2/search/research/papers?query=rate%20limit", headers=headers)
+    payload = await response.json()
+    assert response.status == 503
+    assert payload["code"] == "research_provider_unavailable"
+    assert response.headers["Retry-After"] == "2"
+    assert h.billing.remaining(account) == before
+
+
+async def test_openalex_research_falls_back_to_crossref(hosted, monkeypatch):
+    import rainbo_scrape.hosted_research as hosted_research
+
+    monkeypatch.setenv("OPENALEX_API_KEY", "fixture-key")
+    h, client, headers = await _auth(hosted)
+
+    async def unavailable_openalex(*args, **kwargs):
+        raise hosted_research.ResearchProviderError(429)
+
+    async def fallback_crossref(hosted_service, params, doi=None):
+        assert params["query.bibliographic"] == "web crawling"
+        return {"items": [{
+            "DOI": "10.5555/fallback", "title": ["Fallback result"],
+            "author": [{"given": "Alex", "family": "Author"}],
+            "created": {"date-parts": [[2025, 1, 1]]}, "subject": ["Web Science"],
+        }]}
+
+    monkeypatch.setattr(hosted_research, "_fetch_openalex", unavailable_openalex)
+    monkeypatch.setattr(hosted_research, "_fetch_crossref", fallback_crossref)
+    response = await client.get("/v2/search/research/papers?query=web%20crawling", headers=headers)
+    payload = await response.json()
+    assert response.status == 200
+    assert payload["results"][0]["provider"] == "Crossref"
+    assert payload["results"][0]["paperId"] == "10.5555/fallback"
+
+
+async def test_openalex_research_search_and_read_include_citation_graph_metadata(hosted, monkeypatch):
+    import rainbo_scrape.hosted_research as hosted_research
+
+    monkeypatch.setenv("OPENALEX_API_KEY", "fixture-key")
+    h, client, headers = await _auth(hosted)
+    calls = []
+    work = {
+        "id": "https://openalex.org/W1234567890",
+        "doi": "https://doi.org/10.5555/openalex",
+        "title": "Open research paper",
+        "authorships": [{"author": {"display_name": "Alex Researcher"}}],
+        "created_date": "2024-01-02T00:00:00Z",
+        "updated_date": "2024-04-05T00:00:00Z",
+        "publication_date": "2023-12-01",
+        "topics": [{"display_name": "Web Science"}],
+        "cited_by_count": 42,
+        "referenced_works": ["https://openalex.org/W1", "https://openalex.org/W2"],
+        "related_works": ["https://openalex.org/W3"],
+        "relevance_score": 0.91,
+        "is_retracted": False,
+    }
+
+    async def fixture_openalex(hosted_service, params):
+        calls.append(dict(params))
+        return {"results": [work], "meta": {"next_cursor": None}}
+
+    monkeypatch.setattr(hosted_research, "_fetch_openalex", fixture_openalex)
+    url = "/v2/search/research/papers?query=web%20science&k=5&authors=Alex&categories=Web%20Science&from=2023-01-01&sort=date_desc"
+    response = await client.get(url, headers=headers)
+    payload = await response.json()
+    assert response.status == 200 and payload["success"] is True
+    assert payload["creditsUsed"] == 130 and len(payload["results"]) == 1
+    paper = payload["results"][0]
+    assert paper["provider"] == "OpenAlex"
+    assert paper["paperId"] == "10.5555/openalex"
+    assert paper["openAlexId"] == "https://openalex.org/W1234567890"
+    assert paper["citedByCount"] == 42 and paper["referenceCount"] == 2
+    assert paper["referenceIds"] == ["https://openalex.org/W1", "https://openalex.org/W2"]
+    assert paper["relatedWorks"] == ["https://openalex.org/W3"]
+    assert paper["isRetracted"] is False and "abstract" not in paper
+    assert calls[0]["search"] == "web science"
+    assert calls[0]["per_page"] == 100
+    assert calls[0]["filter"] == "from_publication_date:2023-01-01"
+    assert calls[0]["sort"] == "publication_date:desc"
+
+    cached = await client.get(url, headers=headers)
+    assert (await cached.json())["results"] == payload["results"]
+    assert len(calls) == 1
+    lookup = await client.get("/v2/search/research/papers/10.5555%2Fopenalex", headers=headers)
+    lookup_payload = await lookup.json()
+    assert lookup.status == 200 and lookup_payload["paper"]["provider"] == "OpenAlex"
+    assert calls[-1]["filter"] == "doi:https://doi.org/10.5555/openalex"
 
 
 async def test_current_langchain_mcp_client_discovers_and_calls_hosted_scraper(hosted):

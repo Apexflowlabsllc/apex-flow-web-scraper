@@ -1,4 +1,4 @@
-"""Hosted research-paper search backed by public Crossref metadata."""
+"""Hosted research-paper search backed by public scholarly metadata."""
 import asyncio
 import hashlib
 import json
@@ -14,6 +14,7 @@ from aiohttp import web
 from .billing import QuotaExceeded, cost_of
 
 _CROSSREF_ROOT = "https://api.crossref.org/works"
+_OPENALEX_ROOT = "https://api.openalex.org/works"
 _CROSSREF_MAILTO = "apexflowlabs@gmail.com"
 _CACHE_TTL = 3600
 _MAX_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -76,6 +77,56 @@ def _paper(work, score=False):
     return {key: value for key, value in result.items() if value is not None}
 
 
+def _openalex_paper(work):
+    doi_url = work.get("doi")
+    if not isinstance(doi_url, str):
+        return None
+    match = re.fullmatch(r"https?://doi\.org/(10\.\d{4,9}/\S+)", doi_url, re.I)
+    if not match:
+        return None
+    doi = match.group(1).lower()
+    title = work.get("title")
+    if not isinstance(title, str) or not title.strip():
+        return None
+    authors = []
+    for authorship in work.get("authorships") or []:
+        author = authorship.get("author") if isinstance(authorship, dict) else None
+        name = author.get("display_name") if isinstance(author, dict) else None
+        if isinstance(name, str) and name.strip():
+            authors.append(name.strip())
+    topics = [topic.get("display_name") for topic in work.get("topics") or []
+              if isinstance(topic, dict) and isinstance(topic.get("display_name"), str)]
+    openalex_id = work.get("id")
+    if not isinstance(openalex_id, str) or not re.fullmatch(r"https://openalex\.org/W\d+", openalex_id):
+        return None
+    references = [value for value in (work.get("referenced_works") or [])[:100]
+                  if isinstance(value, str) and re.fullmatch(r"https://openalex\.org/W\d+", value)]
+    related = [value for value in (work.get("related_works") or [])[:20]
+               if isinstance(value, str) and re.fullmatch(r"https://openalex\.org/W\d+", value)]
+    result = {
+        "paperId": doi,
+        "primaryId": "doi:" + doi,
+        "ids": {"doi": [doi], "openalex": [openalex_id.rsplit("/", 1)[-1]]},
+        "openAlexId": openalex_id,
+        "title": title.strip(),
+        "authors": authors,
+        "createdDate": work.get("created_date"),
+        "updateDate": work.get("updated_date"),
+        "publicationDate": work.get("publication_date"),
+        "categories": topics,
+        "url": "https://doi.org/" + doi,
+        "provider": "OpenAlex",
+        "citedByCount": work.get("cited_by_count"),
+        "referenceCount": len(work.get("referenced_works") or []),
+        "referenceIds": references,
+        "relatedWorks": related,
+        "isRetracted": work.get("is_retracted"),
+    }
+    if isinstance(work.get("relevance_score"), (int, float)) and not isinstance(work.get("relevance_score"), bool):
+        result["score"] = work["relevance_score"]
+    return {key: value for key, value in result.items() if value is not None}
+
+
 def _filter_values(query, name):
     values = []
     for raw in query.getall(name, []):
@@ -92,7 +143,7 @@ def _match_paper(paper, authors, categories, start, end):
         return False
     if any(not any(wanted.casefold() in name for name in paper_categories) for wanted in categories):
         return False
-    created = paper.get("createdDate")
+    created = paper.get("publicationDate") or paper.get("createdDate")
     if start and (not created or created[:10] < start):
         return False
     if end and (not created or created[:10] > end):
@@ -139,6 +190,94 @@ async def _fetch_crossref(hosted, params, doi=None):
         raise ResearchProviderError(502) from exc
 
 
+async def _fetch_openalex(hosted, params):
+    db = hosted.db
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        row = db.execute("SELECT next_allowed FROM research_provider_state WHERE provider='openalex'").fetchone()
+        now = time.time()
+        slot = max(now, float(row[0]) if row else now)
+        db.execute("INSERT INTO research_provider_state(provider,next_allowed) VALUES('openalex',?) "
+                   "ON CONFLICT(provider) DO UPDATE SET next_allowed=excluded.next_allowed", (slot + 1.05,))
+        db.execute("COMMIT")
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
+    await asyncio.sleep(max(0, slot - now))
+    query = dict(params)
+    query["api_key"] = os.environ["OPENALEX_API_KEY"].strip()
+    timeout = aiohttp.ClientTimeout(total=20)
+    async with aiohttp.ClientSession(timeout=timeout,
+                                     headers={"User-Agent": "ApexFlowWebScraper/1.0 (https://webscraper.apexflowlabs.com)"}) as session:
+        async with session.get(_OPENALEX_ROOT, params=query, allow_redirects=False) as response:
+            if response.status != 200:
+                raise ResearchProviderError(response.status)
+            chunks, size = [], 0
+            async for chunk in response.content.iter_chunked(65536):
+                size += len(chunk)
+                if size > _MAX_RESPONSE_BYTES:
+                    raise ResearchProviderError(502)
+                chunks.append(chunk)
+    try:
+        payload = json.loads(b"".join(chunks).decode("utf-8"))
+        if not isinstance(payload, dict) or not isinstance(payload.get("results"), list):
+            raise ValueError("OpenAlex response has no results array")
+        return payload
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        raise ResearchProviderError(502) from exc
+
+
+async def _search_openalex(hosted, query, k, start, end, sort):
+    params = {
+        "search": query,
+        "per_page": 100,
+        "cursor": "*",
+        "select": "id,doi,title,authorships,created_date,updated_date,publication_date,topics,cited_by_count,referenced_works,related_works,relevance_score,is_retracted",
+    }
+    if sort == "date_desc":
+        params["sort"] = "publication_date:desc"
+    filters = []
+    if start:
+        filters.append("from_publication_date:" + start)
+    if end:
+        filters.append("to_publication_date:" + end)
+    if filters:
+        params["filter"] = ",".join(filters)
+    papers = []
+    for _ in range(max(1, (k + 99) // 100)):
+        payload = await _fetch_openalex(hosted, params)
+        papers.extend(paper for work in payload["results"] if isinstance(work, dict)
+                      for paper in [_openalex_paper(work)] if paper)
+        if len(papers) >= k or not payload.get("meta", {}).get("next_cursor"):
+            break
+        params["cursor"] = payload["meta"]["next_cursor"]
+    return papers[:k]
+
+
+async def _search_crossref(hosted, query, k, start, end, sort):
+    params = {
+        "query.bibliographic": query,
+        "rows": min(1000, max(k, k * 3)),
+        "select": "DOI,title,author,created,updated,indexed,score,subject",
+        "sort": "created" if sort == "date_desc" else "score",
+        "order": "desc",
+    }
+    date_filters = []
+    if start:
+        date_filters.append("from-created-date:" + start)
+    if end:
+        date_filters.append("until-created-date:" + end)
+    if date_filters:
+        params["filter"] = ",".join(date_filters)
+    message = await _fetch_crossref(hosted, params)
+    items = message.get("items", []) if isinstance(message, dict) else []
+    papers = [paper for work in items if isinstance(work, dict)
+              for paper in [_paper(work, score=True)] if paper]
+    if sort == "date_desc":
+        papers.sort(key=lambda paper: (paper.get("createdDate") or "", paper["paperId"]), reverse=True)
+    return papers[:k]
+
+
 def install(app, hosted, wrap, error):
     hosted.db.executescript("""
         CREATE TABLE IF NOT EXISTS research_paper_cache(
@@ -175,8 +314,9 @@ def install(app, hosted, wrap, error):
         if sort not in ("relevance", "date_desc"):
             return error("sort must be relevance or date_desc")
 
+        provider = "OpenAlex" if os.environ.get("OPENALEX_API_KEY", "").strip() else "Crossref"
         filters = {"query": query, "k": k, "authors": authors, "categories": categories,
-                   "from": start, "to": end, "sort": sort}
+                   "from": start, "to": end, "sort": sort, "provider": provider}
         cache_key = hashlib.sha256(json.dumps(filters, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         row = hosted.db.execute("SELECT payload FROM research_paper_cache WHERE cache_key=? AND expires>?",
                                 (cache_key, time.time())).fetchone()
@@ -187,27 +327,16 @@ def install(app, hosted, wrap, error):
         try:
             if row:
                 papers = json.loads(row[0])
+            elif provider == "OpenAlex":
+                try:
+                    papers = await _search_openalex(hosted, query, k, start, end, sort)
+                except (ResearchProviderError, aiohttp.ClientError, asyncio.TimeoutError, OSError):
+                    papers = await _search_crossref(hosted, query, k, start, end, sort)
+                if not papers:
+                    papers = await _search_crossref(hosted, query, k, start, end, sort)
             else:
-                provider_params = {
-                    "query.bibliographic": query,
-                    "rows": min(1000, max(k, k * 3)),
-                    "select": "DOI,title,author,created,updated,indexed,score,subject",
-                    "sort": "created" if sort == "date_desc" else "score",
-                    "order": "desc",
-                }
-                range_filters = []
-                if start:
-                    range_filters.append("from-created-date:" + start)
-                if end:
-                    range_filters.append("until-created-date:" + end)
-                if range_filters:
-                    provider_params["filter"] = ",".join(range_filters)
-                message = await _fetch_crossref(hosted, provider_params)
-                items = message.get("items", []) if isinstance(message, dict) else []
-                papers = [paper for work in items if isinstance(work, dict)
-                          for paper in [_paper(work, score=True)] if paper]
-                if sort == "date_desc":
-                    papers.sort(key=lambda paper: (paper.get("createdDate") or "", paper["paperId"]), reverse=True)
+                papers = await _search_crossref(hosted, query, k, start, end, sort)
+            if not row:
                 hosted.db.execute("DELETE FROM research_paper_cache WHERE expires<=?", (time.time(),))
                 hosted.db.execute("INSERT OR REPLACE INTO research_paper_cache(cache_key,payload,expires) VALUES(?,?,?)",
                                   (cache_key, json.dumps(papers, separators=(",", ":")), time.time() + _CACHE_TTL))
@@ -234,9 +363,10 @@ def install(app, hosted, wrap, error):
         if paper_id.lower().startswith("doi:"):
             paper_id = paper_id[4:]
         if not _DOI_RE.fullmatch(paper_id):
-            return error("paper_id must be a DOI returned by the Crossref research search endpoint")
+            return error("paper_id must be a DOI returned by the research paper search endpoint")
         paper_id = paper_id.lower()
-        cache_key = hashlib.sha256(("doi:" + paper_id).encode()).hexdigest()
+        provider = "OpenAlex" if os.environ.get("OPENALEX_API_KEY", "").strip() else "Crossref"
+        cache_key = hashlib.sha256((provider + ":doi:" + paper_id).encode()).hexdigest()
         row = hosted.db.execute("SELECT payload FROM research_paper_cache WHERE cache_key=? AND expires>?",
                                 (cache_key, time.time())).fetchone()
         try:
@@ -246,8 +376,24 @@ def install(app, hosted, wrap, error):
         try:
             paper = json.loads(row[0]) if row else None
             if paper is None:
-                work = await _fetch_crossref(hosted, {"select": "DOI,title,author,created,updated,indexed,subject"}, paper_id)
-                paper = _paper(work if isinstance(work, dict) else {})
+                if provider == "OpenAlex":
+                    try:
+                        payload = await _fetch_openalex(hosted, {
+                            "filter": "doi:https://doi.org/" + paper_id,
+                            "per_page": 1,
+                            "select": "id,doi,title,authorships,created_date,updated_date,publication_date,topics,cited_by_count,referenced_works,related_works,relevance_score,is_retracted",
+                        })
+                        work = payload["results"][0] if payload["results"] else {}
+                        paper = _openalex_paper(work if isinstance(work, dict) else {})
+                    except (ResearchProviderError, aiohttp.ClientError, asyncio.TimeoutError, OSError):
+                        paper = None
+                    if paper is None:
+                        work = await _fetch_crossref(
+                            hosted, {"select": "DOI,title,author,created,updated,indexed,subject"}, paper_id)
+                        paper = _paper(work if isinstance(work, dict) else {})
+                else:
+                    work = await _fetch_crossref(hosted, {"select": "DOI,title,author,created,updated,indexed,subject"}, paper_id)
+                    paper = _paper(work if isinstance(work, dict) else {})
                 if paper is None:
                     raise ResearchProviderError(404)
                 hosted.db.execute("INSERT OR REPLACE INTO research_paper_cache(cache_key,payload,expires) VALUES(?,?,?)",

@@ -4247,7 +4247,7 @@
       "get": {
         "operationId": "firecrawlResearchPaperSearch",
         "summary": "Search scholarly metadata",
-        "description": "Searches Crossref's public scholarly metadata API. Returns DOI identifiers, titles, authors, dates, subject categories, and source links; abstracts are omitted because some are subject to publisher or author copyright. Results are cached for one hour. Each request costs 130 Apex credits. This is a DOI-metadata search, not a complete citation graph or proprietary research index.",
+        "description": "Searches public scholarly metadata. Crossref is the default source. When OPENALEX_API_KEY is configured, OpenAlex is tried first; provider errors or empty DOI results fall back to Crossref and each result identifies its source and results include citation counts, up to 100 reference IDs, up to 20 related-work IDs, and retraction status. Abstracts are omitted. Results are cached for one hour. Each API request costs 130 Apex credits; OpenAlex usage is billed to the operator-configured OpenAlex account.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -4312,7 +4312,7 @@
             "name": "from",
             "in": "query",
             "required": false,
-            "description": "Inclusive lower bound on Crossref creation date.",
+            "description": "Inclusive lower date bound: Crossref creation date or OpenAlex publication date.",
             "schema": {
               "type": "string",
               "format": "date"
@@ -4322,7 +4322,7 @@
             "name": "to",
             "in": "query",
             "required": false,
-            "description": "Inclusive upper bound on Crossref creation date.",
+            "description": "Inclusive upper date bound: Crossref creation date or OpenAlex publication date.",
             "schema": {
               "type": "string",
               "format": "date"
@@ -4411,11 +4411,55 @@
                           "provider": {
                             "type": "string",
                             "enum": [
-                              "Crossref"
-                            ]
+                              "Crossref",
+                              "OpenAlex"
+                            ],
+                            "description": "Metadata source selected by server configuration."
                           },
                           "score": {
                             "type": "number"
+                          },
+                          "publicationDate": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "OpenAlex publication date, when available."
+                          },
+                          "openAlexId": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "OpenAlex work identifier, present when OpenAlex is the source."
+                          },
+                          "citedByCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "OpenAlex matched citation count."
+                          },
+                          "referenceCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Total OpenAlex references for this work."
+                          },
+                          "referenceIds": {
+                            "type": "array",
+                            "maxItems": 100,
+                            "items": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "description": "At most the first 100 OpenAlex referenced-work IDs."
+                          },
+                          "relatedWorks": {
+                            "type": "array",
+                            "maxItems": 20,
+                            "items": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "description": "At most 20 OpenAlex related-work IDs."
+                          },
+                          "isRetracted": {
+                            "type": "boolean",
+                            "description": "OpenAlex retraction status, when available."
                           }
                         }
                       }
@@ -4440,7 +4484,7 @@
             }
           },
           "503": {
-            "description": "Crossref is unavailable or rate limited; reservation is refunded.",
+            "description": "Crossref and OpenAlex are unavailable or rate limited; Apex reservation is refunded.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4456,7 +4500,7 @@
       "get": {
         "operationId": "firecrawlResearchPaperRead",
         "summary": "Read scholarly DOI metadata",
-        "description": "Looks up a DOI from Crossref and returns citation metadata without an abstract. Each request costs 130 Apex credits. Encode the DOI slash in the URL path when needed.",
+        "description": "Looks up DOI metadata. Crossref is the default source; OpenAlex is used when OPENALEX_API_KEY is configured. OpenAlex results include citation counts, bounded reference/related-work IDs, and retraction status. Abstracts are omitted. Each request costs 130 Apex credits; OpenAlex usage is billed to the configured OpenAlex account. Encode the DOI slash in the URL path when needed.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -4495,7 +4539,7 @@
             }
           },
           "404": {
-            "description": "DOI not found in Crossref",
+            "description": "DOI not found in the configured scholarly metadata provider.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4505,7 +4549,7 @@
             }
           },
           "503": {
-            "description": "Crossref is unavailable or rate limited; reservation is refunded.",
+            "description": "Crossref and OpenAlex are unavailable or rate limited; Apex reservation is refunded.",
             "content": {
               "application/json": {
                 "schema": {
