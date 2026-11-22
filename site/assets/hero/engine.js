@@ -5,8 +5,8 @@
 import * as G from './gl.js';
 import * as S from './shaders.js';
 import { robotMesh, slabMesh, RIG } from './robot.js';
-import { paintSite, paintAtlas } from './page-art.js';
-import { makeWorld, ribbonMesh, PAGE_W, PAGE_D } from './world.js';
+import { paintSite, paintAtlas, paintData } from './page-art.js';
+import { makeWorld, ribbonMesh, streamMesh, PAGE_W, PAGE_D } from './world.js';
 import { Swarm, Packets, STRIDE } from './swarm.js';
 
 const pause = () => new Promise((r) => setTimeout(r, 0));
@@ -17,10 +17,10 @@ const sheet = (w, h) => { if (typeof OffscreenCanvas === 'function') return new 
 /* The camera's four stops along the scroll: target, bearing, height angle, distance, picture shift, lens opening. */
 const SHOTS = {
   wide: [
-    { t: [-0.2, 0.4, 1.9], az: -22, el: 12.5, d: 7.8, sx: 0.34, sy: 0.0, ap: 0.5 },
-    { t: [1.0, 0, 0.3], az: -16, el: 36, d: 31, sx: 0.32, sy: -0.16, ap: 0.1 },
-    { t: [4.6, 0.1, -1.2], az: 18, el: 38, d: 12.5, sx: 0.52, sy: -0.04, ap: 0.36 },
-    { t: [2.6, 0.2, 1.0], az: -38, el: 19, d: 17.5, sx: 0.46, sy: -0.08, ap: 0.3 }
+    { t: [0.6, 0.4, 1.6], az: -30, el: 19, d: 10.2, sx: 0.3, sy: -0.02, ap: 0.42 },
+    { t: [3.2, 0.6, -0.6], az: -15, el: 31, d: 35, sx: 0.3, sy: -0.14, ap: 0.09 },
+    { t: [2.2, 0.1, 2.3], az: 14, el: 34, d: 11.5, sx: 0.5, sy: -0.04, ap: 0.36 },
+    { t: [8.6, 1.9, -0.4], az: -26, el: 13, d: 15.5, sx: 0.4, sy: -0.06, ap: 0.3 }
   ],
   tall: [
     { t: [0.2, 0.3, 1.3], az: -14, el: 15, d: 10.5, sx: 0, sy: -0.62, ap: 0.45 },
@@ -47,7 +47,7 @@ export async function run(canvas, cfg, post) {
   /* Shaders build in the browser's compiler threads while the art and meshes are made here. */
   const building = [['bot', S.BOT_VS, S.BOT_FS], ['depth', S.DEPTH_VS, S.DEPTH_FS], ['contact', S.CONTACT_VS, S.CONTACT_FS], ['page', S.PAGE_VS, S.PAGE_FS],
     ['trail', S.TRAIL_VS, S.TRAIL_FS], ['flat', S.QUAD_VS, S.FLAT_FS], ['env', S.QUAD_VS, S.ENV_FS], ['sky', S.QUAD_VS, S.SKY_FS], ['floor', S.FLOOR_VS, S.FLOOR_FS],
-    ['link', S.LINK_VS, S.LINK_FS], ['glow', S.GLOW_VS, S.GLOW_FS], ['half', S.QUAD_VS, S.HALF_FS], ['dof', S.QUAD_VS, S.DOF_FS],
+    ['link', S.LINK_VS, S.LINK_FS], ['stream', S.LINK_VS, S.STREAM_FS], ['beam', S.BEAM_VS, S.BEAM_FS], ['glow', S.GLOW_VS, S.GLOW_FS], ['half', S.QUAD_VS, S.HALF_FS], ['dof', S.QUAD_VS, S.DOF_FS],
     ['bright', S.QUAD_VS, S.BRIGHT_FS], ['blur', S.QUAD_VS, S.BLUR_FS], ['final', S.QUAD_VS, S.FINAL_FS]]
     .map(([k, vs, fs]) => [k, G.beginProgram(gl, vs, fs)]);
   mark('shaders-sent');
@@ -84,6 +84,7 @@ export async function run(canvas, cfg, post) {
     return tex;
   };
   const elements = siteArt.els, pageTex = texFrom(siteArt.bmp), atlasTex = texFrom(atlasSheet);
+  const dataSheet = sheet(600, 800); paintData(dataSheet); const dataTex = texFrom(dataSheet);
   let pagePx = firstW;
   const trail = G.target(gl, 320, 200);
   gl.bindFramebuffer(gl.FRAMEBUFFER, trail.fbo); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
@@ -126,6 +127,8 @@ export async function run(canvas, cfg, post) {
   const slabVao = vao([[G.staticBuffer(gl, slabMesh()), [[0, 3], [1, 3]]]]);
   const floorVao = vao([[G.staticBuffer(gl, new Float32Array([-110, -90, 110, -90, 110, 70, -110, -90, 110, 70, -110, 70])), [[0, 2]]]]);
   const ribbon = ribbonMesh(world), ribbonVao = vao([[G.staticBuffer(gl, ribbon), [[0, 3], [1, 3]]]]);
+  const fibres = streamMesh(world), fibreVao = vao([[G.staticBuffer(gl, fibres), [[0, 3], [1, 3]]]]);
+  const litRows = new Float32Array(8), pulse = new Float32Array(6); litRows[0] = litRows[7] = 1;
   const MOTES = compact ? 40 : 110, motes = Array.from({ length: MOTES }, (_, i) => { const h = (k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); }; return [h(1) * 46 - 23, h(2) * 9, h(3) * 34 - 20, 0.05 + h(4) * 0.1, 0.15 + h(5) * 0.45]; });
   const glowBuf = new Float32Array((packets.max * 6 + 40 + MOTES) * 8), glowInst = dyn(glowBuf.length);
   const glowVao = vao([[corners, [[0, 2]]], [glowInst, [[3, 4, 1], [4, 4, 1]]]]);
@@ -141,8 +144,7 @@ export async function run(canvas, cfg, post) {
   const setStage = (i) => { if (i !== stage) { stage = i; post({ t: 'stage', i }); } };
   let flare = 0, ct = calm ? 15.6 : 2.2, fired = { f: [], p: [] };
   const hiRec = new Float32Array(6), hiRect = new Float32Array(48), hiA = new Float32Array(12), hiC = new Float32Array(12);
-  const collector = [9.5, 1.6, 6.5];
-  swarm.onPacket = (x, z) => packets.send([x, 0.25, z], collector.slice(), -1);
+  swarm.onPacket = (x, z) => packets.send([x, 0.25, z], world.rowPos[(Math.random() * 6) | 0].slice(), -1);
 
   function direct(dt) {
     ct += dt;
@@ -154,11 +156,11 @@ export async function run(canvas, cfg, post) {
       if (!fired.f[r] && ct >= t0) { fired.f[r] = 1; swarm.setFocus(recordEl[r], 1.5); }
       if (!fired.p[r] && ct >= t0 + 0.7) {
         fired.p[r] = 1;
-        const e = elements[recordEl[r]], from = [(e.x + e.w / 2 - 0.5) * PAGE_W, 0.25, (e.y + e.h / 2 - 0.5) * PAGE_D];
-        for (let k = 0; k < 5; k++) packets.send([from[0] + (Math.random() - 0.5) * e.w * PAGE_W * 0.7, 0.25, from[2] + (Math.random() - 0.5) * e.h * PAGE_D * 0.7], collector.slice(), r, k * 0.09, k ? null : showRow);
+        for (let k = 0; k < 5; k++) packets.send(world.streams[r].from.slice(), world.rowPos[r].slice(), r, k * 0.09, k ? null : showRow);
       }
       const active = ct >= t0 && ct < t0 + 1.7 ? 1 : 0;
       hiRec[r] += (active - hiRec[r]) * Math.min(1, dt * (active ? 9 : 2.5));
+      pulse[r] = hiRec[r]; litRows[r + 1] += ((lit[r] ? 1 : 0) - litRows[r + 1]) * Math.min(1, dt * 5);
     }
     if (ct >= 14.4) for (let r = 0; r < 6; r++) showRow(r);
     // highlight slots: 0-5 records being extracted (lime), 6-11 the busiest content boxes (cyan)
@@ -280,7 +282,14 @@ export async function run(canvas, cfg, post) {
     gl.uniform4fv(u.uHi, hiRect); gl.uniform1fv(u.uHiA, hiA); gl.uniform1fv(u.uHiC, hiC);
     gl.uniform1f(u.uScan, ct >= 3 && ct < 8 ? -0.03 + ((ct - 3) / 5) * 1.06 : -1);
     gl.uniform2f(u.uRes, W, H); gl.uniform1f(u.uReflOn, refl ? 1 : 0);
-    gl.bindVertexArray(slabVao);
+    gl.bindVertexArray(slabVao); gl.uniform1f(u.uHolo, 0);
+    for (const s of world.tiles) {       // the field of other pages
+      bind(0, gl.TEXTURE_2D, atlasTex); gl.uniform1f(u.uMain, 0); gl.uniform4f(u.uAtlas, 0.5, 0.5, (s.atlas % 2) * 0.5, Math.floor(s.atlas / 2) * 0.5);
+      gl.uniform3fv(u.uPos, s.pos); gl.uniform4fv(u.uQuat, s.q); gl.uniform3f(u.uSize, s.w, 0.1, s.d); gl.uniform2f(u.uDim, s.w, s.d);
+      gl.drawArrays(gl.TRIANGLES, 0, 36); draws++;
+    }
+    { const s = world.data; bind(0, gl.TEXTURE_2D, dataTex); gl.uniform1f(u.uHolo, 1); gl.uniform1fv(u.uLit, litRows); gl.uniform1f(u.uMain, 0); gl.uniform4f(u.uAtlas, 1, 1, 0, 0);
+      gl.uniform3fv(u.uPos, s.pos); gl.uniform4fv(u.uQuat, s.q); gl.uniform3f(u.uSize, s.w, 0.05, s.d); gl.uniform2f(u.uDim, s.w, s.d); gl.drawArrays(gl.TRIANGLES, 0, 36); draws++; gl.uniform1f(u.uHolo, 0); }
     world.surfaces.forEach((s, i) => {
       bind(0, gl.TEXTURE_2D, i ? atlasTex : pageTex);
       gl.uniform1f(u.uMain, i ? 0 : 1);
@@ -295,6 +304,11 @@ export async function run(canvas, cfg, post) {
     gl.blendFuncSeparate(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
     u = use(prog.contact); gl.uniformMatrix4fv(u.uVP, false, vp);
     lod.forEach((l, k) => { if (swarm.counts[k]) { gl.bindVertexArray(l.contact); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, swarm.counts[k]); draws++; } });
+    gl.blendFunc(gl.ONE, gl.ONE);         // light: scan fans on the page and the data streams
+    u = use(prog.beam); gl.uniformMatrix4fv(u.uVP, false, vp); gl.uniform1f(u.uTime, clock);
+    for (let k = 0; k < 2; k++) if (swarm.counts[k]) { gl.bindVertexArray(lod[k].contact); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, swarm.counts[k]); draws++; }
+    u = use(prog.stream); eyeTo(u, vp, eye); gl.uniform1fv(u.uPulse, pulse);
+    gl.bindVertexArray(fibreVao); gl.drawArrays(gl.TRIANGLES, 0, fibres.length / 6); draws++;
     gl.disable(gl.BLEND); gl.depthMask(true);
     u = use(prog.bot); eyeTo(u, vp, eye); gl.uniform1f(u.uMirror, 0); gl.uniformMatrix4fv(u.uLightVP, false, lightVP); gl.uniform2f(u.uPageSize, PAGE_W, PAGE_D);
     robots([0, 1, 2]);
@@ -304,7 +318,7 @@ export async function run(canvas, cfg, post) {
     glowBuf.set(packets.buf.subarray(0, g));
     const sprite = (p, size, r, gr, b, a) => { glowBuf.set([p[0], p[1], p[2], size, r, gr, b, a], g); g += 8; };
     for (const m of motes) sprite([m[0] + Math.sin(clock * 0.2 + m[1]) * 0.6, 0.3 + ((m[1] + clock * m[4] * 0.4) % 9), m[2]], m[3], 0.3, 0.85, 1, 0.22 + 0.18 * Math.sin(clock * m[4] * 3 + m[0]));
-    sprite(collector, 0.5 + flare * 0.5, 0.6, 1, 0.32, 0.12 + flare * 0.3);
+    for (let r = 0; r < 6; r++) sprite(world.rowPos[r], 0.3 + pulse[r] * 0.5, 0.1, 0.85, 1, 0.2 + pulse[r] * 0.7);
     for (const b of world.bridges) { sprite(b.p[0], 0.55, 0.1, 0.8, 1, 0.35 + 0.45 * swarm.linkBoost); sprite(b.p[3], 0.55, 0.1, 0.8, 1, 0.35 + 0.45 * swarm.linkBoost); }
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
     u = use(prog.glow); gl.uniformMatrix4fv(u.uVP, false, vp); gl.uniform3fv(u.uEye, eye);
@@ -329,11 +343,7 @@ export async function run(canvas, cfg, post) {
     stats.draws = draws; stats.tris = Math.round(tris); draws = 0; tris = 0;
   }
 
-  function aimCollector() {
-    if (!anchor) return;   // a point behind the dataset panel, well out in the scene so nothing flies into the lens
-    const far = G.project(inv, [anchor[0], anchor[1], 1]), dx = far[0] - eye[0], dy = far[1] - eye[1], dz = far[2] - eye[2], k = Math.max(7, cam.focus * 0.9) / Math.hypot(dx, dy, dz);
-    collector[0] = eye[0] + dx * k; collector[1] = Math.max(0.6, eye[1] + dy * k); collector[2] = eye[2] + dz * k;
-  }
+  function aimCollector() {}
 
   /* Start: settle the swarm so the first picture is already alive. */
   mark('wired');

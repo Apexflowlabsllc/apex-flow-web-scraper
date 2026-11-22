@@ -1,9 +1,10 @@
-/* The crawler robot: a six-legged machine with an armoured shell, a lens eye and three-jointed legs.
+/* The crawler robot: a six-legged camera pod with one big lens eye, green side lights and three-jointed legs.
    Faces +X, stands on y = 0, about 1.3 long and 1.7 across the feet. Built at three detail levels.
    Parts: 0 body, then 1 + leg * 3 + segment (0 hip link, 1 upper leg, 2 lower leg) so the shader can move each joint. */
 import { Mesh, MAT, alongY, basis, rotX, rotZ } from './kit.js';
 
 export const CORE = 7;   // status core on the back: its own material so it can pulse and change colour
+export const LED = 8;    // the row of green lights
 const DEG = Math.PI / 180;
 
 /* Leg order alternates the two tripod groups: even = front-left, mid-right, rear-left; odd = the other three. */
@@ -34,41 +35,38 @@ export function robotMesh(level) {
   const ball = (c, rad, rings = E[0], sides = E[1]) => m.at(c, null, () => m.ellipsoid(rad, rings, sides));
   const faceX = rotZ(-90 * DEG);   // local Y -> +X, for parts that look forward
 
-  /* body */
-  set(MAT.FRAME, 0); box([0, 0.3, 0], [0.37, 0.07, 0.215], 0.05, B);                                   // chassis
-  set(MAT.SHELL); m.at([-0.02, 0.345, 0], null, () => m.ellipsoid([0.4, 0.15, 0.255], E[0], E[1], 0, 0.5));   // carapace
-  set(MAT.FRAME); box([-0.03, 0.468, 0], [0.27, 0.022, 0.045], 0.02, S);                                // spine channel
-  set(MAT.EMIT); box([0.02, 0.491, 0], [0.16, 0.004, 0.011], 0.003, far ? 0 : 1);                        // light bar
-  set(CORE); if (far) box([-0.2, 0.5, 0], [0.06, 0.012, 0.06], 0, 0); else m.at([-0.2, 0.497, 0], null, () => m.ellipsoid([0.058, 0.02, 0.058], 6, L, 0, 0.5));
-  set(MAT.FRAME); box([-0.4, 0.31, 0], [0.07, 0.075, 0.16], 0.03, B);                                   // rear pack
-  set(MAT.SHELL); box([0.455, 0.315, 0], [0.085, 0.075, 0.135], 0.045, B);                              // head
-  set(MAT.GLASS); box([0.508, 0.325, 0], [0.04, 0.04, 0.118], 0.03, S);                                  // visor
+  /* body: a camera pod. A barrel along the body with one big lens at the front and a row of green lights on its side */
+  set(MAT.FRAME, 0); box([0, 0.262, 0], [0.31, 0.05, 0.2], 0.04, B);                                   // chassis the legs hang from
+  set(MAT.SHELL); m.at([-0.02, 0.37, 0], faceX, () => m.cylinder(0.2, 0.6, L, 0.1));                   // barrel
+  set(MAT.FRAME); m.at([0.31, 0.37, 0], faceX, () => m.cylinder(0.228, 0.11, L, 0.2));                 // lens hood
+  set(MAT.GLASS); m.at([0.36, 0.37, 0], null, () => m.ellipsoid([0.05, 0.178, 0.178], E[0], E[1]));    // the lens
   set(MAT.EMIT);
-  if (far) box([0.552, 0.325, 0], [0.006, 0.03, 0.05], 0, 0);
-  else ring([0.552, 0.325, 0], faceX, 0.03, 0.007);                                                      // iris ring
+  if (far) box([0.405, 0.37, 0], [0.008, 0.1, 0.1], 0, 0);
+  else { ring([0.395, 0.37, 0], faceX, 0.115, 0.02); m.at([0.408, 0.37, 0], null, () => m.ellipsoid([0.012, 0.06, 0.06], 6, L)); }   // glowing iris and pupil
+  set(MAT.FRAME); m.at([-0.33, 0.37, 0], null, () => m.ellipsoid([0.1, 0.19, 0.19], far ? 3 : E[0] >> 1, E[1]));   // rear cap
+  set(LED); for (const s of [-1, 1]) for (let k = 0; k < (far ? 1 : 4); k++) box([far ? 0 : -0.14 + k * 0.075, 0.5, s * 0.142], far ? [0.13, 0.016, 0.012] : [0.024, 0.016, 0.012], far ? 0 : 0.006, far ? 0 : 1);   // green lights
+  set(CORE); if (far) box([-0.2, 0.585, 0], [0.05, 0.012, 0.05], 0, 0); else m.at([-0.2, 0.582, 0], null, () => m.ellipsoid([0.05, 0.018, 0.05], 6, L, 0, 0.5));
   if (!far) {
-    set(MAT.RUBBER); box([-0.02, 0.362, 0], [0.392, 0.009, 0.248], 0.009, 1);                            // gasket between shell and chassis
-    set(MAT.FRAME); m.at([0.36, 0.31, 0], faceX, () => m.cylinder(0.07, 0.09, L));                       // neck
-    set(MAT.CHROME); ring([0.548, 0.325, 0], faceX, 0.05, 0.012);                                         // lens ring
-    set(MAT.GLASS); ball([0.547, 0.325, 0], [0.018, 0.044, 0.044], 8, L);                                 // lens
-    set(MAT.CHROME); m.at([-0.2, 0.488, 0], null, () => m.cylinder(0.075, 0.018, L));                    // core seat
+    set(MAT.FRAME); m.at([-0.03, 0.37, 0], faceX, () => m.cylinder(0.207, 0.16, L, 0.15));              // dark band round the barrel
+    set(MAT.CHROME); ring([0.372, 0.37, 0], faceX, 0.192, 0.02);                                         // lens bezel
+    ring([-0.27, 0.37, 0], faceX, 0.196, 0.012);
+    set(MAT.SHELL); box([-0.03, 0.562, 0], [0.2, 0.018, 0.11], 0.016, S);                                // top plate
+    set(MAT.CHROME); m.at([-0.2, 0.572, 0], null, () => m.cylinder(0.066, 0.016, L));                    // core seat
+    set(MAT.FRAME); m.tube([-0.3, 0.55, -0.07], [-0.4, 0.74, -0.09], 0.007, 0.004, 6);                   // antenna
+    set(MAT.EMIT); ball([-0.4, 0.743, -0.09], [0.013, 0.013, 0.013], 5, 10);
     for (const s of [-1, 1]) {
-      set(MAT.EMIT); ball([0.535, 0.325, s * 0.086], [0.012, 0.014, 0.014], 5, 10);                       // side sensor
-      set(MAT.CHROME); m.tube([0.49, 0.262, s * 0.05], [0.6, 0.205, s * 0.03], 0.012, 0.006, hero ? 10 : 6);   // probe arm
-      set(MAT.EMIT); ball([0.602, 0.204, s * 0.03], [0.011, 0.011, 0.011], 4, 8);
-      set(MAT.EMIT); box([-0.472, 0.3, s * 0.11], [0.004, 0.012, 0.03], 0.003, 1);                        // tail light
-      for (const x of [0.27, 0, -0.27]) { set(MAT.SHELL); box([x, 0.392, s * 0.2], [0.078, 0.02, 0.058], 0.018, S, rotX(s * 22 * DEG)); }   // shoulder armour
+      set(MAT.SHELL); box([0.06, 0.37, s * 0.203], [0.16, 0.085, 0.012], 0.01, S);                        // side armour
+      set(MAT.CHROME); m.tube([0.3, 0.2, s * 0.07], [0.43, 0.13, s * 0.05], 0.013, 0.006, hero ? 10 : 6); // probe arm
+      set(MAT.EMIT); ball([0.432, 0.129, s * 0.05], [0.011, 0.011, 0.011], 4, 8);
+      set(MAT.EMIT); box([-0.425, 0.37, s * 0.09], [0.004, 0.03, 0.014], 0.003, 1);                       // tail light
     }
-    set(MAT.FRAME); m.tube([0.42, 0.39, -0.08], [0.33, 0.6, -0.1], 0.007, 0.004, 6);                     // antenna
-    set(MAT.EMIT); ball([0.33, 0.603, -0.1], [0.013, 0.013, 0.013], 5, 10);
-    set(MAT.CHROME); for (let k = 0; k < (hero ? 5 : 3); k++) box([-0.432, 0.405, (k - (hero ? 2 : 1)) * (hero ? 0.05 : 0.09)], [0.05, 0.03, 0.006], 0.004, 1);   // cooling fins
-    set(MAT.RUBBER); box([0, 0.224, 0], [0.28, 0.014, 0.15], 0.012, 1);                                   // belly plate
+    set(MAT.RUBBER); box([0, 0.205, 0], [0.25, 0.012, 0.14], 0.01, 1);                                   // belly plate
   }
   if (hero) {
     set(MAT.CHROME);
-    for (const s of [-1, 1]) for (const x of [0.33, 0.21, 0.06, -0.06, -0.21, -0.33]) m.at([x, 0.413, s * 0.2 * Math.cos(22 * DEG) + s * 0.012], rotX(s * 22 * DEG), () => m.cylinder(0.009, 0.012, 8));   // bolts
-    set(MAT.ACCENT); box([0.455, 0.392, 0], [0.05, 0.004, 0.09], 0.003, 1);                               // head stripe
-    set(MAT.FRAME); for (const s of [-1, 1]) for (let k = 0; k < 3; k++) box([-0.1 + k * 0.09, 0.3, s * 0.217], [0.03, 0.03, 0.004], 0.003, 1);   // side vents
+    for (const s of [-1, 1]) for (const x of [-0.07, 0.19]) for (const y of [0.31, 0.43]) m.at([x, y, s * 0.216], rotX(90 * DEG), () => m.cylinder(0.009, 0.012, 8));   // bolts
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; m.at([0.368, 0.37 + Math.cos(a) * 0.212, Math.sin(a) * 0.212], faceX, () => m.cylinder(0.008, 0.014, 8)); }   // hood screws
+    set(MAT.ACCENT); m.at([0.24, 0.37, 0], faceX, () => m.cylinder(0.203, 0.016, L, 0.3));                // cyan ring behind the hood
   }
 
   /* legs: built in a frame at the hip with x outward, y up, z the lift axis */
