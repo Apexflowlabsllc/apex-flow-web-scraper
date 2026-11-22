@@ -729,6 +729,83 @@ async def test_v2_search_research_category_uses_academic_domains_and_combines_pd
     assert [item["url"] for item in excluded_payload["data"]["web"]] == ["https://nature.com/articles/abc.pdf"]
 
 
+async def test_firecrawl_research_paper_search_and_read_use_cached_crossref_metadata(hosted, monkeypatch):
+    import rainbo_scrape.hosted_research as hosted_research
+
+    h, client, headers = await _auth(hosted)
+    calls = []
+
+    async def fixture_crossref(hosted_service, params, doi=None):
+        calls.append((dict(params), doi))
+        if doi:
+            return {"DOI": doi, "title": ["Fixture DOI paper"],
+                    "author": [{"given": "Alex", "family": "Researcher"}],
+                    "created": {"date-parts": [[2024, 2, 3]]},
+                    "subject": ["Computer Science"]}
+        return {"items": [
+            {"DOI": "10.5555/old", "title": ["Old paper"], "author": [{"given": "Jane", "family": "Doe"}],
+             "created": {"date-parts": [[2020, 1, 1]]}, "subject": ["Artificial Intelligence"], "score": 100},
+            {"DOI": "10.5555/current", "title": ["Current paper"], "author": [{"given": "Jane", "family": "Doe"}],
+             "created": {"date-parts": [[2024, 3, 4]]}, "subject": ["Artificial Intelligence"], "score": 95},
+            {"DOI": "10.5555/other", "title": ["Other paper"], "author": [{"given": "John", "family": "Smith"}],
+             "created": {"date-parts": [[2024, 5, 6]]}, "subject": ["Biology"], "score": 90},
+        ]}
+
+    monkeypatch.setattr(hosted_research, "_fetch_crossref", fixture_crossref)
+    url = "/v2/search/research/papers?query=machine%20learning&k=5&authors=Jane&categories=Artificial%20Intelligence&from=2023-01-01&sort=date_desc"
+    response = await client.get(url, headers=headers)
+    payload = await response.json()
+    assert response.status == 200 and payload["success"] is True
+    assert payload["creditsUsed"] == 130
+    assert len(payload["results"]) == 1
+    paper = payload["results"][0]
+    assert paper["paperId"] == "10.5555/current"
+    assert paper["primaryId"] == "doi:10.5555/current"
+    assert paper["authors"] == ["Jane Doe"]
+    assert paper["categories"] == ["Artificial Intelligence"]
+    assert "abstract" not in paper
+    params = calls[0][0]
+    assert params["query.bibliographic"] == "machine learning"
+    assert params["sort"] == "created" and params["order"] == "desc"
+    assert params["filter"] == "from-created-date:2023-01-01"
+
+    cached = await client.get(url, headers=headers)
+    cached_payload = await cached.json()
+    assert cached.status == 200 and cached_payload["results"] == payload["results"]
+    assert len(calls) == 1
+
+    lookup = await client.get("/v2/search/research/papers/10.5555%2Flookup", headers=headers)
+    lookup_payload = await lookup.json()
+    assert lookup.status == 200 and lookup_payload["success"] is True
+    assert lookup_payload["paper"]["paperId"] == "10.5555/lookup"
+    assert calls[-1][1] == "10.5555/lookup"
+
+    invalid = await client.get("/v2/search/research/papers/not-a-doi", headers=headers)
+    assert invalid.status == 400
+    account = h.billing.account_for(headers["Authorization"][7:])
+    usage = h.billing.db.execute("SELECT kind,credits FROM usage WHERE account=? AND kind='search'", (account,)).fetchall()
+    assert sum(row[1] for row in usage) == 390
+
+
+async def test_firecrawl_research_provider_failures_refund_reserved_credits(hosted, monkeypatch):
+    import rainbo_scrape.hosted_research as hosted_research
+
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    before = h.billing.remaining(account)
+
+    async def failed_crossref(*args, **kwargs):
+        raise hosted_research.ResearchProviderError(429)
+
+    monkeypatch.setattr(hosted_research, "_fetch_crossref", failed_crossref)
+    response = await client.get("/v2/search/research/papers?query=rate%20limit", headers=headers)
+    payload = await response.json()
+    assert response.status == 503
+    assert payload["code"] == "research_provider_unavailable"
+    assert response.headers["Retry-After"] == "2"
+    assert h.billing.remaining(account) == before
+
+
 async def test_current_langchain_mcp_client_discovers_and_calls_hosted_scraper(hosted):
     import os
 

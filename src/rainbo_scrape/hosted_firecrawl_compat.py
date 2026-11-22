@@ -1539,6 +1539,9 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 return error(exc.reason, "request_failed", exc.status)
         return wrapped
 
+    from .hosted_research import install as install_research
+    install_research(app, hosted, wrap, error)
+
     app.router.add_post("/v2/scrape", wrap(scrape))
     app.router.add_post("/v2/parse", wrap(parse_document))
     app.router.add_get("/v2/parse/formats", wrap(parse_format_list))

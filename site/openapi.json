@@ -389,11 +389,21 @@
                     "maxItems": 50,
                     "items": {
                       "type": "object",
-                      "required": ["selector", "attribute"],
+                      "required": [
+                        "selector",
+                        "attribute"
+                      ],
                       "additionalProperties": false,
                       "properties": {
-                        "selector": {"type": "string", "minLength": 1, "maxLength": 500},
-                        "attribute": {"type": "string", "pattern": "^[a-zA-Z0-9_:-]{1,64}$"}
+                        "selector": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "attribute": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z0-9_:-]{1,64}$"
+                        }
                       }
                     },
                     "description": "Extract selected HTML attributes using CSS selectors. Each selector returns at most 200 values; oversized output is truncated with a warning."
@@ -629,11 +639,21 @@
                     "maxItems": 50,
                     "items": {
                       "type": "object",
-                      "required": ["selector", "attribute"],
+                      "required": [
+                        "selector",
+                        "attribute"
+                      ],
                       "additionalProperties": false,
                       "properties": {
-                        "selector": {"type": "string", "minLength": 1, "maxLength": 500},
-                        "attribute": {"type": "string", "pattern": "^[a-zA-Z0-9_:-]{1,64}$"}
+                        "selector": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "attribute": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z0-9_:-]{1,64}$"
+                        }
                       }
                     },
                     "description": "Extract selected HTML attributes using CSS selectors. Each selector returns at most 200 values; oversized output is truncated with a warning."
@@ -819,7 +839,11 @@
                   },
                   "topic": {
                     "type": "string",
-                    "enum": ["general", "news", "images"],
+                    "enum": [
+                      "general",
+                      "news",
+                      "images"
+                    ],
                     "default": "general",
                     "description": "Select general web results, dedicated news, or dedicated image search. News requires Tavily or Exa; images require Brave and use strict SafeSearch."
                   },
@@ -827,16 +851,31 @@
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 50,
-                    "items": {"type": "string", "minLength": 3, "maxLength": 253, "format": "hostname"}
+                    "items": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 253,
+                      "format": "hostname"
+                    }
                   },
                   "exclude_domains": {
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 50,
-                    "items": {"type": "string", "minLength": 3, "maxLength": 253, "format": "hostname"}
+                    "items": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 253,
+                      "format": "hostname"
+                    }
                   }
                 },
-                "not": {"required": ["include_domains", "exclude_domains"]},
+                "not": {
+                  "required": [
+                    "include_domains",
+                    "exclude_domains"
+                  ]
+                },
                 "required": [
                   "query"
                 ]
@@ -879,11 +918,17 @@
                             "description": "Direct image URL for topic=images."
                           },
                           "imageWidth": {
-                            "type": ["integer", "null"],
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
                             "description": "Image width when supplied by the index."
                           },
                           "imageHeight": {
-                            "type": ["integer", "null"],
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
                             "description": "Image height when supplied by the index."
                           }
                         }
@@ -1012,33 +1057,134 @@
         "operationId": "listApiKeys",
         "summary": "List account API keys",
         "description": "Returns key IDs and labels only. Bearer key values are never returned by this endpoint.",
-        "responses": {"200": {"description": "Account keys", "content": {"application/json": {"schema": {"type": "object", "properties": {
-          "keys": {"type": "array", "items": {"type": "object", "properties": {
-            "id": {"type": "string"}, "label": {"type": "string"}, "created_at": {"type": "number"}, "revoked": {"type": "boolean"}
-          }}}
-        }}}}}
-      }},
+        "responses": {
+          "200": {
+            "description": "Account keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "number"
+                          },
+                          "revoked": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "createApiKey",
         "summary": "Create a labeled API key",
         "description": "Returns the new bearer secret once. Store it in a secret manager; list responses never include the secret.",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {
-          "label": {"type": "string", "maxLength": 80}
-        }, "additionalProperties": false}}}},
-        "responses": {"201": {"description": "Created key, including one-time bearer secret", "content": {"application/json": {"schema": {"type": "object", "properties": {
-          "id": {"type": "string"}, "key": {"type": "string", "writeOnly": true}, "label": {"type": "string"}, "created_at": {"type": "number"}
-        }}}}}, "409": {"description": "Account reached its active key limit"}}
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "maxLength": 80
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created key, including one-time bearer secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string",
+                      "writeOnly": true
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Account reached its active key limit"
+          }
+        }
       }
     },
     "/keys/{key_id}": {
       "delete": {
         "operationId": "revokeApiKey",
         "summary": "Revoke an account API key",
-        "parameters": [{"name": "key_id", "in": "path", "required": true, "schema": {"type": "string"}}],
-        "responses": {"200": {"description": "Revoked", "content": {"application/json": {"schema": {"type": "object", "properties": {
-          "id": {"type": "string"}, "revoked": {"type": "boolean"}
-        }}}}}, "404": {"description": "Key not found, belongs to another account, or already revoked"},
-        "409": {"description": "Create a replacement before revoking the account's last active key"}}
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "revoked": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Key not found, belongs to another account, or already revoked"
+          },
+          "409": {
+            "description": "Create a replacement before revoking the account's last active key"
+          }
+        }
       }
     },
     "/usage": {
@@ -2343,17 +2489,29 @@
         "operationId": "firecrawlCompatParseUpload",
         "summary": "Parse an uploaded document",
         "description": "Parses one uploaded PDF, DOCX, HTML, text, JSON, or XML document. Maximum file size is 12 MiB; the operation costs one credit. Supported options are formats and onlyMainContent=true.",
-        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["file"],
+                "required": [
+                  "file"
+                ],
                 "properties": {
-                  "file": {"type": "string", "format": "binary"},
-                  "options": {"type": "string", "description": "Optional JSON object encoded as a multipart field. Supports formats and onlyMainContent=true."}
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "options": {
+                    "type": "string",
+                    "description": "Optional JSON object encoded as a multipart field. Supports formats and onlyMainContent=true."
+                  }
                 },
                 "additionalProperties": false
               }
@@ -2361,10 +2519,25 @@
           }
         },
         "responses": {
-          "200": {"description": "Parsed document; costs one credit", "content": {"application/json": {"schema": {"type": "object"}}}},
-          "400": {"description": "Invalid document or unsupported option"},
-          "402": {"description": "Insufficient credits"},
-          "413": {"description": "Upload exceeds 12 MiB"}
+          "200": {
+            "description": "Parsed document; costs one credit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid document or unsupported option"
+          },
+          "402": {
+            "description": "Insufficient credits"
+          },
+          "413": {
+            "description": "Upload exceeds 12 MiB"
+          }
         }
       }
     },
@@ -2372,8 +2545,23 @@
       "get": {
         "operationId": "firecrawlCompatParseFormats",
         "summary": "List supported upload formats",
-        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
-        "responses": {"200": {"description": "Supported upload formats; cached privately for one hour", "content": {"application/json": {"schema": {"type": "object"}}}}}
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supported upload formats; cached privately for one hour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v2/scrape": {
@@ -2479,11 +2667,21 @@
                               "maxItems": 50,
                               "items": {
                                 "type": "object",
-                                "required": ["selector", "attribute"],
+                                "required": [
+                                  "selector",
+                                  "attribute"
+                                ],
                                 "additionalProperties": false,
                                 "properties": {
-                                  "selector": {"type": "string", "minLength": 1, "maxLength": 500},
-                                  "attribute": {"type": "string", "pattern": "^[a-zA-Z0-9_:-]{1,64}$"}
+                                  "selector": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "attribute": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9_:-]{1,64}$"
+                                  }
                                 }
                               }
                             }
@@ -2576,19 +2774,51 @@
         "operationId": "firecrawlCompatCreditUsage",
         "summary": "Current credit usage",
         "description": "Returns account allowance and billing period dates. Values are Apex account-scoped.",
-        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Current allowance and period metadata",
-            "content": {"application/json": {"schema": {"type": "object", "properties": {
-              "success": {"type": "boolean"},
-              "data": {"type": "object", "properties": {
-                "remainingCredits": {"type": "integer"},
-                "planCredits": {"type": "integer"},
-                "billingPeriodStart": {"type": ["string", "null"], "format": "date-time"},
-                "billingPeriodEnd": {"type": ["string", "null"], "format": "date-time"}
-              }}
-            }}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "remainingCredits": {
+                          "type": "integer"
+                        },
+                        "planCredits": {
+                          "type": "integer"
+                        },
+                        "billingPeriodStart": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        },
+                        "billingPeriodEnd": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2598,20 +2828,73 @@
         "operationId": "firecrawlCompatHistoricalCreditUsage",
         "summary": "Historical credit usage",
         "description": "Returns monthly account-wide totals by default. Set byApiKey=true for per-key totals. Legacy usage recorded before key-level attribution was added is returned with a null apiKeyId.",
-        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
-        "parameters": [{"name": "byApiKey", "in": "query", "schema": {"type": "boolean", "default": false}}],
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "byApiKey",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
         "responses": {
-          "200": {"description": "Monthly account-wide totals", "content": {"application/json": {"schema": {"type": "object", "properties": {
-            "success": {"type": "boolean"},
-            "periods": {"type": "array", "items": {"type": "object", "properties": {
-              "startDate": {"type": "string", "format": "date-time"},
-              "endDate": {"type": "string", "format": "date-time"},
-              "totalCredits": {"type": "integer"},
-              "apiKeyId": {"type": ["string", "null"], "description": "Stable opaque key identifier; null for unattributed legacy usage."},
-              "apiKeyLabel": {"type": ["string", "null"], "description": "User-provided key label, when available."}
-            }}}
-          }}}}},
-          "400": {"description": "Invalid or unsupported option"}
+          "200": {
+            "description": "Monthly account-wide totals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "periods": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "startDate": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "endDate": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "totalCredits": {
+                            "type": "integer"
+                          },
+                          "apiKeyId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Stable opaque key identifier; null for unattributed legacy usage."
+                          },
+                          "apiKeyLabel": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "User-provided key label, when available."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or unsupported option"
+          }
         }
       }
     },
@@ -2730,28 +3013,87 @@
                     "maxItems": 3,
                     "items": {
                       "oneOf": [
-                        {"type": "string", "enum": ["web", "news", "images"]},
-                        {"type": "object", "required": ["type"], "properties": {"type": {"type": "string", "enum": ["web", "news", "images"]}}, "additionalProperties": false}
+                        {
+                          "type": "string",
+                          "enum": [
+                            "web",
+                            "news",
+                            "images"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "type"
+                          ],
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "web",
+                                "news",
+                                "images"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        }
                       ]
                     }
                   },
                   "categories": {
                     "type": "array",
                     "maxItems": 2,
-                    "items": {"oneOf": [{"type": "string", "enum": ["pdf", "research"]}, {"type": "object", "required": ["type"], "properties": {"type": {"type": "string", "enum": ["pdf", "research"]}}, "additionalProperties": false}]},
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pdf",
+                            "research"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "type"
+                          ],
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "pdf",
+                                "research"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
                     "description": "Supports pdf (filetype:pdf query and PDF URL post-filter) and research (curated academic-domain filter); these can be combined. Neither uses a proprietary index."
                   },
                   "includeDomains": {
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 50,
-                    "items": {"type": "string", "minLength": 3, "maxLength": 253, "format": "hostname"}
+                    "items": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 253,
+                      "format": "hostname"
+                    }
                   },
                   "excludeDomains": {
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 50,
-                    "items": {"type": "string", "minLength": 3, "maxLength": 253, "format": "hostname"}
+                    "items": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 253,
+                      "format": "hostname"
+                    }
                   },
                   "origin": {
                     "type": "string",
@@ -2765,16 +3107,70 @@
                       "formats": {
                         "type": "array",
                         "minItems": 1,
-                        "items": {"oneOf": [{"type": "string", "enum": ["markdown", "html", "rawHtml", "links", "images", "screenshot"]}, {"type": "object", "required": ["type"], "properties": {"type": {"type": "string", "enum": ["markdown", "html", "rawHtml", "links", "images", "screenshot"]}}, "additionalProperties": false}]}
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "markdown",
+                                "html",
+                                "rawHtml",
+                                "links",
+                                "images",
+                                "screenshot"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "type"
+                              ],
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "markdown",
+                                    "html",
+                                    "rawHtml",
+                                    "links",
+                                    "images",
+                                    "screenshot"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
                       },
-                      "onlyMainContent": {"type": "boolean", "enum": [true]},
-                      "waitFor": {"type": "integer", "minimum": 0, "maximum": 5000},
-                      "actions": {"type": "array", "maxItems": 8, "items": {"type": "object"}}
+                      "onlyMainContent": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      },
+                      "waitFor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 5000
+                      },
+                      "actions": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                          "type": "object"
+                        }
+                      }
                     },
                     "additionalProperties": false
                   }
                 },
-                "not": {"required": ["includeDomains", "excludeDomains"]}
+                "not": {
+                  "required": [
+                    "includeDomains",
+                    "excludeDomains"
+                  ]
+                }
               }
             }
           }
@@ -2786,21 +3182,55 @@
         "operationId": "createApexInteractSession",
         "summary": "Create a bounded browser session",
         "description": "Creates a short-lived, account-owned browser session. Every request is restricted to the explicitly allowed public origins and read-only GET/HEAD traffic. Arbitrary code, CDP, and live video are not exposed.",
-        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["allowedOrigins"],
+                "required": [
+                  "allowedOrigins"
+                ],
                 "properties": {
-                  "allowedOrigins": {"type": "array", "minItems": 1, "maxItems": 10, "items": {"type": "string", "format": "uri"}},
-                  "url": {"type": "string", "format": "uri", "description": "Optional initial page; must match an allowed origin."},
-                  "ttl": {"type": "integer", "minimum": 30, "maximum": 900, "default": 300},
-                  "activityTtl": {"type": "integer", "minimum": 10, "maximum": 300, "default": 120},
-                  "streamWebView": {"type": "boolean", "const": false},
-                  "blockAds": {"type": "boolean", "const": false}
+                  "allowedOrigins": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "items": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Optional initial page; must match an allowed origin."
+                  },
+                  "ttl": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 900,
+                    "default": 300
+                  },
+                  "activityTtl": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 300,
+                    "default": 120
+                  },
+                  "streamWebView": {
+                    "type": "boolean",
+                    "const": false
+                  },
+                  "blockAds": {
+                    "type": "boolean",
+                    "const": false
+                  }
                 },
                 "additionalProperties": false
               }
@@ -2808,18 +3238,85 @@
           }
         },
         "responses": {
-          "200": {"description": "Session created; costs three credits.", "content": {"application/json": {"schema": {"type": "object", "properties": {"success": {"type": "boolean"}, "id": {"type": "string"}, "expiresAt": {"type": "string", "format": "date-time"}, "actionsUrl": {"type": "string"}, "allowedOrigins": {"type": "array", "items": {"type": "string"}}, "creditCost": {"type": "integer"}}}}}},
-          "402": {"description": "Paid plan or credits required"},
-          "429": {"description": "Interactive session capacity reached"},
-          "503": {"description": "Browser runtime unavailable"}
+          "200": {
+            "description": "Session created; costs three credits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "actionsUrl": {
+                      "type": "string"
+                    },
+                    "allowedOrigins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "creditCost": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Paid plan or credits required"
+          },
+          "429": {
+            "description": "Interactive session capacity reached"
+          },
+          "503": {
+            "description": "Browser runtime unavailable"
+          }
         }
       },
       "get": {
         "operationId": "listApexInteractSessions",
         "summary": "List account browser sessions",
-        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
-        "parameters": [{"name": "status", "in": "query", "required": false, "schema": {"type": "string", "enum": ["active", "destroyed"]}}],
-        "responses": {"200": {"description": "Account-owned active or recently destroyed sessions", "content": {"application/json": {"schema": {"type": "object"}}}}}
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "destroyed"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account-owned active or recently destroyed sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v2/interact/{session}/execute": {
@@ -2827,15 +3324,68 @@
         "operationId": "executeApexInteractActions",
         "summary": "Navigate and run bounded browser actions",
         "description": "Navigates only within the session origin allowlist and runs up to eight declarative click/wait/scroll actions. Does not execute caller-supplied code.",
-        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
-        "parameters": [{"name": "session", "in": "path", "required": true, "schema": {"type": "string"}}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {"url": {"type": "string", "format": "uri"}, "actions": {"type": "array", "maxItems": 8, "items": {"$ref": "#/components/schemas/BrowserAction"}}}, "additionalProperties": false}}}},
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "$ref": "#/components/schemas/BrowserAction"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {"description": "Current page state; costs three credits.", "content": {"application/json": {"schema": {"type": "object"}}}},
-          "403": {"description": "Destination outside allowed origins"},
-          "404": {"description": "Session is not owned by this account"},
-          "410": {"description": "Session expired"},
-          "402": {"description": "Insufficient credits"}
+          "200": {
+            "description": "Current page state; costs three credits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Destination outside allowed origins"
+          },
+          "404": {
+            "description": "Session is not owned by this account"
+          },
+          "410": {
+            "description": "Session expired"
+          },
+          "402": {
+            "description": "Insufficient credits"
+          }
         }
       }
     },
@@ -2843,9 +3393,29 @@
       "delete": {
         "operationId": "deleteApexInteractSession",
         "summary": "Destroy a browser session",
-        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
-        "parameters": [{"name": "session", "in": "path", "required": true, "schema": {"type": "string"}}],
-        "responses": {"200": {"description": "Session destroyed"}, "404": {"description": "Session is not owned by this account"}}
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session destroyed"
+          },
+          "404": {
+            "description": "Session is not owned by this account"
+          }
+        }
       }
     },
     "/v2/crawl/active": {
@@ -2853,8 +3423,23 @@
         "operationId": "firecrawlCompatListActiveCrawls",
         "summary": "List active account crawls",
         "description": "Lists up to 100 running crawl jobs owned by the authenticated account. This endpoint is read-only and does not consume credits.",
-        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
-        "responses": {"200": {"description": "Active crawls owned by this API account", "content": {"application/json": {"schema": {"type": "object"}}}}}
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active crawls owned by this API account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v2/crawl": {
@@ -3002,11 +3587,21 @@
                                   "maxItems": 50,
                                   "items": {
                                     "type": "object",
-                                    "required": ["selector", "attribute"],
+                                    "required": [
+                                      "selector",
+                                      "attribute"
+                                    ],
                                     "additionalProperties": false,
                                     "properties": {
-                                      "selector": {"type": "string", "minLength": 1, "maxLength": 500},
-                                      "attribute": {"type": "string", "pattern": "^[a-zA-Z0-9_:-]{1,64}$"}
+                                      "selector": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 500
+                                      },
+                                      "attribute": {
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_:-]{1,64}$"
+                                      }
                                     }
                                   }
                                 }
@@ -3211,17 +3806,32 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": {"type": "string"},
-                          "timestamp": {"type": "string", "format": "date-time"},
-                          "url": {"type": "string", "format": "uri"},
-                          "error": {"type": "string"},
-                          "code": {"type": "string"}
+                          "id": {
+                            "type": "string"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "error": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          }
                         }
                       }
                     },
                     "robotsBlocked": {
                       "type": "array",
-                      "items": {"type": "string", "format": "uri"}
+                      "items": {
+                        "type": "string",
+                        "format": "uri"
+                      }
                     }
                   }
                 }
@@ -3232,7 +3842,9 @@
             "description": "No such crawl for this account",
             "content": {
               "application/json": {
-                "schema": {"type": "object"}
+                "schema": {
+                  "type": "object"
+                }
               }
             }
           }
@@ -3256,14 +3868,35 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": ["success", "id", "url", "status"],
+                  "required": [
+                    "success",
+                    "id",
+                    "url",
+                    "status"
+                  ],
                   "properties": {
-                    "success": {"type": "boolean"},
-                    "id": {"type": "string"},
-                    "url": {"type": "string"},
-                    "status": {"type": "string", "enum": ["scraping"]},
-                    "signingSecret": {"type": "string", "description": "Returned only when a webhook is configured. Store it securely."},
-                    "signingSecretNotice": {"type": "string"}
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "scraping"
+                      ]
+                    },
+                    "signingSecret": {
+                      "type": "string",
+                      "description": "Returned only when a webhook is configured. Store it securely."
+                    },
+                    "signingSecretNotice": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -3310,13 +3943,34 @@
                   },
                   "webhook": {
                     "type": "object",
-                    "required": ["url"],
+                    "required": [
+                      "url"
+                    ],
                     "additionalProperties": false,
                     "description": "Optional signed lifecycle callback. Only public HTTPS on port 443 is accepted.",
                     "properties": {
-                      "url": {"type": "string", "format": "uri", "description": "HTTPS callback URL on port 443."},
-                      "events": {"type": "array", "uniqueItems": true, "items": {"type": "string", "enum": ["started", "page", "completed"]}, "description": "Event names to deliver; defaults to all three."},
-                      "metadata": {"type": "object", "description": "JSON object included in each event; maximum 16 KiB."}
+                      "url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "HTTPS callback URL on port 443."
+                      },
+                      "events": {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "started",
+                            "page",
+                            "completed"
+                          ]
+                        },
+                        "description": "Event names to deliver; defaults to all three."
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "description": "JSON object included in each event; maximum 16 KiB."
+                      }
                     }
                   },
                   "formats": {
@@ -3355,11 +4009,21 @@
                               "maxItems": 50,
                               "items": {
                                 "type": "object",
-                                "required": ["selector", "attribute"],
+                                "required": [
+                                  "selector",
+                                  "attribute"
+                                ],
                                 "additionalProperties": false,
                                 "properties": {
-                                  "selector": {"type": "string", "minLength": 1, "maxLength": 500},
-                                  "attribute": {"type": "string", "pattern": "^[a-zA-Z0-9_:-]{1,64}$"}
+                                  "selector": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "attribute": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9_:-]{1,64}$"
+                                  }
                                 }
                               }
                             }
@@ -3577,6 +4241,280 @@
             }
           }
         ]
+      }
+    },
+    "/v2/search/research/papers": {
+      "get": {
+        "operationId": "firecrawlResearchPaperSearch",
+        "summary": "Search scholarly metadata",
+        "description": "Searches Crossref's public scholarly metadata API. Returns DOI identifiers, titles, authors, dates, subject categories, and source links; abstracts are omitted because some are subject to publisher or author copyright. Results are cached for one hour. Each request costs 130 Apex credits. This is a DOI-metadata search, not a complete citation graph or proprietary research index.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          },
+          {
+            "name": "k",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of ranked records to return.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 40
+            }
+          },
+          {
+            "name": "authors",
+            "in": "query",
+            "required": false,
+            "description": "Repeat or comma-separate author-name substrings; every value must match.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "maxItems": 20
+            },
+            "style": "form",
+            "explode": true
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "description": "Repeat or comma-separate subject-category substrings; every value must match.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "maxItems": 20
+            },
+            "style": "form",
+            "explode": true
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Inclusive lower bound on Crossref creation date.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Inclusive upper bound on Crossref creation date.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "relevance",
+                "date_desc"
+              ],
+              "default": "relevance"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ranked DOI metadata records with source attribution and Apex credits used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "results",
+                    "creditsUsed"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "paperId",
+                          "primaryId",
+                          "ids",
+                          "title",
+                          "authors",
+                          "categories",
+                          "url",
+                          "provider"
+                        ],
+                        "properties": {
+                          "paperId": {
+                            "type": "string",
+                            "description": "Canonical DOI identifier."
+                          },
+                          "primaryId": {
+                            "type": "string"
+                          },
+                          "ids": {
+                            "type": "object"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "authors": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "createdDate": {
+                            "type": "string"
+                          },
+                          "updateDate": {
+                            "type": "string"
+                          },
+                          "categories": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "Crossref"
+                            ]
+                          },
+                          "score": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    },
+                    "creditsUsed": {
+                      "type": "integer",
+                      "const": 130
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Crossref is unavailable or rate limited; reservation is refunded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/search/research/papers/{paper_id}": {
+      "get": {
+        "operationId": "firecrawlResearchPaperRead",
+        "summary": "Read scholarly DOI metadata",
+        "description": "Looks up a DOI from Crossref and returns citation metadata without an abstract. Each request costs 130 Apex credits. Encode the DOI slash in the URL path when needed.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paper_id",
+            "in": "path",
+            "required": true,
+            "description": "A DOI returned by the scholarly search route; URL-encode reserved path characters.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paper metadata and Apex credits used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DOI not found in Crossref",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Crossref is unavailable or rate limited; reservation is refunded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
