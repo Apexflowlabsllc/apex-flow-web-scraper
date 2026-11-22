@@ -38,7 +38,26 @@ curl https://webscraper.apexflowlabs.com/v1/scrape \
 
 3. Or connect its hosted MCP server to Claude Code, Codex, VS Code Copilot, Cursor, Gemini CLI, Cascade/Windsurf, or another MCP client: [copy-paste setup guides](https://webscraper.apexflowlabs.com/docs.html#agents).
 
-The npm package is not published yet. Its prepared installer configures Codex CLI, Claude Code/Desktop, Cursor, Gemini CLI, Windsurf, GitHub Copilot CLI and VS Code, Cline, Roo Code (workspace), Continue (workspace), OpenCode, Amazon Q Developer, JetBrains Air, or Zed individually or in one pass. For example, select one client with `npx -y apex-flow-web-scraper setup --client opencode`, or preview every supported target with `npx -y apex-flow-web-scraper setup --all --dry-run`. The installer backs up existing settings, preserves unrelated servers, and keeps the API key out of configuration files. Developer API examples cover [OpenAI Responses](examples/openai-responses-mcp.py), [Anthropic Messages](examples/anthropic-messages-mcp.py), [Google ADK](examples/google-adk-mcp.py), and [xAI/Grok's native Python SDK](examples/xai-native-mcp.py) and [Responses API](examples/xai-responses-mcp.py). Both Grok examples restrict MCP access to `scrape_page`; see [xAI's remote MCP documentation](https://docs.x.ai/developers/tools/remote-mcp) for current API support. These are developer API integrations. ChatGPT's built-in MCP connections have separate plan and workspace requirements.
+Grok CLI can connect directly over remote MCP without the npm package. Add this to `~/.grok/config.toml`, then set `APEX_SCRAPER_API_KEY` in the environment that launches Grok:
+
+```toml
+[mcp_servers.apex_flow_web_scraper]
+url = "https://webscraper.apexflowlabs.com/v1/mcp"
+headers = { "Authorization" = "Bearer ${APEX_SCRAPER_API_KEY}" }
+```
+
+Grok expands the environment variable when loading headers, so the key stays out of the config file. Use `grok mcp doctor apex_flow_web_scraper` to check the connection.
+
+The npm package is not published yet. Its prepared installer has individual targets for Codex CLI, Claude Code/Desktop, Grok CLI, Cursor, Gemini CLI, Windsurf, GitHub Copilot CLI and VS Code, Cline, Roo Code, Continue, OpenCode, Amazon Q Developer, JetBrains Air, and Zed. For example, select Grok with `npx -y apex-flow-web-scraper setup --client grok`, or preview all supported targets with `npx -y apex-flow-web-scraper setup --all --dry-run`. The installer backs up existing settings, preserves unrelated servers, and keeps the API key out of configuration files.
+
+Developer API examples are available for:
+
+- [OpenAI Responses](examples/openai-responses-mcp.py)
+- [Anthropic Messages](examples/anthropic-messages-mcp.py)
+- [Google ADK](examples/google-adk-mcp.py)
+- [xAI/Grok's native Python SDK](examples/xai-native-mcp.py) and [Responses API](examples/xai-responses-mcp.py)
+
+Both Grok API examples restrict MCP access to `scrape_page`; see [xAI's remote MCP documentation](https://docs.x.ai/developers/tools/remote-mcp) for current API support. Model calls can use vendor tokens and scraping calls use Apex credits. ChatGPT's built-in MCP connections have separate plan and workspace requirements.
 
 For agents that support the open Agent Skills format, this repository also includes a portable skill and dependency-free Python CLI. After it is merged to the public default branch, install it with `npx skills add Apexflowlabsllc/apex-flow-web-scraper --skill apex-flow-web-scraper`; set `APEX_SCRAPER_API_KEY` in the agent's environment. The skill covers page reads, batches, changes-only comparisons, maps, crawls, usage and saved-page search.
 

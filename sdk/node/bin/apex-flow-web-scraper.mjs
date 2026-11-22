@@ -33,6 +33,7 @@ export function getClientTargets({ home = homedir(), appData = process.env.APPDA
     { id: "codex", label: "OpenAI Codex CLI", format: "toml", path: join(home, ".codex", "config.toml"), detect: join(home, ".codex") },
     { id: "claude-code", label: "Claude Code", format: "jsonc", path: join(home, ".claude.json"), detect: join(home, ".claude"), entryType: "stdio" },
     { id: "claude-desktop", label: "Claude Desktop", format: "jsonc", path: claudeDesktop, detect: dirname(claudeDesktop) },
+    { id: "grok", label: "Grok CLI", format: "toml", path: join(home, ".grok", "config.toml"), detect: join(home, ".grok"), remoteUrl: "https://webscraper.apexflowlabs.com/v1/mcp", authEnvVar: "APEX_SCRAPER_API_KEY" },
     { id: "cursor", label: "Cursor", format: "jsonc", path: join(home, ".cursor", "mcp.json"), detect: join(home, ".cursor") },
     { id: "gemini", label: "Gemini CLI", format: "jsonc", path: join(home, ".gemini", "settings.json"), detect: join(home, ".gemini") },
     { id: "windsurf", label: "Windsurf", format: "jsonc", path: join(home, ".codeium", "windsurf", "mcp_config.json"), detect: join(home, ".codeium", "windsurf") },
@@ -71,7 +72,7 @@ export function jsoncWithMcpServer(source, { force = false, entry = MCP_COMMAND,
   return { text: applyEdits(text, edits), changed: true };
 }
 
-export function tomlWithMcpServer(source, { force = false, os = platform() } = {}) {
+export function tomlWithMcpServer(source, { force = false, os = platform(), remoteUrl, authEnvVar = "APEX_SCRAPER_API_KEY" } = {}) {
   const section = "[mcp_servers.apex_flow_web_scraper]";
   const lines = source.split(/\r?\n/);
   const header = /^\s*\[\[?\s*mcp_servers\s*\.\s*(?:apex_flow_web_scraper|\"apex_flow_web_scraper\"|'apex_flow_web_scraper')\s*\]\]?\s*(?:#.*)?$/;
@@ -79,7 +80,9 @@ export function tomlWithMcpServer(source, { force = false, os = platform() } = {
   const start = lines.findIndex((line) => header.test(line));
   if (start >= 0 && !force) return { text: source, changed: false, reason: "already configured; review the existing section manually" };
   const command = getMcpCommand(os);
-  const block = [section, `command = ${JSON.stringify(command.command)}`, `args = ${JSON.stringify(command.args)}`];
+  const block = remoteUrl
+    ? [section, `url = ${JSON.stringify(remoteUrl)}`, `headers = { "Authorization" = ${JSON.stringify("Bearer ${" + authEnvVar + "}")} }`]
+    : [section, `command = ${JSON.stringify(command.command)}`, `args = ${JSON.stringify(command.args)}`];
   if (start >= 0) {
     let end = start + 1;
     while (end < lines.length) {
@@ -106,7 +109,7 @@ function makeBackup(path) {
 export function installClient(target, { force = false, dryRun = false, os = platform() } = {}) {
   const oldText = existsSync(target.path) ? readFileSync(target.path, "utf8") : "";
   const result = target.format === "toml"
-    ? tomlWithMcpServer(oldText, { force, os })
+    ? tomlWithMcpServer(oldText, { force, os, remoteUrl: target.remoteUrl, authEnvVar: target.authEnvVar })
     : jsoncWithMcpServer(oldText, { force, rootKey: target.rootKey, entry: target.entryFactory ? target.entryFactory({ os }) : { ...(target.entryType ? { type: target.entryType } : {}), ...getMcpCommand(os) } });
   if (!result.changed || dryRun) return { ...result, backup: null };
   mkdirSync(dirname(target.path), { recursive: true });
@@ -121,7 +124,7 @@ export function installClient(target, { force = false, dryRun = false, os = plat
 function printHelp() {
   stdout.write(`Apex Flow Web Scraper ${process.env.npm_package_version || ""}\n\n`);
   stdout.write("Commands:\n  setup [--all | --client <name>] [--yes] [--force] [--dry-run]\n  mcp\n  clients\n\n");
-  stdout.write("Clients: codex, claude-code, claude-desktop, cursor, gemini, windsurf, copilot, cline, roo-code, continue, opencode, amazon-q, jetbrains-air, zed\n");
+  stdout.write("Clients: codex, claude-code, claude-desktop, grok, cursor, gemini, windsurf, copilot, cline, roo-code, continue, opencode, amazon-q, jetbrains-air, zed\n");
   stdout.write("The MCP bridge reads APEX_SCRAPER_API_KEY from its environment. It never writes the key into client settings.\n");
 }
 
@@ -142,7 +145,7 @@ function parseArgs(argv) {
 
 export async function runSetup(options, { home = homedir(), appData = process.env.APPDATA, os = platform(), io = { stdin, stdout, stderr } } = {}) {
   const targets = getClientTargets({ home, appData, os });
-  const aliases = { claude: "claude-code", vscode: "copilot", "github-copilot": "copilot", roo: "roo-code" };
+  const aliases = { claude: "claude-code", "grok-cli": "grok", vscode: "copilot", "github-copilot": "copilot", roo: "roo-code" };
   let selected;
   if (options.client) {
     const id = aliases[options.client] || options.client;
