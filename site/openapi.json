@@ -2677,7 +2677,7 @@
       "post": {
         "operationId": "firecrawlCompatSearch",
         "summary": "Firecrawl-compatible web, news, and image search",
-        "description": "Requires an operator-configured web search provider. Supports query, limit, one source per request: web, news, or images (string and {type:...} forms), and mutually exclusive includeDomains/excludeDomains arrays of 1–50 hostnames. News uses Tavily or Exa; images use Brave's dedicated index with strict SafeSearch. Returns Firecrawl-shaped results with position. Firecrawl SDK origin telemetry is accepted but not recorded. Does not call Apex saved-page search.",
+        "description": "Requires an operator-configured web search provider. Supports query, limit, one source per request: web, news, or images (string and {type:...} forms), and mutually exclusive includeDomains/excludeDomains arrays of 1–50 hostnames. News uses Tavily or Exa; images use Brave's dedicated index with strict SafeSearch. Optional web/news scrapeOptions support markdown, html, rawHtml, links, images, screenshot and bounded actions/waitFor. Each returned page uses Apex safety checks and metering; creditsUsed aggregates search and successful page scrapes, with failures reported on individual results. Image scraping, JSON extraction and summary formats are not supported. Returns Firecrawl-shaped results with position. Firecrawl SDK origin telemetry is accepted but not recorded. Does not call Apex saved-page search.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -2751,6 +2751,21 @@
                     "type": "string",
                     "maxLength": 200,
                     "description": "Accepted for Firecrawl SDK compatibility; Apex does not record it."
+                  },
+                  "scrapeOptions": {
+                    "type": "object",
+                    "description": "Optional scraping of each web/news result through Apex. Supports formats markdown/html/rawHtml/links/images/screenshot, onlyMainContent:true, waitFor 0–5000, and bounded read-only actions.",
+                    "properties": {
+                      "formats": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {"oneOf": [{"type": "string", "enum": ["markdown", "html", "rawHtml", "links", "images", "screenshot"]}, {"type": "object", "required": ["type"], "properties": {"type": {"type": "string", "enum": ["markdown", "html", "rawHtml", "links", "images", "screenshot"]}}, "additionalProperties": false}]}
+                      },
+                      "onlyMainContent": {"type": "boolean", "enum": [true]},
+                      "waitFor": {"type": "integer", "minimum": 0, "maximum": 5000},
+                      "actions": {"type": "array", "maxItems": 8, "items": {"type": "object"}}
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "not": {"required": ["includeDomains", "excludeDomains"]}

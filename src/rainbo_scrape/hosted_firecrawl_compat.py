@@ -665,7 +665,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         body = await request.json()
         if not isinstance(body, dict):
             return error("Request body must be a JSON object")
-        allowed = {"query", "limit", "sources", "includeDomains", "excludeDomains", "origin"}
+        allowed = {"query", "limit", "sources", "includeDomains", "excludeDomains", "origin", "scrapeOptions"}
         extra = set(body) - allowed
         if extra:
             return error("Unsupported Apex compatibility options: " + ", ".join(sorted(extra)))
@@ -681,6 +681,33 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                     return error("sources must contain 'web', 'news', or 'images' (string or {type: ...})")
         if len(source_types) != 1 or source_types[0] not in ("web", "news", "images"):
             return error("This adapter supports one Firecrawl source per request: web, news, or images")
+        scrape_options = body.get("scrapeOptions")
+        scrape_actions = []
+        if scrape_options is not None:
+            if source_types[0] == "images":
+                return error("scrapeOptions is supported for web and news search results, not image results")
+            if not isinstance(scrape_options, dict):
+                return error("scrapeOptions must be an object")
+            extra_scrape = set(scrape_options) - {"formats", "onlyMainContent", "waitFor", "actions"}
+            if extra_scrape:
+                return error("Unsupported search scrapeOptions: " + ", ".join(sorted(extra_scrape)))
+            if scrape_options.get("onlyMainContent", True) is not True:
+                return error("onlyMainContent:false is not supported; Apex returns the main content")
+            formats = scrape_options.get("formats", ["markdown"])
+            if not isinstance(formats, list) or not formats:
+                return error("scrapeOptions.formats must be a non-empty list")
+            normalized_formats = []
+            for item in formats:
+                kind = item if isinstance(item, str) else item.get("type") if isinstance(item, dict) else None
+                if isinstance(item, dict) and set(item) != {"type"}:
+                    return error("Search scrape format options are not supported by this compatibility subset")
+                if kind not in {"markdown", "html", "rawHtml", "links", "images", "screenshot"}:
+                    return error("Search scrape formats support markdown, html, rawHtml, links, images, screenshot")
+                normalized_formats.append("raw_html" if kind == "rawHtml" else kind)
+            try:
+                scrape_actions = translate_wait_for(scrape_options.get("actions"), scrape_options.get("waitFor", 0))
+            except ValueError as exc:
+                return error(str(exc))
         topic = source_types[0] if source_types[0] in ("news", "images") else "general"
         origin = body.get("origin")
         if origin is not None and (not isinstance(origin, str) or len(origin) > 200):
@@ -716,7 +743,51 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             results = [{"url": item.get("url"), "title": item.get("title"),
                         "description": item.get("snippet"), "position": index}
                        for index, item in enumerate(payload.get("results", []), start=1)]
-        reply = {"success": True, "data": {key: results}}
+        search_credits = payload.get("credits_used", 0)
+        total_credits = search_credits if isinstance(search_credits, int) else 0
+        if scrape_options is not None:
+            semaphore = asyncio.Semaphore(3)
+
+            async def scrape_result(item):
+                nonlocal total_credits
+                url = item.get("url")
+                if not isinstance(url, str) or not url:
+                    item["error"] = "Search result has no scrapeable page URL"
+                    item["statusCode"] = 400
+                    return item
+                selected_outputs = [value for value in normalized_formats if value != "screenshot"]
+                apex_body = {"url": url, "render": "auto"}
+                if selected_outputs:
+                    apex_body["outputs"] = selected_outputs
+                if "screenshot" in normalized_formats:
+                    apex_body["screenshot"] = True
+                    if "outputs" in apex_body:
+                        apex_body["outputs"].append("screenshot")
+                if scrape_actions:
+                    apex_body["actions"] = scrape_actions
+                async with semaphore:
+                    try:
+                        response = await perform(request["account"], apex_body)
+                    except (ScrapeError, ValueError) as exc:
+                        item["error"] = str(exc)[:500]
+                        item["statusCode"] = getattr(exc, "status", 400)
+                        return item
+                page_payload = unpack(response)
+                credits = page_payload.get("credits_used", 0)
+                if isinstance(credits, int):
+                    total_credits += credits
+                if response.status < 200 or response.status >= 300:
+                    item["error"] = page_payload.get("error", "Page scrape failed")
+                    item["statusCode"] = response.status
+                    return item
+                page = page_payload.get("result") or {}
+                data = page_data(page, credits, screenshot="screenshot" in normalized_formats)
+                item["metadata"] = {**(item.get("metadata") or {}), **data.pop("metadata", {})}
+                item.update(data)
+                return item
+
+            results = await asyncio.gather(*(scrape_result(item) for item in results))
+        reply = {"success": True, "data": {key: results}, "creditsUsed": total_credits}
         if origin:
             reply["warning"] = "Search SDK origin telemetry is accepted but not recorded by Apex."
         return web.json_response(reply)

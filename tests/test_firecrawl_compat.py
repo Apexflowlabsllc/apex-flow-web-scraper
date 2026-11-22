@@ -565,6 +565,36 @@ async def test_v2_search_maps_brave_images_source(hosted, monkeypatch):
     }]
 
 
+async def test_v2_search_scrape_options_scrapes_results_and_counts_page_credits(hosted, monkeypatch):
+    import rainbo_scrape.hosted_search as hosted_search
+
+    h, client, headers = await _auth(hosted)
+    monkeypatch.setenv("TAVILY_API_KEY", "fixture-search-key")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "tavily")
+
+    async def fixture_search(query, count, include_domains=None, exclude_domains=None, topic="general"):
+        return [{"url": "https://example.com/compat", "title": "Search title", "snippet": "Search snippet"}]
+
+    monkeypatch.setattr(hosted_search, "tavily", fixture_search)
+    response = await client.post("/v2/search", headers=headers, json={
+        "query": "fixture", "sources": ["web"],
+        "scrapeOptions": {"formats": ["markdown"], "waitFor": 25},
+    })
+    payload = await response.json()
+    assert response.status == 200 and payload["success"] is True
+    result = payload["data"]["web"][0]
+    assert result["url"] == "https://example.com/compat"
+    assert result["markdown"] == "# Fixture"
+    assert result["metadata"]["apexCreditsUsed"] == 1
+    assert payload["creditsUsed"] == 211  # Search reserve (210) plus one page scrape credit.
+    assert h.scrape_calls[-1][1]["actions"] == [{"type": "wait", "ms": 25}]
+
+    rejected = await client.post("/v2/search", headers=headers, json={
+        "query": "fixture", "sources": ["images"], "scrapeOptions": {"formats": ["markdown"]},
+    })
+    assert rejected.status == 400
+
+
 async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hosted, monkeypatch):
     import rainbo_scrape.hosted_search as hosted_search
     Firecrawl = pytest.importorskip("firecrawl").Firecrawl
