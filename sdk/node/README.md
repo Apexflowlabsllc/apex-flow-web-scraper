@@ -34,6 +34,29 @@ inherited by the AI client, then restart it. The bridge connects to the hosted
 Streamable HTTP MCP endpoint; scraping is still run by Apex Flow's hosted service.
 `npm install apex-flow-web-scraper` is not available until the package release.
 
+### Use the Vercel AI SDK
+
+The repository includes a server-side integration using Vercel's official
+`@ai-sdk/mcp` client. It discovers the hosted Apex tools over Streamable HTTP,
+lets AI SDK's `generateText` select and call them, and closes the MCP client
+afterward. The example is tested against a local MCP fixture without an AI
+provider key or a production request.
+
+```bash
+cd sdk/node
+npm install
+export APEX_SCRAPER_API_KEY="your-apex-key"
+export AI_GATEWAY_MODEL="provider/model-enabled-for-your-account"
+export AI_GATEWAY_API_KEY="your-vercel-ai-gateway-key"
+node examples/vercel-ai-sdk-mcp.mjs "Scrape https://example.com and summarize it"
+```
+
+On Vercel, use the AI Gateway authentication available to the project instead
+of placing a key in source. The Apex key and Gateway credentials stay in the
+server environment; never expose them to browser code. The model call is billed
+by the configured model provider, and scrape calls use the Apex plan and
+credits. See the [official AI SDK MCP integration guide](https://vercel.com/docs/mcp/integrations/ai-sdk).
+
 The local bridge also provides `web_search_byok`. Set exactly one of
 `BRAVE_SEARCH_API_KEY`, `TAVILY_API_KEY`, or `EXA_API_KEY` in the environment
 that launches the AI client (or set `APEX_SEARCH_PROVIDER` when setting more

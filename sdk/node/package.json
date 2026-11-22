@@ -48,6 +48,8 @@
     "apex-flow"
   ],
   "devDependencies": {
+    "@ai-sdk/mcp": "2.0.102",
+    "ai": "7.0.179",
     "firecrawl": "4.54.0"
   }
 }

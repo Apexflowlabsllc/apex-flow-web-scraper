@@ -68,6 +68,7 @@ Developer API examples are available for:
 - [Anthropic Messages](examples/anthropic-messages-mcp.py)
 - [Google ADK](examples/google-adk-mcp.py)
 - [xAI/Grok's native Python SDK](examples/xai-native-mcp.py) and [Responses API](examples/xai-responses-mcp.py)
+- [Vercel AI SDK 7](sdk/node/examples/vercel-ai-sdk-mcp.mjs) with the official `@ai-sdk/mcp` client and Streamable HTTP
 
 ### Migrate an existing Firecrawl SDK client
 

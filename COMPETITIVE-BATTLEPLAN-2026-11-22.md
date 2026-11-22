@@ -5,7 +5,7 @@
 ## What is already a real advantage
 
 - **Low, predictable listed price.** The site offers a $5 one-time 35,000-credit pass and monthly plans from $15 for 110,000 credits. A plain page costs one credit, a rendered page three, and failed requests are refunded. No automatic overages are advertised.
-- **AI connection coverage.** The current branch prepares 15 individual MCP client installers and includes direct MCP examples for OpenAI Responses, Anthropic Messages, Google ADK, and both xAI/Grok Python SDK paths. Client-specific setup reduces integration work, but setup files alone do not prove compatibility or adoption.
+- **AI connection coverage.** The current branch prepares 15 individual MCP client installers and direct MCP examples for OpenAI Responses, Anthropic Messages, Google ADK, xAI/Grok, and Vercel AI SDK 7 through the official `@ai-sdk/mcp` client. The Vercel path has a local MCP fixture test proving authenticated tool discovery and a model tool-call loop; it does not prove adoption or a live AI Gateway call.
 - **A source receipt on every read.** The API returns change status, source URL and extraction metadata; batches, crawls, bounded one-request browser actions, sitemap maps, saved-page search, documents, and schema-checked extraction are present in the source.
 - **Honest access behavior.** Apex stops at access challenges and can return a clearly labelled Internet Archive snapshot. It does not claim to defeat CAPTCHAs, bot walls, or access controls.
 
