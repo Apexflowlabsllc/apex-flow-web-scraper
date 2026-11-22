@@ -1,6 +1,6 @@
 # Apex Flow Web Scraper: capability plan
 
-**Decision record, 8 October 2026 · Public engine 0.1.0**
+**Decision record, 8 October 2026 · updated 22 November 2026 · repository package 0.11.0**
 
 The aim is broad, dependable capability under customer control. “Beat every
 competitor” is a direction, not a measured result. We do not describe a feature
@@ -10,20 +10,31 @@ be recovered.
 
 ## What users can do today
 
-The 0.1.0 engine supports public HTTP/HTTPS pages, same-origin crawl jobs, an
-optional isolated Brave render, CSS extraction recipes, required-field
-validation, source evidence, durable status and cancellation, JSON/CSV exports,
-local corpus search and nine MCP tools. The worker and local website are
-single-installation tools; the workspace is not a public multi-user service.
+This roadmap covers both the self-hosted engine and the hosted service. The
+repository's API source, `site/openapi.json`, and `site/docs.html` describe a
+hosted product with authenticated page and batch scraping, JavaScript
+rendering, sitemap discovery, crawl jobs, change diffs, CSS recipes, paid JSON
+Schema extraction, account-scoped saved-page search, PDF/DOCX parsing, Shopify
+catalog change signals, and remote MCP access. A source-tree description does
+not prove that the latest branch is deployed; verify the release before
+promising a hosted feature or limit.
 
-It does not yet support customer login profiles, CAPTCHA solving or
-user-assisted challenge continuation, managed proxy pools, visual workflow
-recording, OCR, shared cloud accounts, global datasets, or a contractual
-extraction SLA. An operator may configure one customer-controlled HTTP proxy
-with `RAINBO_SCRAPE_PROXY_URL`; the engine validates destinations
-against public-address policy before forwarding and exposes only a boolean
-health indicator. This is proxy routing, not a proxy network or geographic
-coverage promise. The 44 current tests and one successful server smoke scrape
+The self-hosted engine supports public HTTP/HTTPS pages, same-origin crawl
+jobs, an optional isolated Brave render, CSS extraction recipes, required-field
+validation, source evidence, durable status and cancellation, JSON/CSV exports,
+local corpus search, and MCP tools for health, fetch, maps, crawls, recipes,
+search, jobs and change comparisons. It can also use a separate local browser
+profile that the account owner signs into; that profile remains on the owner's
+machine and is not sent to the hosted service. The worker and local website
+are single-installation tools, not a public multi-user service.
+
+Neither edition provides CAPTCHA solving, bot-wall evasion, managed proxy
+pools, visual workflow recording, OCR, shared cloud accounts, global datasets,
+or a contractual extraction SLA. An operator may configure one
+customer-controlled HTTP proxy with `RAINBO_SCRAPE_PROXY_URL`; the engine
+validates destinations against public-address policy before forwarding and
+exposes only a boolean health indicator. This is proxy routing, not a proxy
+network or geographic coverage promise. Existing unit tests and smoke scrapes
 are not comparative accuracy, coverage or uptime evidence.
 
 ## Capability map

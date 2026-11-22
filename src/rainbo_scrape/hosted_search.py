@@ -4,9 +4,9 @@ import os
 import aiohttp
 from aiohttp import web
 
-from .billing import QuotaExceeded
+from .billing import QuotaExceeded, cost_of
 
-CREDITS = 70  # a search costs us half a US cent; this stays above cost on every plan
+CREDITS = cost_of("search")  # keep endpoint reservation aligned with the central price table
 
 
 def configured():

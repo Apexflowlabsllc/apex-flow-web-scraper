@@ -44,6 +44,7 @@ def test_prices_undercut_firecrawl_standard():
 
 def test_cost_validation():
     assert cost_of("proxy_page", 2) == 16
+    assert cost_of("search") == 70
     with pytest.raises(ValueError):
         cost_of("bogus")
     with pytest.raises(ValueError):

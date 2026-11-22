@@ -18,7 +18,7 @@ PLANS = {
     "scale": {"price": 299, "credits": 3750000, "rpm": 240, "concurrency": 20, "saved_pages": 1000},
 }
 # Credits per request kind. Rendered pages cost our browser time; proxied pages cost real bandwidth.
-COSTS = {"page": 1, "render": 3, "proxy_page": 8, "proxy_render": 10, "extract": 150, "search": 1}
+COSTS = {"page": 1, "render": 3, "proxy_page": 8, "proxy_render": 10, "extract": 150, "search": 70}
 PREFIX = "rs_live_"
 
 

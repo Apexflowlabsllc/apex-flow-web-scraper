@@ -39,6 +39,17 @@ test("JSONC integration is idempotent and refuses to overwrite a conflicting ent
   assert.deepEqual(JSON.parse(jsoncWithMcpServer('{"mcpServers":{"apex-flow-web-scraper":{"command":"custom"}}}', { force: true }).text).mcpServers[SERVER_NAME], MCP_COMMAND);
 });
 
+test("nested JSONC paths preserve unrelated OpenCode config and use an environment reference", () => {
+  const source = '{\n  "theme": "dark",\n  "mcp": {"servers": {"existing": {"type":"local","command":["node"]}}}\n}\n';
+  const entry = { type: "local", command: ["npx", "-y", "apex-flow-web-scraper", "mcp"], environment: { APEX_SCRAPER_API_KEY: "{env:APEX_SCRAPER_API_KEY}" } };
+  const result = jsoncWithMcpServer(source, { rootKey: ["mcp", "servers"], entry });
+  const value = JSON.parse(result.text);
+  assert.equal(value.theme, "dark");
+  assert.deepEqual(value.mcp.servers.existing, { type: "local", command: ["node"] });
+  assert.deepEqual(value.mcp.servers[SERVER_NAME], entry);
+  assert.doesNotMatch(JSON.stringify(value), /Bearer |rs_live_/);
+});
+
 test("Zed context_servers format keeps unrelated settings and never embeds a key", () => {
   const result = jsoncWithMcpServer('{\n  "theme": "One Dark",\n  "context_servers": {"other": {"command":"node"}}\n}', {
     rootKey: "context_servers", entry: { command: "npx", args: ["-y", "apex-flow-web-scraper", "mcp"], env: {} },
@@ -50,15 +61,31 @@ test("Zed context_servers format keeps unrelated settings and never embeds a key
   assert.doesNotMatch(JSON.stringify(value), /API_KEY|Bearer/);
 });
 
-test("target registry includes individually selectable Cline, Roo Code and Zed installs", () => {
+test("target registry includes individually selectable Cline, Roo Code, Continue, OpenCode, Amazon Q, JetBrains Air and Zed installs", () => {
   const home = "E:/fixture-home";
   const cwd = "E:/fixture-project";
   const targets = getClientTargets({ home, cwd, appData: "E:/fixture-appdata", xdgConfigHome: "E:/fixture-config", os: "win32" });
   const byId = Object.fromEntries(targets.map((target) => [target.id, target]));
   assert.equal(byId.cline.path, join(home, ".cline", "data", "settings", "cline_mcp_settings.json"));
   assert.equal(byId["roo-code"].path, join(cwd, ".roo", "mcp.json"));
+  assert.equal(byId.continue.path, join(cwd, ".continue", "mcpServers", `${SERVER_NAME}.json`));
+  assert.equal(byId.continue.rootKey, "mcpServers");
+  assert.equal(byId.opencode.path, join("E:/fixture-config", "opencode", "opencode.json"));
+  assert.deepEqual(byId.opencode.rootKey, ["mcp", "servers"]);
+  assert.equal(byId["amazon-q"].path, join(home, ".aws", "amazonq", "mcp.json"));
+  assert.equal(byId["jetbrains-air"].path, join(home, ".jetbrains", "mcp", "mcp.json"));
   assert.equal(byId.zed.path, join("E:/fixture-appdata", "Zed", "settings.json"));
   assert.equal(byId.zed.rootKey, "context_servers");
+});
+
+test("OpenCode target builds its native local-server command and secret reference", () => {
+  const home = "E:/fixture-home";
+  const target = getClientTargets({ home, xdgConfigHome: "E:/fixture-config", os: "win32" }).find((item) => item.id === "opencode");
+  assert.deepEqual(target.entryFactory({ os: "win32" }), {
+    type: "local",
+    command: ["cmd", "/c", "npx", "-y", "apex-flow-web-scraper", "mcp"],
+    environment: { APEX_SCRAPER_API_KEY: "{env:APEX_SCRAPER_API_KEY}" },
+  });
 });
 
 test("Codex TOML integration appends a stdio server and does not duplicate it", () => {
