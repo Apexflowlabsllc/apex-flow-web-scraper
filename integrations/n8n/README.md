@@ -46,10 +46,14 @@ silently switch to a different provider or expose local bring-your-own-key
 search, which belongs in a local client process.
 
 The package passes `@n8n/node-cli` 0.57.4 lint/build, TypeScript checks, 8
-contract tests and a tarball dry run. `npm audit --omit=dev` reports zero
-runtime vulnerabilities. The CLI's development dependency tree currently
-reports 35 advisories (19 high, 16 moderate); these are not shipped in the
-package tarball, and should be reviewed before adopting the CLI as a release
-dependency. The package remains private and unpublished. The n8n UI and
-multi-version runtime behavior still need a local n8n integration run before
-release or a verified-node submission.
+contract tests and a tarball dry run. A local `n8n-node dev` session booted n8n
+2.48.7 from an E: test profile: `/healthz` returned 200, and authenticated
+`/types/nodes.json` returned 200 with the Apex node, `apexFlowApi` credential,
+and scrape/batch actions present. The preview was stopped after the check.
+This verifies catalog loading; it does not verify visual editor rendering, a
+workflow execution, credential testing against the hosted API, or other n8n
+versions. `npm audit --omit=dev` reports zero runtime vulnerabilities. The
+CLI's development dependency tree currently reports 35 advisories (19 high,
+16 moderate); these are not shipped in the package tarball, and should be
+reviewed before adopting the CLI as a release dependency. The package remains
+private and unpublished.

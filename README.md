@@ -69,7 +69,7 @@ Developer API examples are available for:
 - [Google ADK](examples/google-adk-mcp.py)
 - [xAI/Grok's native Python SDK](examples/xai-native-mcp.py) and [Responses API](examples/xai-responses-mcp.py)
 - [Vercel AI SDK 7](sdk/node/examples/vercel-ai-sdk-mcp.mjs) with the official `@ai-sdk/mcp` client and Streamable HTTP
-- Private, unpublished [n8n community node](integrations/n8n/README.md) for scrape, map, web search, crawl lifecycle and batch creation. It passes n8n's official CLI lint/build and 8 contract tests; it has not been loaded into a live n8n instance.
+- Private, unpublished [n8n community node](integrations/n8n/README.md) for scrape, map, web search, crawl lifecycle and batch creation. It passes the official CLI lint/build and 8 contract tests; its node and credential appeared in a local n8n 2.48.7 catalog check. Workflow execution and credential use still need validation.
 
 ### Migrate an existing Firecrawl SDK client
 
