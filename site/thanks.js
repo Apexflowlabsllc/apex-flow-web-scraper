@@ -9,6 +9,7 @@ async function claim() {
     if (r.status === 202) throw new Error('Your payment is still processing. Check again in a moment.');
     if (!r.ok || !d.key) throw new Error(d.error || 'We could not verify this checkout. Please contact support.');
     key = d.key;
+    try { localStorage.setItem('apex_scraper_session', session); } catch {}
     document.getElementById('title').textContent = 'Your API is ready.';
     document.getElementById('message').textContent = 'Access verified. Save your key and start building.';
     document.getElementById('api-key').textContent = '••••••••••••••••••••••••';

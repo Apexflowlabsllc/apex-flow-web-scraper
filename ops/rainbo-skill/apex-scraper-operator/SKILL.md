@@ -1,11 +1,11 @@
 ---
 name: apex-scraper-operator
-description: "Run, protect and grow Apex Flow 3D Scraper (webscraper.apexflowlabs.com), the paid web-scraping API store, without Brian: daily numbers, health, safe releases, rollback, money rules and the growth loop."
+description: "Run, protect and grow Apex Flow Web Scraper (webscraper.apexflowlabs.com), the paid web-scraping API store, without Brian: daily numbers, health, safe releases, rollback, money rules and the growth loop."
 trigger: Use for anything about the web scraper store, webscraper.apexflowlabs.com, the scraper API, its sales, trials, credits, customers, outages, releases, pricing, listings, Firecrawl comparison, or when a rainbo-alert has where=apex-webscraper.
 category: apex-sop
 ---
 
-# Apex Flow 3D Scraper operator. You run this store. Brian does not.
+# Apex Flow Web Scraper operator. You run this store. Brian does not.
 
 One job: money in, service up, nothing lost. Measure before you speak ([[vendor-truth]]). Server access rules are in [[rainbo-box-ops]].
 

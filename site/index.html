@@ -108,6 +108,7 @@ h1 em,.chapter h2 em{font-style:normal;background:linear-gradient(100deg,var(--v
 .stat{padding:26px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(25,217,238,.12),rgba(8,22,31,.4) 60%)}
 .stat b{display:block;font-size:clamp(38px,5.4vw,60px);letter-spacing:-.04em;line-height:1;background:linear-gradient(100deg,#fff,#9fe9ff);-webkit-background-clip:text;background-clip:text;color:transparent}
 .stat span{color:var(--mute);font-size:14px;display:block;margin-top:8px}
+.connect{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:26px 0 16px}.connect a{display:flex;align-items:center;gap:13px;padding:15px 16px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(160deg,#0c2230,#07141c);color:var(--ink);text-decoration:none;transition:transform .25s cubic-bezier(.2,.7,.2,1),border-color .25s,box-shadow .25s}.connect a:hover,.connect a:focus-visible{transform:translateY(-3px);border-color:rgba(25,217,238,.7);box-shadow:0 24px 54px -32px rgba(25,217,238,.9)}.connect i{flex:none;display:grid;place-items:center;width:42px;height:42px;border-radius:12px;border:1px solid rgba(25,217,238,.5);background:#04121a;color:var(--v);font:800 13px ui-monospace,Consolas,monospace;font-style:normal;box-shadow:inset 0 0 16px rgba(25,217,238,.22)}.connect b{font-size:16px;letter-spacing:-.01em}@media (max-width:860px){.connect{grid-template-columns:repeat(2,1fr)}}
 section{padding:72px 0 8px}
 h2{font-size:clamp(30px,5vw,54px);letter-spacing:-.035em;line-height:1.02;margin:12px 0 20px;max-width:20ch}
 /* code */
@@ -183,7 +184,7 @@ button{font:inherit;cursor:pointer}.plan .btn{margin-top:22px;text-align:center;
 <canvas id="crawl-scene" aria-hidden="true"></canvas><div class="hero-scrim" aria-hidden="true"></div>
 <div class="wrap">
 <nav aria-label="Primary"><a class="logo" href="#"><i></i>APEX FLOW WEB SCRAPER</a>
-<div class="links"><a class="hide" href="#features">Features</a><a class="hide" href="/compare.html">Compare</a><a class="hide" href="#pricing">Pricing</a><a class="hide" href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper" rel="noopener">GitHub</a><a class="btn ghost" href="/dashboard.html" style="padding:9px 16px">Dashboard</a></div></nav>
+<div class="links"><a class="hide" href="#features">Features</a><a class="hide" href="/integrations/">Integrations</a><a class="hide" href="/compare.html">Compare</a><a class="hide" href="#pricing">Pricing</a><a class="hide" href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper" rel="noopener">GitHub</a><a class="btn ghost" href="/dashboard.html" style="padding:9px 16px">Dashboard</a></div></nav>
 <div class="chapters">
 <div class="chapter on" data-chapter>
 <p class="eyebrow">PUBLIC WEB DATA · BUILT FOR DEVELOPERS AND AI AGENTS</p>
@@ -225,6 +226,7 @@ button{font:inherit;cursor:pointer}.plan .btn{margin-top:22px;text-align:center;
 <div class="stat"><b>$0</b><span>Per page self-hosted. No key, no meter.</span></div>
 </div>
 
+<section id="connect" class="rv"><p class="eyebrow">Works where you work</p><h2>Every AI gets the live web.</h2><p class="lede">One address and one key. Pick your assistant or framework for the exact setup, checked against its own documentation.</p><div class="connect"><a href="/integrations/claude-code.html"><i aria-hidden="true">CC</i><b>Claude Code</b></a><a href="/integrations/cursor.html"><i aria-hidden="true">CU</i><b>Cursor</b></a><a href="/integrations/vs-code.html"><i aria-hidden="true">VS</i><b>VS Code + Copilot</b></a><a href="/integrations/codex.html"><i aria-hidden="true">CX</i><b>Codex CLI</b></a><a href="/integrations/gemini-cli.html"><i aria-hidden="true">GM</i><b>Gemini CLI</b></a><a href="/integrations/claude-api.html"><i aria-hidden="true">AN</i><b>Claude API</b></a><a href="/integrations/openai-responses.html"><i aria-hidden="true">OA</i><b>OpenAI API</b></a><a href="/integrations/langchain.html"><i aria-hidden="true">LC</i><b>LangChain</b></a></div><p class="note"><a href="/integrations/">See all 19 integrations →</a> including Claude Desktop, Windsurf, Cline, Zed, LM Studio, the Vercel AI SDK, n8n, Make, Zapier and plain HTTP.</p></section>
 <section id="quickstart" class="rv"><p class="eyebrow">From URL to useful data</p><h2>Your first API call. In seconds.</h2><p class="lede">Get your key, send a URL, and use the Markdown. No browser fleet to manage.</p><pre><code>curl https://webscraper.apexflowlabs.com/v1/scrape \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
@@ -300,7 +302,7 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
 <p class="lede" style="margin:0 auto">Try your sources with 1,000 free credits. Upgrade when your pipeline is ready.</p>
 <div class="cta" style="justify-content:center"><a class="btn" href="/trial.html">Get started free →</a><a class="btn ghost" href="/docs.html">Explore the docs</a></div></section>
 </main>
-<footer><div>Apex Flow Web Scraper · by Apex Flow Labs · Owned infrastructure, no hosted scraping calls.</div><div><a href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper" rel="noopener">GitHub</a> · <a href="/docs.html">Docs</a> · <a href="/docs.html#agents">Connect an AI agent</a> · <a href="/openapi.json">OpenAPI</a> · <a href="/compare.html">Compare</a> · <a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a> · <a href="mailto:apexflowlabs@gmail.com">Support</a> · <a href="https://www.apexflowlabs.com">Apex Flow Labs</a></div></footer>
+<footer><div>Apex Flow Web Scraper · by Apex Flow Labs · Owned infrastructure, no hosted scraping calls.</div><div><a href="https://github.com/Apexflowlabsllc/apex-flow-web-scraper" rel="noopener">GitHub</a> · <a href="/docs.html">Docs</a> · <a href="/integrations/">Integrations</a> · <a href="/openapi.json">OpenAPI</a> · <a href="/compare.html">Compare</a> · <a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a> · <a href="mailto:apexflowlabs@gmail.com">Support</a> · <a href="https://www.apexflowlabs.com">Apex Flow Labs</a></div></footer>
 </div>
 <script>
 (function(){

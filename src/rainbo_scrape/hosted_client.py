@@ -1,4 +1,4 @@
-"""Python client for the hosted Apex Flow 3D Scraper API. Standard library only.
+"""Python client for the hosted Apex Flow Web Scraper API. Standard library only.
 
     from rainbo_scrape.hosted_client import Apex
     apex = Apex()                       # reads APEX_SCRAPER_API_KEY

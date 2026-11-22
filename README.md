@@ -1,4 +1,4 @@
-# Apex Flow 3D Scraper
+# Apex Flow Web Scraper
 
 **Hosted API for developers and AI agents: scrape, crawl and monitor the public web as clean Markdown.** [Get 1,000 free credits](https://webscraper.apexflowlabs.com/trial.html) · [Docs](https://webscraper.apexflowlabs.com/docs.html) · [Pricing](https://webscraper.apexflowlabs.com/#pricing) · [OpenAPI](https://webscraper.apexflowlabs.com/openapi.json)
 

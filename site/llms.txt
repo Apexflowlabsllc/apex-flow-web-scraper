@@ -64,3 +64,8 @@ For a smaller REST or MCP scrape response, select outputs such as ["markdown"] o
 - Firecrawl public prices read 13 November 2026: Free 1,000 credits per month; Hobby $19 (5,000); Standard $99 (100,000); Growth $399 (500,000); Scale $749 (1,000,000) monthly billing. We are cheaper per plain page in the tiers compared; Firecrawl has a monthly free allowance, higher concurrency and a larger ecosystem.
 - Dated price comparisons with tradeoffs, read 13 November 2026: ScrapingBee https://webscraper.apexflowlabs.com/scrapingbee-alternative.html; ScraperAPI https://webscraper.apexflowlabs.com/scraperapi-alternative.html; Scrapfly https://webscraper.apexflowlabs.com/scrapfly-alternative.html; ZenRows https://webscraper.apexflowlabs.com/zenrows-alternative.html; Apify https://webscraper.apexflowlabs.com/apify-alternative.html
 - Self-hosted: read pages you are signed in to through your own browser profile on your own machine (rainbo-scrape login, then fetch --signed-in). Not part of the hosted API.
+
+## Connect an assistant or app
+- MCP server (Streamable HTTP): https://webscraper.apexflowlabs.com/v1/mcp with header Authorization: Bearer YOUR_API_KEY.
+- Setup pages for Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Cline, Codex CLI, Gemini CLI, Zed, LM Studio, the Claude API, the OpenAI Responses API and Agents SDK, LangChain, the Vercel AI SDK, n8n, Make, Zapier and plain HTTP: https://webscraper.apexflowlabs.com/integrations/
+- Agent skill file: https://webscraper.apexflowlabs.com/agent-onboarding/SKILL.md
