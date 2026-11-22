@@ -2,8 +2,13 @@ import asyncio
 import hashlib
 import hmac
 import json
+import secrets
+import sqlite3
 import socket
 import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from threading import Barrier
 
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
@@ -11,7 +16,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from rainbo_scrape.api import make_app
 from rainbo_scrape.billing import Billing, _hash
 from rainbo_scrape.hosted import Hosted, SITE
-from rainbo_scrape.hosted_monitors import _secret
+from rainbo_scrape.hosted_monitors import _claim_monitor_event, _secret
 from rainbo_scrape.policy import PublicResolver, ScrapeError
 
 
@@ -23,6 +28,46 @@ def add_account(h, plan, session):
     key = h.key_for(session, nonce)
     h.db.execute("INSERT INTO keys(hash,account,label) VALUES(?,?,?)", (_hash(key), account, "monitor test"))
     return account, {"Authorization": "Bearer " + key}
+
+
+def test_monitor_event_claim_is_exclusive_and_stale_owner_cannot_finish():
+    work_dir = Path(__file__).resolve().parents[1] / "work"
+    work_dir.mkdir(exist_ok=True)
+    db_path = work_dir / f"monitor-claim-{secrets.token_hex(8)}.sqlite3"
+    db = sqlite3.connect(db_path, isolation_level=None, timeout=10)
+    try:
+        db.execute("CREATE TABLE monitor_events(id TEXT PRIMARY KEY,state TEXT,attempts INTEGER,next_attempt REAL,lease_until REAL,lease_token TEXT)")
+        db.execute("INSERT INTO monitor_events VALUES('event','pending',0,0,NULL,NULL)")
+        now = time.time()
+        barrier = Barrier(2)
+
+        def compete():
+            connection = sqlite3.connect(db_path, isolation_level=None, timeout=10)
+            try:
+                barrier.wait()
+                return _claim_monitor_event(connection, "event", now)
+            finally:
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _: compete(), range(2)))
+        winners = [claim for claim in results if claim is not None]
+        assert len(winners) == 1 and winners[0][1] == 1
+        first = winners[0]
+
+        # Once a worker lease expires, another worker can recover the event. The
+        # old worker's token cannot mark the recovered event delivered.
+        second = _claim_monitor_event(db, "event", now + 121)
+        assert second is not None and second[0] != first[0] and second[1] == 2
+        stale_update = db.execute(
+            "UPDATE monitor_events SET state='delivered' WHERE id='event' AND lease_token=?",
+            (first[0],),
+        ).rowcount
+        assert stale_update == 0
+        assert db.execute("SELECT state,lease_token FROM monitor_events WHERE id='event'").fetchone() == ("pending", second[0])
+    finally:
+        db.close()
+        db_path.unlink(missing_ok=True)
 
 
 @pytest.fixture

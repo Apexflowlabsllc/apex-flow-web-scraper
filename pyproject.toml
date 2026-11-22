@@ -25,6 +25,7 @@ dependencies = ["aiohttp>=3.12,<4", "beautifulsoup4>=4.13,<5", "lxml>=5,<7", "ma
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10", "pytest-asyncio>=1,<2"]
+firecrawl-compat = ["firecrawl==4.57.0"]
 
 [project.scripts]
 rainbo-scrape = "rainbo_scrape.cli:main"

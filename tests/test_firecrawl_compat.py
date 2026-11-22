@@ -2,6 +2,7 @@ import asyncio
 import io
 import json
 import time
+import pytest
 from aiohttp import FormData
 from pypdf import PdfWriter
 
@@ -325,6 +326,35 @@ async def test_v2_map_search_and_batch_expose_exact_supported_subset(hosted, mon
     assert status_payload["success"] is True
     assert status_payload["completed"] == status_payload["total"] == 1
     assert status_payload["data"][0]["markdown"] == "# Fixture"
+
+
+async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hosted):
+    Firecrawl = pytest.importorskip("firecrawl").Firecrawl
+
+    h, client, headers = await _auth(hosted)
+    api_key = headers["Authorization"][7:]
+    app = Firecrawl(api_key=api_key, api_url=str(client.make_url("/")).rstrip("/"), max_retries=1)
+    scraped = await asyncio.to_thread(app.v2.scrape, "https://example.com", formats=["markdown"])
+    assert scraped.markdown == "# Fixture"
+    assert "ad blocking is not implemented by Apex" in scraped.warning
+    assert "origin attribution is not recorded by Apex" in scraped.warning
+
+    started = await asyncio.to_thread(app.v2.start_batch_scrape, ["https://example.com"])
+    status = None
+    for _ in range(30):
+        status = await asyncio.to_thread(app.v2.get_batch_scrape_status, started.id)
+        if status.status != "scraping":
+            break
+        await asyncio.sleep(0.01)
+    assert status is not None and status.status == "completed"
+    assert status.completed == status.total == 1
+    assert status.data[0].markdown == "# Fixture"
+    assert "origin attribution is not recorded by Apex" in status.data[0].warning
+
+    unsupported = await client.post("/v2/scrape", headers=headers,
+                                    json={"url": "https://example.com", "mobile": True})
+    assert unsupported.status == 400
+    assert (await unsupported.json())["code"] == "unsupported_option"
 
 
 async def test_v2_batch_reports_per_url_errors_and_supports_cancel(hosted, monkeypatch):

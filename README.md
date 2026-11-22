@@ -71,7 +71,7 @@ Developer API examples are available for:
 
 ### Migrate an existing Firecrawl SDK client
 
-Keep the official Firecrawl SDK and point its API URL at Apex. The adapter covers a documented subset of Firecrawl v2; unsupported options return an explicit error instead of being silently ignored. Hosted whole-web search still requires an operator-configured Apex provider. See the [compatibility contract](site/firecrawl-compat.html) before switching production traffic.
+Keep the official Firecrawl SDK and point its API URL at Apex. The adapter covers a documented subset of Firecrawl v2; unsupported options fail explicitly, and SDK defaults that Apex cannot honor add a response warning. Hosted whole-web search still requires an operator-configured Apex provider. See the [compatibility contract](site/firecrawl-compat.html) before switching production traffic.
 
 ```js
 import { Firecrawl } from "firecrawl";
@@ -85,7 +85,7 @@ const page = await scraper.scrape("https://example.com", { formats: ["markdown"]
 console.log(page.markdown);
 ```
 
-The same pattern works with Firecrawl's Python SDK using `api_url`. Current official examples: [JavaScript SDK](https://github.com/firecrawl/firecrawl/tree/main/apps/js-sdk/firecrawl) and [Python SDK](https://github.com/firecrawl/firecrawl/tree/main/apps/python-sdk). The adapter contract test uses the official Node SDK against its v2 API shapes; it does not claim full SDK parity.
+The same pattern works with Firecrawl's Python SDK using `api_url`. Current official examples: [JavaScript SDK](https://github.com/firecrawl/firecrawl/tree/main/apps/js-sdk/firecrawl) and [Python SDK](https://github.com/firecrawl/firecrawl/tree/main/apps/python-sdk). Both clients have selected v2 route coverage; this does not claim full SDK parity.
 
 Both Grok API examples restrict MCP access to `scrape_page`; see [xAI's remote MCP documentation](https://docs.x.ai/developers/tools/remote-mcp) for current API support. Model calls can use vendor tokens and scraping calls use Apex credits. ChatGPT's built-in MCP connections have separate plan and workspace requirements.
 
@@ -269,12 +269,16 @@ python -m pip install -e '.[test]'
 python -m pytest -q
 ```
 
-On 22 November 2026, the current review branch passed 148 Python tests and 18
-Node tests. The suite covers policy, cache/ETag, response limits, atomic
-accounting, recovery, cancellation, recipes, private-web boundaries, SDKs and
-client installers. Upstream dependency suites were not run. Browser-dependent
-tests require Brave availability. A dated Firecrawl comparison is in
-`BENCHMARK-2026-11-05.md`.
+'.[test,firecrawl-compat]'`. This pins the SDK version under test; it is not a
+To run the selected compatibility checks against Firecrawl's current Python
+SDK, install its isolated test extra with
+`python -m pip install -e '.[test,firecrawl-compat]'`. This pins the SDK version under test; it is not a
+'.[test,firecrawl-compat]'`. This pins the SDK version under test; it is not a
+runtime dependency of Apex. The Node package test suite includes the official
+Firecrawl Node SDK as a dev-only dependency. Compatibility checks cover selected
+v2 calls, not every SDK option. Browser-dependent tests require Brave
+availability. A dated Firecrawl comparison is in
+`FIRECRAWL-PARITY-MATRIX-2026-11-22.md`.
 
 Access challenge pages are detected and reported with an `access_challenge`
 error. The current release does not provide an isolated signed-in account

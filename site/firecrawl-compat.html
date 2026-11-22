@@ -35,7 +35,7 @@
   -d '{"url":"https://example.com","formats":["markdown","links"]}'</code></pre>
 
     <h2>Reuse the official SDK</h2>
-    <p>The current official Firecrawl Node and Python clients accept a custom API origin. Point an existing client at Apex and use an Apex API key to try the supported routes. The current Node SDK is tested against Apex's documented response shapes. This verifies selected calls; it does not establish full Firecrawl SDK parity.</p>
+    <p>The current official Firecrawl Node and Python clients accept a custom API origin. Point an existing client at Apex and use an Apex API key to try the supported routes. Selected v2 calls are tested against the official clients. Unsupported options fail explicitly; SDK defaults Apex cannot honor are surfaced as response warnings. This does not establish full Firecrawl SDK parity.</p>
     <pre><code>import { Firecrawl } from "firecrawl";
 
 const scraper = new Firecrawl({

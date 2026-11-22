@@ -86,7 +86,7 @@ See the [hosted API guide](https://webscraper.apexflowlabs.com/docs.html#sdk) an
 
 ### Reuse the official Firecrawl SDK
 
-For migration tests, install Firecrawl's official SDK and point its `apiUrl` to Apex's API origin. The documented Firecrawl v2 adapter subset is listed in the [compatibility contract](https://webscraper.apexflowlabs.com/firecrawl-compat.html); unsupported options fail explicitly.
+For migration tests, install Firecrawl's official SDK and point its `apiUrl` to Apex's API origin. The documented Firecrawl v2 adapter subset is listed in the [compatibility contract](https://webscraper.apexflowlabs.com/firecrawl-compat.html); unsupported options fail explicitly, and defaults that Apex cannot honor add a response warning.
 
 ```js
 import { Firecrawl } from "firecrawl";

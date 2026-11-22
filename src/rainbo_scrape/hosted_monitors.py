@@ -26,7 +26,7 @@ def prepare(h):
             id TEXT PRIMARY KEY, account TEXT NOT NULL, url TEXT NOT NULL,
             webhook_url TEXT NOT NULL, interval_seconds INTEGER NOT NULL,
             state TEXT NOT NULL, created REAL NOT NULL, next_check REAL NOT NULL,
-            lease_until REAL,
+            lease_until REAL, lease_token TEXT,
             last_check REAL, last_sha TEXT, failures INTEGER NOT NULL DEFAULT 0,
             last_error TEXT);
         CREATE INDEX IF NOT EXISTS monitors_due ON monitors(state,next_check);
@@ -35,13 +35,47 @@ def prepare(h):
             id TEXT PRIMARY KEY, monitor_id TEXT NOT NULL, account TEXT NOT NULL,
             created REAL NOT NULL, payload TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending',
             attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL,
-            http_status INTEGER, last_error TEXT);
+            http_status INTEGER, last_error TEXT, lease_until REAL, lease_token TEXT);
         CREATE INDEX IF NOT EXISTS monitor_events_due ON monitor_events(state,next_attempt);
         CREATE INDEX IF NOT EXISTS monitor_events_account ON monitor_events(account,monitor_id,created);
     """)
     columns = {row[1] for row in h.db.execute("PRAGMA table_info(monitors)")}
     if "lease_until" not in columns:
         h.db.execute("ALTER TABLE monitors ADD COLUMN lease_until REAL")
+    if "lease_token" not in columns:
+        h.db.execute("ALTER TABLE monitors ADD COLUMN lease_token TEXT")
+    event_columns = {row[1] for row in h.db.execute("PRAGMA table_info(monitor_events)")}
+    if "lease_until" not in event_columns:
+        h.db.execute("ALTER TABLE monitor_events ADD COLUMN lease_until REAL")
+    if "lease_token" not in event_columns:
+        h.db.execute("ALTER TABLE monitor_events ADD COLUMN lease_token TEXT")
+    h.db.execute("CREATE INDEX IF NOT EXISTS monitor_events_lease_due ON monitor_events(state,next_attempt,lease_until)")
+
+
+def _claim_monitor_check(db, monitor_id, now, lease_seconds=180):
+    """Atomically claim one due monitor check across workers sharing the database."""
+    token = secrets.token_urlsafe(18)
+    claimed = db.execute(
+        "UPDATE monitors SET lease_until=?,lease_token=? WHERE id=? AND state='active' "
+        "AND next_check<=? AND (lease_until IS NULL OR lease_until<=?)",
+        (now + lease_seconds, token, monitor_id, now, now),
+    ).rowcount
+    return token if claimed else None
+
+
+def _claim_monitor_event(db, event_id, now, lease_seconds=120):
+    """Atomically claim a due webhook attempt; event IDs remain stable across retries."""
+    token = secrets.token_urlsafe(18)
+    claimed = db.execute(
+        "UPDATE monitor_events SET lease_until=?,lease_token=?,attempts=attempts+1 "
+        "WHERE id=? AND state='pending' AND next_attempt<=? "
+        "AND (lease_until IS NULL OR lease_until<=?)",
+        (now + lease_seconds, token, event_id, now, now),
+    ).rowcount
+    if not claimed:
+        return None
+    row = db.execute("SELECT attempts FROM monitor_events WHERE id=? AND lease_token=?", (event_id, token)).fetchone()
+    return (token, row[0]) if row else None
 
 
 def _secret(h, account, monitor_id):
@@ -192,18 +226,17 @@ def install(h, app, perform, webhook_sender=None):
         active = h.db.execute("SELECT id FROM monitors WHERE account=? AND state='active' ORDER BY created,id",
                               (account,)).fetchall()
         if not h.entitled(account):
-            h.db.execute("UPDATE monitors SET state='paused',lease_until=NULL,last_error='Paid period inactive.' WHERE account=? AND state='active'",
+            h.db.execute("UPDATE monitors SET state='paused',lease_until=NULL,lease_token=NULL,last_error='Paid period inactive.' WHERE account=? AND state='active'",
                          (account,))
             return
         for stale in active[limit:]:
-            h.db.execute("UPDATE monitors SET state='paused',lease_until=NULL,last_error='Plan monitor limit changed; choose monitors to resume.' WHERE id=? AND state='active'",
+            h.db.execute("UPDATE monitors SET state='paused',lease_until=NULL,lease_token=NULL,last_error='Plan monitor limit changed; choose monitors to resume.' WHERE id=? AND state='active'",
                          (stale[0],))
         if limit == 0:
             return
         # Claim the check before awaiting network work so another worker/process cannot duplicate it.
-        claimed = h.db.execute("UPDATE monitors SET lease_until=? WHERE id=? AND state='active' AND next_check<=? AND (lease_until IS NULL OR lease_until<=?)",
-                               (now + 180, ident, now, now)).rowcount
-        if not claimed:
+        lease_token = _claim_monitor_check(h.db, ident, now)
+        if not lease_token:
             return
         try:
             # Scheduled automation obeys robots.txt, even though an explicitly named one-off
@@ -214,20 +247,20 @@ def install(h, app, perform, webhook_sender=None):
                 failures = h.db.execute("SELECT failures FROM monitors WHERE id=?", (ident,)).fetchone()
                 count = (failures[0] if failures else 0) + 1
                 if response.status == 402:
-                    h.db.execute("UPDATE monitors SET state='paused',lease_until=NULL,last_check=?,failures=?,last_error=? WHERE id=?",
-                                 (now, count, "Insufficient credits; monitor paused.", ident))
+                    h.db.execute("UPDATE monitors SET state='paused',lease_until=NULL,lease_token=NULL,last_check=?,failures=?,last_error=? WHERE id=? AND lease_token=?",
+                                 (now, count, "Insufficient credits; monitor paused.", ident, lease_token))
                 else:
                     delay = min(900 * (2 ** min(count - 1, 4)), 21600)
-                    h.db.execute("UPDATE monitors SET next_check=?,lease_until=NULL,last_check=?,failures=?,last_error=? WHERE id=? AND state='active'",
-                                 (now + delay, now, count, str(data.get("error") or "Check failed")[:300], ident))
+                    h.db.execute("UPDATE monitors SET next_check=?,lease_until=NULL,lease_token=NULL,last_check=?,failures=?,last_error=? WHERE id=? AND state='active' AND lease_token=?",
+                                 (now + delay, now, count, str(data.get("error") or "Check failed")[:300], ident, lease_token))
                 return
             change = data.get("change") or {}
             sha = change.get("content_sha256")
             if not isinstance(sha, str) or not sha:
                 raise ValueError("Successful scrape did not return a content hash")
             jitter = secrets.randbelow(max(1, min(121, interval // 10 + 1)))
-            updated = h.db.execute("UPDATE monitors SET next_check=?,lease_until=NULL,last_check=?,last_sha=?,failures=0,last_error=NULL WHERE id=? AND state='active'",
-                                   (now + interval + jitter, now, sha, ident)).rowcount
+            updated = h.db.execute("UPDATE monitors SET next_check=?,lease_until=NULL,lease_token=NULL,last_check=?,last_sha=?,failures=0,last_error=NULL WHERE id=? AND state='active' AND lease_token=?",
+                                   (now + interval + jitter, now, sha, ident, lease_token)).rowcount
             if not updated:
                 return
             if last_sha and last_sha != sha:
@@ -247,11 +280,15 @@ def install(h, app, perform, webhook_sender=None):
             if record:
                 count = record[0] + 1
                 delay = min(900 * (2 ** min(count - 1, 4)), 21600)
-                h.db.execute("UPDATE monitors SET next_check=?,lease_until=NULL,last_check=?,failures=?,last_error=? WHERE id=? AND state='active'",
-                             (now + delay, now, count, "Check failed; retry scheduled.", ident))
+                h.db.execute("UPDATE monitors SET next_check=?,lease_until=NULL,lease_token=NULL,last_check=?,failures=?,last_error=? WHERE id=? AND state='active' AND lease_token=?",
+                             (now + delay, now, count, "Check failed; retry scheduled.", ident, lease_token))
 
     async def deliver_one(row, client):
-        event_id, monitor_id, account, payload, attempts = row
+        event_id, monitor_id, account, payload = row
+        claimed = _claim_monitor_event(h.db, event_id, time.time())
+        if not claimed:
+            return
+        lease_token, attempts = claimed
         now = int(time.time())
         secret = _secret(h, account, monitor_id).encode()
         body = payload.encode()
@@ -259,7 +296,7 @@ def install(h, app, perform, webhook_sender=None):
         target = h.db.execute("SELECT webhook_url FROM monitors WHERE id=? AND account=? AND state!='deleted'",
                               (monitor_id, account)).fetchone()
         if not target:
-            h.db.execute("UPDATE monitor_events SET state='cancelled',last_error='Monitor deleted' WHERE id=?", (event_id,))
+            h.db.execute("UPDATE monitor_events SET state='cancelled',lease_until=NULL,lease_token=NULL,last_error='Monitor deleted' WHERE id=? AND lease_token=?", (event_id, lease_token))
             return
         response_status = None
         try:
@@ -270,19 +307,18 @@ def install(h, app, perform, webhook_sender=None):
             else:
                 response_status = await _post_webhook(client, target[0], body, headers)
             if 200 <= response_status < 300:
-                h.db.execute("UPDATE monitor_events SET state='delivered',attempts=attempts+1,http_status=?,last_error=NULL WHERE id=?",
-                             (response_status, event_id))
+                h.db.execute("UPDATE monitor_events SET state='delivered',lease_until=NULL,lease_token=NULL,http_status=?,last_error=NULL WHERE id=? AND state='pending' AND lease_token=?",
+                             (response_status, event_id, lease_token))
             else:
                 raise aiohttp.ClientResponseError(None, (), status=response_status)
         except Exception as exc:
-            count = attempts + 1
-            if count >= 6:
-                h.db.execute("UPDATE monitor_events SET state='failed',attempts=?,http_status=?,last_error=? WHERE id=?",
-                             (count, response_status, type(exc).__name__, event_id))
+            if attempts >= 6:
+                h.db.execute("UPDATE monitor_events SET state='failed',lease_until=NULL,lease_token=NULL,http_status=?,last_error=? WHERE id=? AND state='pending' AND lease_token=?",
+                             (response_status, type(exc).__name__, event_id, lease_token))
             else:
-                delay = min(30 * (2 ** (count - 1)), 1800)
-                h.db.execute("UPDATE monitor_events SET attempts=?,next_attempt=?,http_status=?,last_error=? WHERE id=?",
-                             (count, time.time() + delay, response_status, type(exc).__name__, event_id))
+                delay = min(30 * (2 ** (attempts - 1)), 1800)
+                h.db.execute("UPDATE monitor_events SET lease_until=NULL,lease_token=NULL,next_attempt=?,http_status=?,last_error=? WHERE id=? AND state='pending' AND lease_token=?",
+                             (time.time() + delay, response_status, type(exc).__name__, event_id, lease_token))
 
     async def scheduler(app):
         timeout = aiohttp.ClientTimeout(total=10, connect=4, sock_read=5)
@@ -296,8 +332,8 @@ def install(h, app, perform, webhook_sender=None):
                     # Small concurrent groups avoid an unbounded scrape fan-out.
                     for offset in range(0, len(due), 4):
                         await asyncio.gather(*(check_one(row) for row in due[offset:offset + 4]))
-                    pending = h.db.execute("SELECT id,monitor_id,account,payload,attempts FROM monitor_events WHERE state='pending' AND next_attempt<=? ORDER BY created LIMIT ?",
-                                           (time.time(), MAX_EVENTS_PER_TICK)).fetchall()
+                    pending = h.db.execute("SELECT id,monitor_id,account,payload FROM monitor_events WHERE state='pending' AND next_attempt<=? AND (lease_until IS NULL OR lease_until<=?) ORDER BY created LIMIT ?",
+                                           (time.time(), time.time(), MAX_EVENTS_PER_TICK)).fetchall()
                     for offset in range(0, len(pending), 4):
                         await asyncio.gather(*(deliver_one(row, client) for row in pending[offset:offset + 4]))
                 except asyncio.CancelledError:
@@ -341,7 +377,7 @@ def _state_for(h, account, body, state):
     interval = row[0]
     jitter = secrets.randbelow(max(1, min(121, interval // 10 + 1))) if state == "active" else 0
     next_check = time.time() + interval + jitter if state == "active" else 0
-    updated = h.db.execute("UPDATE monitors SET state=?,next_check=?,lease_until=NULL,last_error=NULL WHERE id=? AND account=?",
+    updated = h.db.execute("UPDATE monitors SET state=?,next_check=?,lease_until=NULL,lease_token=NULL,last_error=NULL WHERE id=? AND account=?",
                            (state, next_check, ident, account)).rowcount
     if not updated:
         return web.json_response({"error": "Monitor not found", "code": "not_found"}, status=404)

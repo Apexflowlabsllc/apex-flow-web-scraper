@@ -40,6 +40,31 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
     def error(message, code="unsupported_option", status=400):
         return web.json_response({"success": False, "error": message, "code": code}, status=status)
 
+    def sdk_default_warnings(body):
+        """Accept current SDK's benign defaults, but disclose options Apex doesn't implement."""
+        warnings = []
+        for key, default, label in (
+                ("blockAds", True, "ad blocking"),
+                ("removeBase64Images", True, "base64 image removal"),
+                ("storeInCache", True, "Firecrawl cache controls"),
+                ("fastMode", False, "fast mode"),
+                ("mobile", False, "mobile rendering")):
+            if key not in body:
+                continue
+            value = body[key]
+            if type(value) is not bool:
+                return None, f"{key} must be a boolean"
+            if value != default:
+                return None, f"{key}={str(value).lower()} is not supported by Apex"
+            if default:
+                warnings.append(f"{label} is not implemented by Apex; Apex's own rendering and cache rules apply")
+        origin = body.get("origin")
+        if origin is not None:
+            if not isinstance(origin, str) or not 1 <= len(origin) <= 128:
+                return None, "origin must be 1–128 characters"
+            warnings.append("Firecrawl SDK origin attribution is not recorded by Apex")
+        return ("; ".join(warnings) if warnings else None), None
+
     def unpack(response):
         try:
             return json.loads(response.body.decode("utf-8"))
@@ -164,10 +189,14 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         body = await request.json()
         if not isinstance(body, dict):
             return error("Request body must be a JSON object")
-        allowed = {"url", "formats", "onlyMainContent", "maxAge", "screenshot", "actions"}
+        allowed = {"url", "formats", "onlyMainContent", "maxAge", "screenshot", "actions",
+                   "origin", "blockAds", "removeBase64Images", "storeInCache", "fastMode", "mobile"}
         extra = set(body) - allowed
         if extra:
             return error("Unsupported Apex compatibility options: " + ", ".join(sorted(extra)))
+        compat_warning, compat_error = sdk_default_warnings(body)
+        if compat_error:
+            return error(compat_error)
         url = body.get("url")
         if not isinstance(url, str) or not url:
             return error("url is required")
@@ -222,6 +251,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             return failure
         result = payload.get("result") or {}
         data = page_data(result, payload.get("credits_used"), payload.get("change"), want_screenshot)
+        if compat_warning:
+            data["warning"] = "; ".join(filter(None, [data.get("warning"), compat_warning]))
         selected = {}
         if "markdown" in parsed and "markdown" in data:
             selected["markdown"] = data["markdown"]
@@ -642,6 +673,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 result = page_data(result, credits,
                                    screenshot=options.get("screenshot", False)
                                    or "screenshot" in options.get("_compat_formats", []))
+                if options.get("_compat_warning"):
+                    result["warning"] = "; ".join(filter(None, [result.get("warning"), options["_compat_warning"]]))
                 for field in ("markdown", "html", "rawHtml", "links", "screenshot", "json"):
                     if field not in options.get("_compat_formats", []) and not (
                             field == "screenshot" and options.get("screenshot", False)):
@@ -740,10 +773,14 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if len(urls) > max_urls:
             return error(f"This plan supports at most {max_urls} URLs per batch job", "batch_limit", 413)
         allowed = {"urls", "formats", "onlyMainContent", "maxAge", "screenshot", "actions",
-                   "ignoreInvalidURLs"}
+                   "ignoreInvalidURLs", "origin", "blockAds", "removeBase64Images", "storeInCache",
+                   "fastMode", "mobile"}
         extra = set(body) - allowed
         if extra:
             return error("Unsupported Apex compatibility options: " + ", ".join(sorted(extra)))
+        compat_warning, compat_error = sdk_default_warnings(body)
+        if compat_error:
+            return error(compat_error)
         if body.get("ignoreInvalidURLs", False) is not False:
             return error("ignoreInvalidURLs:true is not supported; invalid or unsafe destinations are reported per URL")
         if body.get("onlyMainContent", True) is not True:
@@ -795,6 +832,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if "screenshot" in selected or body.get("screenshot", False):
             apex_options["screenshot"] = True
         apex_options["_compat_formats"] = selected
+        if compat_warning:
+            apex_options["_compat_warning"] = compat_warning
         hosted.db.execute("DELETE FROM firecrawl_batch_pages WHERE job IN (SELECT id FROM firecrawl_batch_jobs WHERE created<?)",
                           (time.time() - 7 * 86400,))
         hosted.db.execute("DELETE FROM firecrawl_batch_jobs WHERE created<?", (time.time() - 7 * 86400,))
