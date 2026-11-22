@@ -76,22 +76,15 @@ export function makeWorld(elements, compact) {
     link(0, [8, -2.6], [1, 0.3, 0], 3, ...leftOf(sats[2]), 1.5);
   }
 
-  /* The engine sits front-left and feeds bots down a ramp onto the page. */
-  const eq = qMul(qAxis(0, 1, 0, 24 * DEG), qAxis(0, 0, 1, -13 * DEG));
-  const engine = { pos: compact ? [-9.6, 1.5, 4.6] : [-11.9, 1.75, 5.9], q: eq, scale: compact ? 1.05 : 1.45 };
-  const mouth = add(engine.pos, qRot(eq, [0.12 * engine.scale, -0.55 * engine.scale, 0]));
-  const fwd = qRot(eq, [1, 0, 0]);
-  const land = compact ? [-7.7, 2.6] : [-7.7, 3.6];
-  const p3 = [land[0], 0.02, land[1]];
-  const ramp = { a: -1, b: 0, pa: null, pb: land, p: [mouth, add(mouth, fwd, 2.2), add(p3, [-2.4, 0.45, 0.7]), p3], na: [0, 1, 0], nb: [0, 1, 0], len: 0, spawn: true };
-  bridges.push(ramp);
-
   const tmp = [0, 0, 0], prev = [0, 0, 0];
   for (const b of bridges) {
     bezier(b, 0, prev);
     for (let i = 1; i <= 40; i++) { bezier(b, i / 40, tmp); b.len += Math.hypot(tmp[0] - prev[0], tmp[1] - prev[1], tmp[2] - prev[2]); prev[0] = tmp[0]; prev[1] = tmp[1]; prev[2] = tmp[2]; }
   }
-  return { surfaces, bridges, engine, ramp: bridges.length - 1, elements };
+  /* Where the large robots stand when the page opens, and the area they keep to (x min, x max, z min, z max). */
+  const stage = compact ? [[-0.6, 2.6], [2.4, 1.2], [-3.0, 0.6], [1.0, -1.6]] : [[0.5, 2.7], [-2.9, 1.3], [3.6, 0.9], [-0.3, -1.1], [5.6, 2.6], [-4.4, -2.4], [3.0, -2.6]];
+  const stageBox = compact ? [-4.5, 4.5, -2.5, 3.6] : [-6.6, 6.2, -3.2, 3.9];
+  return { surfaces, bridges, elements, stage, stageBox };
 }
 
 /* Ribbon geometry for every bridge: position xyz, then t, side, length. */

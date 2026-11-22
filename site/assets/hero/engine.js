@@ -1,19 +1,36 @@
-/* Crawl scene engine: a website being crawled by thousands of 3D bots, drawn live in WebGL2.
+/* Crawl scene engine: robots crawling over web pages, drawn live in WebGL2 with physically based lighting,
+   real shadows, reflections in the glass, depth of field and a camera that travels as the page scrolls.
    It touches no DOM, so it runs inside a worker (the normal path) or on the page thread (the fallback).
    The scene is illustrative; the labels on the page say so. No outside libraries or image assets. */
 import * as G from './gl.js';
 import * as S from './shaders.js';
-import { botMesh, engineMesh, ringMesh, slabMesh } from './meshes.js';
+import { robotMesh, slabMesh, RIG } from './robot.js';
 import { paintSite, paintAtlas } from './page-art.js';
 import { makeWorld, ribbonMesh, PAGE_W, PAGE_D } from './world.js';
 import { Swarm, Packets, STRIDE } from './swarm.js';
 
 const pause = () => new Promise((r) => setTimeout(r, 0));
 const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
-const DEG = Math.PI / 180, CYCLE = 18, FOGC = [0.014, 0.04, 0.058];
+const DEG = Math.PI / 180, CYCLE = 18, FOGC = [0.006, 0.014, 0.02], SUN = [-0.39, 0.86, 0.33], SUNC = [2.5, 2.42, 2.3];
 const sheet = (w, h) => { if (typeof OffscreenCanvas === 'function') return new OffscreenCanvas(w, h); const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 
-/* cfg: { calm, compact, weak, cssW, cssH, dpr }. post(message) reports to the page. Returns { input(message) }. */
+/* The camera's four stops along the scroll: target, bearing, height angle, distance, picture shift, lens opening. */
+const SHOTS = {
+  wide: [
+    { t: [-0.2, 0.4, 1.9], az: -22, el: 12.5, d: 7.8, sx: 0.34, sy: 0.0, ap: 0.5 },
+    { t: [1.0, 0, 0.3], az: -16, el: 36, d: 31, sx: 0.32, sy: -0.16, ap: 0.1 },
+    { t: [4.6, 0.1, -1.2], az: 18, el: 38, d: 12.5, sx: 0.52, sy: -0.04, ap: 0.36 },
+    { t: [2.6, 0.2, 1.0], az: -38, el: 19, d: 17.5, sx: 0.46, sy: -0.08, ap: 0.3 }
+  ],
+  tall: [
+    { t: [0.2, 0.3, 1.3], az: -14, el: 15, d: 10.5, sx: 0, sy: -0.62, ap: 0.45 },
+    { t: [1.4, 0, 0.4], az: -10, el: 33, d: 24, sx: 0, sy: -0.6, ap: 0.1 },
+    { t: [4.2, 0.1, -1.2], az: 10, el: 44, d: 12.5, sx: 0, sy: -0.5, ap: 0.33 },
+    { t: [1.2, 0.2, 0.9], az: -30, el: 22, d: 19, sx: 0, sy: -0.55, ap: 0.28 }
+  ]
+};
+
+/* cfg: { calm, compact, weak, cssW, cssH, dpr, anchor }. post(message) reports to the page. Returns { input(message) }. */
 export async function run(canvas, cfg, post) {
   const mark = (name) => post({ t: 'mark', name });
   const { calm, compact, weak } = cfg;
@@ -23,13 +40,15 @@ export async function run(canvas, cfg, post) {
   mark('context');
   const info = gl.getExtension('WEBGL_debug_renderer_info');
   if (info && /swiftshader|llvmpipe|software|basic render/i.test(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))) throw new Error('no graphics hardware, showing the still picture');
-  const dprCap = compact ? 2 : 3, pixelCap = compact ? 2.2e6 : 8.4e6;
-  let quality = 1, W = 2, H = 2, scene = null, b1 = null, b1b = null, b2 = null, b2b = null;
+  if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) throw new Error('no high-range colour buffers, showing the still picture');
+  const dprCap = compact ? 2 : 3, pixelCap = compact ? 2.0e6 : 8.4e6, mirror = !compact;
+  let quality = 1, W = 2, H = 2, scene = null, half = null, soft = null, refl = null, b1 = null, b1b = null, b2 = null, b2b = null;
 
   /* Shaders build in the browser's compiler threads while the art and meshes are made here. */
-  const building = [['bot', S.BOT_VS, S.BOT_FS], ['shadow', S.SHADOW_VS, S.SHADOW_FS], ['page', S.PAGE_VS, S.PAGE_FS],
-    ['trail', S.TRAIL_VS, S.TRAIL_FS], ['flat', S.QUAD_VS, S.FLAT_FS], ['sky', S.QUAD_VS, S.SKY_FS], ['floor', S.FLOOR_VS, S.FLOOR_FS],
-    ['link', S.LINK_VS, S.LINK_FS], ['glow', S.GLOW_VS, S.GLOW_FS], ['bright', S.QUAD_VS, S.BRIGHT_FS], ['blur', S.QUAD_VS, S.BLUR_FS], ['final', S.QUAD_VS, S.FINAL_FS]]
+  const building = [['bot', S.BOT_VS, S.BOT_FS], ['depth', S.DEPTH_VS, S.DEPTH_FS], ['contact', S.CONTACT_VS, S.CONTACT_FS], ['page', S.PAGE_VS, S.PAGE_FS],
+    ['trail', S.TRAIL_VS, S.TRAIL_FS], ['flat', S.QUAD_VS, S.FLAT_FS], ['env', S.QUAD_VS, S.ENV_FS], ['sky', S.QUAD_VS, S.SKY_FS], ['floor', S.FLOOR_VS, S.FLOOR_FS],
+    ['link', S.LINK_VS, S.LINK_FS], ['glow', S.GLOW_VS, S.GLOW_FS], ['half', S.QUAD_VS, S.HALF_FS], ['dof', S.QUAD_VS, S.DOF_FS],
+    ['bright', S.QUAD_VS, S.BRIGHT_FS], ['blur', S.QUAD_VS, S.BLUR_FS], ['final', S.QUAD_VS, S.FINAL_FS]]
     .map(([k, vs, fs]) => [k, G.beginProgram(gl, vs, fs)]);
   mark('shaders-sent');
   const firstW = compact ? 1024 : 1280;
@@ -38,17 +57,24 @@ export async function run(canvas, cfg, post) {
   await pause();
   const atlasSheet = sheet(compact ? 1024 : 2048, compact ? 640 : 1280); paintAtlas(atlasSheet);
   await pause();
-  const mesh = { bots: [botMesh(2), botMesh(1), botMesh(0)], engine: engineMesh(), ring: ringMesh(), slab: slabMesh() };
+  const models = [null, robotMesh(1), robotMesh(2)];      // the hero model is the largest; it follows after the first picture
   mark('art-ready');
   const parallel = gl.getExtension('KHR_parallel_shader_compile');
   if (parallel) while (building.some(([, p]) => !gl.getProgramParameter(p, parallel.COMPLETION_STATUS_KHR))) await nextFrame();
   const prog = {};
   for (const [k, p] of building) prog[k] = G.finishProgram(gl, p);
   mark('shaders-ready');
-  /* Textures: the page art is painted in code, small first, then 2048 px, then 4096 px where the screen can show it. */
+
+  /* Fixed texture units: 0 the picture being drawn, 1 trail, 2 studio, 3 shadow, 4 reflection, 5 page (for light off the page). */
+  for (const k in prog) {
+    const u = prog[k].u; gl.useProgram(prog[k].p);
+    for (const [name, unit] of [['uTex', 0], ['uTrail', 1], ['uEnv', 2], ['uShadow', 3], ['uRefl', 4], ['uPage', 5], ['uSoft', 6], ['uB1', 7], ['uB2', 8]]) if (u[name]) gl.uniform1i(u[name], unit);
+    if (u.uHip) { gl.uniform4fv(u.uHip, RIG.hip); gl.uniform3fv(u.uJ1, RIG.j1); gl.uniform3fv(u.uJ2, RIG.j2); gl.uniform3fv(u.uAx, RIG.axis); }
+    if (u.uSun) { gl.uniform3fv(u.uSun, SUN); gl.uniform3fv(u.uSunCol, SUNC); }
+  }
   const aniso = gl.getExtension('EXT_texture_filter_anisotropic');
   const texFrom = (src, tex = gl.createTexture()) => {
-    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, src);
     gl.generateMipmap(gl.TEXTURE_2D);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
@@ -57,51 +83,58 @@ export async function run(canvas, cfg, post) {
     if (aniso) gl.texParameterf(gl.TEXTURE_2D, aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
     return tex;
   };
-  const elements = siteArt.els;
-  const pageTex = texFrom(siteArt.bmp);
+  const elements = siteArt.els, pageTex = texFrom(siteArt.bmp), atlasTex = texFrom(atlasSheet);
   let pagePx = firstW;
-  const atlasTex = texFrom(atlasSheet);
   const trail = G.target(gl, 320, 200);
   gl.bindFramebuffer(gl.FRAMEBUFFER, trail.fbo); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  const studio = G.envCube(gl, prog.env, weak ? 64 : 128);
+  const shadow = G.shadowTarget(gl, weak ? 1024 : 2048);
+  const lightVP = G.mat4();
+  { const lv = G.mat4(), lp = G.mat4(); G.lookAt(lv, [SUN[0] * 40, SUN[1] * 40, SUN[2] * 40], [0, 0, 0], [0, 0, -1]); G.ortho(lp, -13.5, 13.5, -10.5, 10.5, 8, 72); G.mul(lightVP, lp, lv); }
   await pause();
-
   mark('textures');
+
   /* World, swarm and geometry. */
   const world = makeWorld(elements, compact);
-  const count = compact ? 720 : weak ? 1500 : 2600;
-  const fov = (compact ? 36 : 30) * DEG, camDist = compact ? 23 : 31;
-  const pxPerUnit = (h) => h / (2 * camDist * Math.tan(fov / 2));
-  const hiSize = 36 / (pxPerUnit(cssH * Math.min(dpr, dprCap)) * 1.5);   // detailed mesh once a bot is ~36 px wide
-  const swarm = new Swarm(world, count, Math.max(hiSize, weak ? 0.4 : 0.17));               // on big screens the small bots get the detailed mesh too
+  const count = compact ? 520 : weak ? 1000 : 1700, heroes = compact ? 4 : 7;
+  const swarm = new Swarm(world, count, heroes);
   const packets = new Packets();
   const recordEl = []; elements.forEach((e, i) => { if (e.record >= 0) recordEl[e.record] = i; });
   const dyn = (floats) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, floats * 4, gl.DYNAMIC_DRAW); return b; };
-  const INST = [[3, 3, 1], [4, 4, 1], [5, 4, 1], [6, 1, 1]];
-  const vao = (parts) => { const v = gl.createVertexArray(); gl.bindVertexArray(v); for (const [buf, layout] of parts) G.bindLayout(gl, buf, layout); return v; };
-  const MESH = [[0, 3], [1, 3], [2, 4]];
+  const INST = [[3, 3, 1], [4, 4, 1], [5, 4, 1], [6, 1, 1]], MESH = [[0, 3], [1, 3], [2, 3]];
+  const vao = (parts, index) => {
+    const v = gl.createVertexArray(); gl.bindVertexArray(v);
+    for (const [buf, layout] of parts) G.bindLayout(gl, buf, layout);
+    if (index) { gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, index, gl.STATIC_DRAW); }
+    return v;
+  };
   const corners = G.staticBuffer(gl, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]));
-  const lod = mesh.bots.map((data) => {
-    const inst = dyn(count * STRIDE);
-    return { inst, verts: data.length / 10, vao: vao([[G.staticBuffer(gl, data), MESH], [inst, INST]]), shadow: vao([[corners, [[0, 2]]], [inst, INST]]) };
-  });
-  const engData = mesh.engine, ringData = mesh.ring;
-  const engInst = dyn(STRIDE), ringInst = dyn(STRIDE * 2), ringBuf = new Float32Array(STRIDE * 2);
-  const engVao = vao([[G.staticBuffer(gl, engData), MESH], [engInst, INST]]), ringVao = vao([[G.staticBuffer(gl, ringData), MESH], [ringInst, INST]]);
-  const E = world.engine;
-  gl.bindBuffer(gl.ARRAY_BUFFER, engInst);
-  gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array([...E.pos, ...E.q, E.scale, 0, 0, 0.35, 1.7]));
-  const slabVao = vao([[G.staticBuffer(gl, mesh.slab), [[0, 3], [1, 3]]]]);
-  const floorVao = vao([[G.staticBuffer(gl, new Float32Array([-90, -70, 90, -70, 90, 60, -90, -70, 90, 60, -90, 60])), [[0, 2]]]]);
+  const lod = swarm.bufs.map((buf) => { const inst = dyn(buf.length); return { inst, contact: vao([[corners, [[0, 2]]], [inst, INST]]) }; });
+  /* A robot model can be paired with any group of robots, so shadows and reflections can use a lighter model than the picture. */
+  const model = [null, null, null], pairs = {};
+  const fit = (level, data) => {
+    const ibo = gl.createBuffer();
+    gl.bindVertexArray(null); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, data.indices, gl.STATIC_DRAW);
+    model[level] = { vbo: G.staticBuffer(gl, data.vertices), ibo, n: data.indices.length, type: data.indices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT };
+  };
+  const pair = (m, group) => {
+    const key = m * 3 + group;
+    if (!pairs[key]) { const v = gl.createVertexArray(); gl.bindVertexArray(v); G.bindLayout(gl, model[m].vbo, MESH); G.bindLayout(gl, lod[group].inst, INST); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model[m].ibo); gl.bindVertexArray(null); pairs[key] = v; }
+    return pairs[key];
+  };
+  fit(1, models[1]); fit(2, models[2]);
+  const slabVao = vao([[G.staticBuffer(gl, slabMesh()), [[0, 3], [1, 3]]]]);
+  const floorVao = vao([[G.staticBuffer(gl, new Float32Array([-110, -90, 110, -90, 110, 70, -110, -90, 110, 70, -110, 70])), [[0, 2]]]]);
   const ribbon = ribbonMesh(world), ribbonVao = vao([[G.staticBuffer(gl, ribbon), [[0, 3], [1, 3]]]]);
-  const MOTES = compact ? 40 : 90, motes = Array.from({ length: MOTES }, (_, i) => { const h = (k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); }; return [h(1) * 46 - 23, h(2) * 11, h(3) * 30 - 20, 0.07 + h(4) * 0.13, 0.15 + h(5) * 0.45]; });
+  const MOTES = compact ? 40 : 110, motes = Array.from({ length: MOTES }, (_, i) => { const h = (k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); }; return [h(1) * 46 - 23, h(2) * 9, h(3) * 34 - 20, 0.05 + h(4) * 0.1, 0.15 + h(5) * 0.45]; });
   const glowBuf = new Float32Array((packets.max * 6 + 40 + MOTES) * 8), glowInst = dyn(glowBuf.length);
   const glowVao = vao([[corners, [[0, 2]]], [glowInst, [[3, 4, 1], [4, 4, 1]]]]);
   const trailBuf = dyn(count * 2), trailVao = vao([[trailBuf, [[0, 2]]]]);
   gl.bindVertexArray(null);
   await pause();
-
   mark('geometry');
-  /* The page mirrors the scene: rows, stage and status arrive there as messages. */
+
+  /* The page mirrors the scene: rows and status arrive there as messages. */
   let stage = -1;
   const lit = new Uint8Array(6);
   const showRow = (r) => { if (!lit[r]) { lit[r] = 1; post({ t: 'row', r }); flare = 1; } };
@@ -139,22 +172,27 @@ export async function run(canvas, cfg, post) {
     }
   }
 
-  /* Camera. */
-  const proj = G.mat4(), view = G.mat4(), vp = G.mat4(), inv = G.mat4(), eye = [0, 0, 0];
-  const base = compact ? { tx: 1.6, tz: 0.4, az: -10, el: 33, sx: 0, sy: -0.64 } : { tx: 1.0, tz: 0.3, az: -16, el: 37, sx: 0.36, sy: -0.2 };
-  let px = 0, py = 0, pxT = 0, pyT = 0, intro = calm ? 1 : 0, clock = 0, scroll = 0, anchor = null;
+  /* Camera: glides between the four stops as the page scrolls, with a little life of its own. */
+  const proj = G.mat4(), view = G.mat4(), vp = G.mat4(), inv = G.mat4(), mview = G.mat4(), mvp = G.mat4(), eye = [0, 0, 0], meye = [0, 0, 0], fwd = [0, 0, -1];
+  const shots = compact ? SHOTS.tall : SHOTS.wide, fov = (compact ? 34 : 30) * DEG, cam = { focus: 8, ap: 1 };
+  let px = 0, py = 0, pxT = 0, pyT = 0, intro = calm ? 1 : 0, clock = 0, scroll = 0, eased = 0, anchor = null;
   function camera(dt) {
     px += (pxT - px) * Math.min(1, dt * 3); py += (pyT - py) * Math.min(1, dt * 3);
-    intro = Math.min(1, intro + dt / 2.6);
-    const k = 1 - Math.pow(1 - intro, 3), sc = scroll;
-    const az = (base.az - (1 - k) * 16 + px * 3.2 + Math.sin(clock * 0.11) * 1.3 - sc * 6) * DEG;
-    const el = (base.el + (1 - k) * 15 - py * 2 + Math.sin(clock * 0.07) * 0.7 - sc * 13) * DEG;
-    const d = camDist + (1 - k) * 11 - sc * 8;
-    const tx = base.tx + sc * 1.2, tz = base.tz - sc * 1.4;
-    eye[0] = tx + d * Math.sin(az) * Math.cos(el); eye[1] = d * Math.sin(el); eye[2] = tz + d * Math.cos(az) * Math.cos(el);
-    G.perspective(proj, fov, W / H, 1, 160, base.sx, base.sy);
-    G.lookAt(view, eye, [tx, 0, tz], [0, 1, 0]);
+    eased += (scroll - eased) * Math.min(1, dt * 4.5);
+    intro = Math.min(1, intro + dt / 3);
+    const k = 1 - Math.pow(1 - intro, 3), u = Math.min(2.9999, Math.max(0, eased) * 3), i = Math.floor(u), f0 = u - i, f = f0 * f0 * (3 - 2 * f0), A = shots[i], B = shots[i + 1];
+    const mix = (a, b) => a + (b - a) * f;
+    const az = (mix(A.az, B.az) - (1 - k) * 14 + px * 2.6 + Math.sin(clock * 0.11) * 1.1) * DEG;
+    const el = (mix(A.el, B.el) + (1 - k) * 9 - py * 1.4 + Math.sin(clock * 0.07) * 0.5) * DEG;
+    const d = mix(A.d, B.d) + (1 - k) * 5, tx = mix(A.t[0], B.t[0]), ty = mix(A.t[1], B.t[1]), tz = mix(A.t[2], B.t[2]);
+    eye[0] = tx + d * Math.sin(az) * Math.cos(el); eye[1] = ty + d * Math.sin(el); eye[2] = tz + d * Math.cos(az) * Math.cos(el);
+    fwd[0] = (tx - eye[0]) / d; fwd[1] = (ty - eye[1]) / d; fwd[2] = (tz - eye[2]) / d;
+    cam.focus = d; cam.ap = mix(A.ap, B.ap);
+    G.perspective(proj, fov, W / H, 0.5, 220, mix(A.sx, B.sx), mix(A.sy, B.sy));
+    G.lookAt(view, eye, [tx, ty, tz], [0, 1, 0]);
     G.mul(vp, proj, view); G.invert(inv, vp);
+    mview.set(view); mview[4] = -view[4]; mview[5] = -view[5]; mview[6] = -view[6]; mview[7] = -view[7];   // the same view, seen in the glass
+    G.mul(mvp, proj, mview); meye[0] = eye[0]; meye[1] = -eye[1]; meye[2] = eye[2];
   }
   /* Where a point of the picture (x and y from -1 to 1, y up) meets the plane y = planeY. */
   function pick(nx, ny, planeY) {
@@ -166,25 +204,31 @@ export async function run(canvas, cfg, post) {
   function resize() {
     let k = Math.min(dpr, dprCap) * quality;
     if (cssW * cssH * k * k > pixelCap) k = Math.sqrt(pixelCap / (cssW * cssH));
-    const w = Math.max(2, Math.round(cssW * k)), h = Math.max(2, Math.round(cssH * k));
+    const w = Math.max(8, Math.round(cssW * k)), h = Math.max(8, Math.round(cssH * k));
     if (w === W && h === H) return;
     W = canvas.width = w; H = canvas.height = h;
-    [scene, b1, b1b, b2, b2b].forEach((t) => t && t.dispose());
+    [scene, half, soft, refl, b1, b1b, b2, b2b].forEach((t) => t && t.dispose());
     const samples = Math.min(gl.getParameter(gl.MAX_SAMPLES), W * H > 5e6 || compact ? 2 : 4);
-    scene = G.target(gl, W, H, { depth: true, samples });
-    b1 = G.target(gl, W >> 1 || 1, H >> 1 || 1); b1b = G.target(gl, b1.w, b1.h);
-    b2 = G.target(gl, W >> 2 || 1, H >> 2 || 1); b2b = G.target(gl, b2.w, b2.h);
+    const hw = W >> 1, hh = H >> 1;
+    scene = G.target(gl, W, H, { depth: true, samples, hdr: true });
+    half = G.target(gl, hw, hh, { hdr: true }); soft = G.target(gl, hw, hh, { hdr: true });
+    refl = mirror ? G.target(gl, hw, hh, { depth: true, hdr: true, mips: true }) : null;
+    b1 = G.target(gl, W >> 2, H >> 2, { hdr: true }); b1b = G.target(gl, b1.w, b1.h, { hdr: true });
+    b2 = G.target(gl, W >> 3, H >> 3, { hdr: true }); b2b = G.target(gl, b2.w, b2.h, { hdr: true });
   }
 
-  const stats = { fps: 0, ms: 0, cpu: 0, draws: 0, bots: count };
-  let draws = 0, trailClock = 0;
+  const stats = { fps: 0, ms: 0, cpu: 0, draws: 0, bots: count, tris: 0 };
+  let draws = 0, tris = 0, trailClock = 0, detail = weak ? 1.6 : 1;
   const use = (p) => { gl.useProgram(p.p); return p.u; };
-  const shared = (u) => { gl.uniformMatrix4fv(u.uVP, false, vp); if (u.uEye) gl.uniform3fv(u.uEye, eye); if (u.uFog) gl.uniform3fv(u.uFog, FOGC); if (u.uFogR) gl.uniform2f(u.uFogR, camDist + 9, camDist + 44); if (u.uTime) gl.uniform1f(u.uTime, clock); };
+  const eyeTo = (u, m, e) => { gl.uniformMatrix4fv(u.uVP, false, m); if (u.uEye) gl.uniform3fv(u.uEye, e); if (u.uFwd) gl.uniform3fv(u.uFwd, fwd); if (u.uFog) gl.uniform3fv(u.uFog, FOGC); if (u.uFogR) gl.uniform2f(u.uFogR, cam.focus + 26, cam.focus + 80); if (u.uTime) gl.uniform1f(u.uTime, clock); if (u.uEnvMips) gl.uniform1f(u.uEnvMips, studio.mips); };
   const fullscreen = () => { gl.drawArrays(gl.TRIANGLES, 0, 3); draws++; };
+  const robots = (use3) => { for (let k = 0; k < 3; k++) { const m = model[use3[k]] ? use3[k] : 1, n = swarm.counts[k]; if (!n) continue; gl.bindVertexArray(pair(m, k)); gl.drawElementsInstanced(gl.TRIANGLES, model[m].n, model[m].type, 0, n); draws++; tris += (model[m].n / 3) * n; } };
+  const bind = (unit, kind, tex) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(kind, tex); };
 
   function render(dt) {
     let u;
-    swarm.fill();
+    const scale = 1080 / Math.max(H, 400) * (weak ? 1.7 : 1);
+    swarm.fill(eye, model[0] ? 0.11 * scale * detail : 1e9, 0.017 * scale * detail);
     lod.forEach((l, k) => { gl.bindBuffer(gl.ARRAY_BUFFER, l.inst); gl.bufferSubData(gl.ARRAY_BUFFER, 0, swarm.bufs[k], 0, swarm.counts[k] * STRIDE); });
     gl.disable(gl.CULL_FACE);
 
@@ -203,95 +247,104 @@ export async function run(canvas, cfg, post) {
       gl.bindVertexArray(trailVao); gl.bindBuffer(gl.ARRAY_BUFFER, trailBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, swarm.trail, 0, swarm.trailCount * 2);
       gl.drawArrays(gl.POINTS, 0, swarm.trailCount); draws++;
     }
+    gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+
+    /* shadows from the key light */
+    bind(3, gl.TEXTURE_2D, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, shadow.fbo); gl.viewport(0, 0, shadow.size, shadow.size);
+    gl.clear(gl.DEPTH_BUFFER_BIT); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(2, 3);
+    u = use(prog.depth); gl.uniformMatrix4fv(u.uVP, false, lightVP);
+    robots([1, 2, 2]);                                   // shadows are cast by lighter models
+    gl.disable(gl.POLYGON_OFFSET_FILL);
+    bind(1, gl.TEXTURE_2D, trail.tex); bind(2, gl.TEXTURE_CUBE_MAP, studio.tex); bind(3, gl.TEXTURE_2D, shadow.tex); bind(5, gl.TEXTURE_2D, pageTex);
+
+    /* the robots as the glass sees them */
+    if (refl) {
+      bind(4, gl.TEXTURE_2D, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, refl.draw); gl.viewport(0, 0, refl.w, refl.h);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      u = use(prog.bot); eyeTo(u, mvp, meye); gl.uniform1f(u.uMirror, 1); gl.uniformMatrix4fv(u.uLightVP, false, lightVP); gl.uniform2f(u.uPageSize, PAGE_W, PAGE_D);
+      robots([1, 1, 2]);
+      refl.resolve();
+      bind(4, gl.TEXTURE_2D, refl.tex);
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, scene.draw); gl.viewport(0, 0, W, H);
-    gl.disable(gl.BLEND); gl.disable(gl.DEPTH_TEST); gl.depthMask(true);
-    gl.clearColor(FOGC[0], FOGC[1], FOGC[2], 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.bindVertexArray(null);
-    u = use(prog.sky); gl.uniform1f(u.uTime, clock); gl.uniform1f(u.uAspect, W / H); fullscreen();
+    gl.clearColor(FOGC[0], FOGC[1], FOGC[2], 400); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.disable(gl.DEPTH_TEST); gl.bindVertexArray(null);
+    u = use(prog.sky); gl.uniformMatrix4fv(u.uInv, false, inv); gl.uniform3fv(u.uEye, eye); gl.uniform3fv(u.uFog, FOGC); fullscreen();
     gl.enable(gl.DEPTH_TEST);
-    u = use(prog.floor); shared(u); gl.uniform1f(u.uY, -1.05); gl.bindVertexArray(floorVao); gl.drawArrays(gl.TRIANGLES, 0, 6); draws++;
+    u = use(prog.floor); eyeTo(u, vp, eye); gl.uniform1f(u.uY, -1.05); gl.bindVertexArray(floorVao); gl.drawArrays(gl.TRIANGLES, 0, 6); draws++;
 
-    u = use(prog.page); shared(u);
-    gl.uniform1i(u.uTex, 0); gl.uniform1i(u.uTrail, 1);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, trail.tex); gl.activeTexture(gl.TEXTURE0);
+    u = use(prog.page); eyeTo(u, vp, eye); gl.uniformMatrix4fv(u.uLightVP, false, lightVP);
     gl.uniform4fv(u.uHi, hiRect); gl.uniform1fv(u.uHiA, hiA); gl.uniform1fv(u.uHiC, hiC);
     gl.uniform1f(u.uScan, ct >= 3 && ct < 8 ? -0.03 + ((ct - 3) / 5) * 1.06 : -1);
+    gl.uniform2f(u.uRes, W, H); gl.uniform1f(u.uReflOn, refl ? 1 : 0);
     gl.bindVertexArray(slabVao);
     world.surfaces.forEach((s, i) => {
-      gl.bindTexture(gl.TEXTURE_2D, i ? atlasTex : pageTex);
+      bind(0, gl.TEXTURE_2D, i ? atlasTex : pageTex);
       gl.uniform1f(u.uMain, i ? 0 : 1);
       if (i) gl.uniform4f(u.uAtlas, 0.5, 0.5, (s.atlas % 2) * 0.5, Math.floor(s.atlas / 2) * 0.5); else gl.uniform4f(u.uAtlas, 1, 1, 0, 0);
-      gl.uniform3fv(u.uPos, s.pos); gl.uniform4fv(u.uQuat, s.q); gl.uniform3f(u.uSize, s.w, i ? 0.14 : 0.3, s.d); gl.uniform2f(u.uDim, s.w, s.d);
+      gl.uniform3fv(u.uPos, s.pos); gl.uniform4fv(u.uQuat, s.q); gl.uniform3f(u.uSize, s.w, i ? 0.14 : 0.34, s.d); gl.uniform2f(u.uDim, s.w, s.d);
       gl.drawArrays(gl.TRIANGLES, 0, 36); draws++;
     });
-    u = use(prog.link); shared(u); gl.uniform1f(u.uAct, swarm.linkBoost);
+    u = use(prog.link); eyeTo(u, vp, eye); gl.uniform1f(u.uAct, swarm.linkBoost);
     gl.bindVertexArray(ribbonVao); gl.drawArrays(gl.TRIANGLES, 0, ribbon.length / 6); draws++;
-
-    u = use(prog.bot); shared(u);
-    gl.bindVertexArray(engVao); gl.drawArraysInstanced(gl.TRIANGLES, 0, engData.length / 10, 1); draws++;
-    for (let k = 0; k < 2; k++) {
-      const q = G.qMul(E.q, G.qAxis(1, 0, 0, clock * (k ? -0.9 : 0.6))), p = G.qRot(E.q, [(k ? -0.55 : 0.28) * E.scale, 0, 0]);
-      ringBuf.set([E.pos[0] + p[0], E.pos[1] + p[1], E.pos[2] + p[2], ...q, E.scale * (k ? 0.86 : 1), 0, 0, 0.6, 1.7], k * STRIDE);
-    }
-    gl.bindBuffer(gl.ARRAY_BUFFER, ringInst); gl.bufferSubData(gl.ARRAY_BUFFER, 0, ringBuf);
-    gl.bindVertexArray(ringVao); gl.drawArraysInstanced(gl.TRIANGLES, 0, ringData.length / 10, 2); draws++;
 
     gl.enable(gl.BLEND); gl.depthMask(false);
     gl.blendFuncSeparate(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
-    u = use(prog.shadow); gl.uniformMatrix4fv(u.uVP, false, vp);
-    lod.forEach((l, k) => { gl.bindVertexArray(l.shadow); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, swarm.counts[k]); draws++; });
+    u = use(prog.contact); gl.uniformMatrix4fv(u.uVP, false, vp);
+    lod.forEach((l, k) => { if (swarm.counts[k]) { gl.bindVertexArray(l.contact); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, swarm.counts[k]); draws++; } });
     gl.disable(gl.BLEND); gl.depthMask(true);
-    u = use(prog.bot); shared(u);
-    lod.forEach((l, k) => { gl.bindVertexArray(l.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, l.verts, swarm.counts[k]); draws++; });
+    u = use(prog.bot); eyeTo(u, vp, eye); gl.uniform1f(u.uMirror, 0); gl.uniformMatrix4fv(u.uLightVP, false, lightVP); gl.uniform2f(u.uPageSize, PAGE_W, PAGE_D);
+    robots([0, 1, 2]);
 
-    /* additive sprites: packets, the engine core, the dataset dock, link ports */
+    /* additive sprites: packets, the dataset dock, link ports, dust in the light */
     let g = packets.count * 8;
     glowBuf.set(packets.buf.subarray(0, g));
     const sprite = (p, size, r, gr, b, a) => { glowBuf.set([p[0], p[1], p[2], size, r, gr, b, a], g); g += 8; };
-    for (const m of motes) sprite([m[0] + Math.sin(clock * 0.2 + m[1]) * 0.6, 0.4 + ((m[1] + clock * m[4] * 0.5) % 11), m[2]], m[3], 0.2, 0.85, 1, 0.35 + 0.3 * Math.sin(clock * m[4] * 3 + m[0]));
-    const mouth = world.bridges[world.ramp].p[0];
-    sprite(mouth, 2.6 * E.scale, 0.1, 0.8, 1, 0.5 + 0.12 * Math.sin(clock * 2.3));
-    sprite(collector, 1.1 + flare * 0.9, 0.6, 1, 0.32, 0.3 + flare * 0.45);
-    for (const b of world.bridges) if (!b.spawn) { sprite(b.p[0], 0.55, 0.1, 0.8, 1, 0.35 + 0.45 * swarm.linkBoost); sprite(b.p[3], 0.55, 0.1, 0.8, 1, 0.35 + 0.45 * swarm.linkBoost); }
+    for (const m of motes) sprite([m[0] + Math.sin(clock * 0.2 + m[1]) * 0.6, 0.3 + ((m[1] + clock * m[4] * 0.4) % 9), m[2]], m[3], 0.3, 0.85, 1, 0.22 + 0.18 * Math.sin(clock * m[4] * 3 + m[0]));
+    sprite(collector, 0.5 + flare * 0.5, 0.6, 1, 0.32, 0.12 + flare * 0.3);
+    for (const b of world.bridges) { sprite(b.p[0], 0.55, 0.1, 0.8, 1, 0.35 + 0.45 * swarm.linkBoost); sprite(b.p[3], 0.55, 0.1, 0.8, 1, 0.35 + 0.45 * swarm.linkBoost); }
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
-    u = use(prog.glow); gl.uniformMatrix4fv(u.uVP, false, vp);
+    u = use(prog.glow); gl.uniformMatrix4fv(u.uVP, false, vp); gl.uniform3fv(u.uEye, eye);
     gl.uniform3f(u.uRight, view[0], view[4], view[8]); gl.uniform3f(u.uUp, view[1], view[5], view[9]);
     gl.bindVertexArray(glowVao); gl.bindBuffer(gl.ARRAY_BUFFER, glowInst); gl.bufferSubData(gl.ARRAY_BUFFER, 0, glowBuf, 0, g);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, g / 8); draws++;
     gl.disable(gl.BLEND); gl.depthMask(true); gl.disable(gl.DEPTH_TEST);
     scene.resolve();
 
-    /* bloom from the emissive mask, then the final grade */
+    /* lens: focus, bloom, grade */
     gl.bindVertexArray(null);
-    const pass = (p, to, tex, set) => { gl.bindFramebuffer(gl.FRAMEBUFFER, to ? to.fbo : null); gl.viewport(0, 0, to ? to.w : W, to ? to.h : H); const uu = use(p); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(uu.uTex, 0); if (set) set(uu); fullscreen(); };
-    pass(prog.bright, b1, scene.tex);
+    const pass = (p, to, tex, set) => { gl.bindFramebuffer(gl.FRAMEBUFFER, to ? to.fbo : null); gl.viewport(0, 0, to ? to.w : W, to ? to.h : H); const uu = use(p); bind(0, gl.TEXTURE_2D, tex); if (uu.uFocus) { gl.uniform1f(uu.uFocus, cam.focus); gl.uniform1f(uu.uAperture, cam.ap); } if (set) set(uu); fullscreen(); };
+    pass(prog.half, half, scene.tex);
+    pass(prog.dof, soft, half.tex, (uu) => { gl.uniform2f(uu.uPx, 1 / half.w, 1 / half.h); gl.uniform1f(uu.uRadius, half.h * 0.026); });
+    pass(prog.bright, b1, half.tex);
     pass(prog.blur, b1b, b1.tex, (uu) => gl.uniform2f(uu.uDir, 1 / b1.w, 0));
     pass(prog.blur, b1, b1b.tex, (uu) => gl.uniform2f(uu.uDir, 0, 1 / b1.h));
     pass(prog.blur, b2b, b1.tex, (uu) => gl.uniform2f(uu.uDir, 1.6 / b2.w, 0));
     pass(prog.blur, b2, b2b.tex, (uu) => gl.uniform2f(uu.uDir, 0, 1.6 / b2.h));
-    pass(prog.final, null, scene.tex, (uu) => {
-      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, b1.tex); gl.uniform1i(uu.uB1, 1);
-      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, b2.tex); gl.uniform1i(uu.uB2, 2);
-      gl.uniform1f(uu.uTime, clock); gl.uniform2f(uu.uRes, W, H); gl.activeTexture(gl.TEXTURE0);
-    });
-    stats.draws = draws; draws = 0;
+    bind(6, gl.TEXTURE_2D, soft.tex); bind(7, gl.TEXTURE_2D, b1.tex); bind(8, gl.TEXTURE_2D, b2.tex);
+    pass(prog.final, null, scene.tex, (uu) => { gl.uniform1f(uu.uTime, clock); gl.uniform2f(uu.uRes, W, H); gl.uniform1f(uu.uDebug, cfg.debug || 0); });
+    stats.draws = draws; stats.tris = Math.round(tris); draws = 0; tris = 0;
   }
 
   function aimCollector() {
-    const hit = anchor && pick(anchor[0], anchor[1], 1.5);
-    if (hit) { collector[0] = hit[0]; collector[1] = hit[1]; collector[2] = hit[2]; }
+    if (!anchor) return;   // a point behind the dataset panel, well out in the scene so nothing flies into the lens
+    const far = G.project(inv, [anchor[0], anchor[1], 1]), dx = far[0] - eye[0], dy = far[1] - eye[1], dz = far[2] - eye[2], k = Math.max(7, cam.focus * 0.9) / Math.hypot(dx, dy, dz);
+    collector[0] = eye[0] + dx * k; collector[1] = Math.max(0.6, eye[1] + dy * k); collector[2] = eye[2] + dz * k;
   }
 
-  /* Start: settle the swarm off-screen so the first picture is already alive. */
+  /* Start: settle the swarm so the first picture is already alive. */
   mark('wired');
   resize();
   mark('targets');
   for (let i = 0; i < 6; i++) { swarm.step(1 / 12); swarm.step(1 / 12); await pause(); }
   mark('settled');
+  anchor = cfg.anchor || null;
   camera(0); aimCollector(); direct(0);
   let last = 0, raf = 0, visible = true, ema = 16, frames = 0, steady = 0, raises = 0;
-  const report = () => post({ t: 'stats', fps: stats.fps, ms: stats.ms, cpu: stats.cpu, draws: stats.draws, bots: stats.bots, size: [W, H], quality, pagePx });
+  const report = () => post({ t: 'stats', fps: stats.fps, ms: stats.ms, cpu: stats.cpu, draws: stats.draws, tris: stats.tris, bots: stats.bots, size: [W, H], quality, pagePx, hero: !!model[0] });
   function frame(now) {
     raf = 0;
     const raw = last ? now - last : 16; last = now;
@@ -300,8 +353,8 @@ export async function run(canvas, cfg, post) {
     camera(dt); swarm.step(dt); packets.step(dt); direct(dt); render(dt);
     if (++frames % 20 === 0) aimCollector();
     ema += (raw - ema) * 0.06; stats.ms = ema; stats.fps = 1000 / ema; stats.cpu += (performance.now() - t0 - stats.cpu) * 0.06;
-    if (frames > 90 && frames % 45 === 0) {     // ease resolution, then bot count, before frames drop
-      if (ema > 21.5) { steady = 0; if (quality > 0.56) { quality *= 0.86; resize(); } else if (swarm.n > 420) { swarm.n = (swarm.n * 0.75) | 0; stats.bots = swarm.n; } }
+    if (frames > 90 && frames % 45 === 0) {     // ease resolution, then robot count, before frames drop
+      if (ema > 21.5) { steady = 0; if (detail < 2.4) detail *= 1.35; else if (quality > 0.56) { quality *= 0.86; resize(); } else if (swarm.n > 420) { swarm.n = (swarm.n * 0.75) | 0; stats.bots = swarm.n; } }
       else if (ema < 17.6 && quality < 1 && raises < 2 && ++steady > 10) { quality = Math.min(1, quality * 1.1); steady = 0; raises++; resize(); }
     }
     if (frames === 2) post({ t: 'on' });
@@ -309,7 +362,7 @@ export async function run(canvas, cfg, post) {
     if (visible && !calm) raf = requestAnimationFrame(frame);
   }
   const wake = () => { if (!raf && visible && !calm) { last = 0; raf = requestAnimationFrame(frame); } };
-  const still = () => { camera(0); aimCollector(); render(0.04); report(); };
+  const still = () => { eased = scroll; camera(0); aimCollector(); render(0.04); report(); };
   if (calm) { flare = 0; packets.step(0); render(0.04); still(); post({ t: 'on' }); } else wake();
 
   /* Messages from the page: pointer, scroll, size, visibility and where the dataset panel sits. */
@@ -323,13 +376,15 @@ export async function run(canvas, cfg, post) {
     else if (m.t === 'show') { visible = m.on; wake(); }
     else if (m.t === 'size') { cssW = m.cssW; cssH = m.cssH; dpr = m.dpr; anchor = m.anchor; resize(); if (calm) still(); }
   }
-  anchor = cfg.anchor || null; aimCollector();
 
-  /* Sharper page art once the first picture is up: 2048 px, then 4096 px only where the screen can use it. */
-  const sharpen = (w) => { texFrom(paint(w).bmp, pageTex); pagePx = w; if (calm) still(); };
+  /* After the first picture: the full-detail robot for close shots, then sharper page art (2048 px, 4096 px on big screens). */
   setTimeout(() => {
-    sharpen(compact ? 1536 : 2048);
-    if (!weak && W >= 2300 && gl.getParameter(gl.MAX_TEXTURE_SIZE) >= 4096) setTimeout(() => sharpen(4096), 1800);
-  }, 700);
+    if (!weak) { fit(0, robotMesh(0)); if (calm) still(); }
+    setTimeout(() => {
+      const sharpen = (w) => { texFrom(paint(w).bmp, pageTex); pagePx = w; if (calm) still(); };
+      sharpen(compact ? 1536 : 2048);
+      if (!weak && W >= 2300 && gl.getParameter(gl.MAX_TEXTURE_SIZE) >= 4096) setTimeout(() => sharpen(4096), 1500);
+    }, 500);
+  }, 350);
   return { input };
 }

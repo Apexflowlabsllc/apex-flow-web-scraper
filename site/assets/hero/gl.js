@@ -141,12 +141,13 @@ export function staticBuffer(gl, data) {
   return b;
 }
 
-/* Colour target, optionally multisampled with depth. resolve() makes .tex current. */
-export function target(gl, w, h, { depth = false, samples = 0 } = {}) {
+/* Colour target. hdr: half-float, samples: multisampled with a resolve step, depth: depth buffer, mips: mip chain. */
+export function target(gl, w, h, { depth = false, samples = 0, hdr = false, mips = false } = {}) {
+  const fmt = hdr ? gl.RGBA16F : gl.RGBA8, levels = mips ? Math.floor(Math.log2(Math.max(w, h))) + 1 : 1;
   const t = { w, h, tex: gl.createTexture(), fbo: gl.createFramebuffer(), draw: null, rbs: [] };
   gl.bindTexture(gl.TEXTURE_2D, t.tex);
-  gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, w, h);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texStorage2D(gl.TEXTURE_2D, levels, fmt, w, h);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mips ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -163,14 +164,16 @@ export function target(gl, w, h, { depth = false, samples = 0 } = {}) {
       gl.framebufferRenderbuffer(gl.FRAMEBUFFER, attach, gl.RENDERBUFFER, rb);
       t.rbs.push(rb);
     };
-    if (samples) { t.draw = gl.createFramebuffer(); store(gl.RGBA8, gl.COLOR_ATTACHMENT0, t.draw); }
+    if (samples) { t.draw = gl.createFramebuffer(); store(fmt, gl.COLOR_ATTACHMENT0, t.draw); }
     if (depth) store(gl.DEPTH_COMPONENT24, gl.DEPTH_ATTACHMENT, t.draw);
   }
   t.resolve = () => {
-    if (t.draw === t.fbo) return;
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, t.draw);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, t.fbo);
-    gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    if (t.draw !== t.fbo) {
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, t.draw);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, t.fbo);
+      gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    }
+    if (mips) { gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.generateMipmap(gl.TEXTURE_2D); }
   };
   t.dispose = () => {
     gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo);
@@ -178,4 +181,56 @@ export function target(gl, w, h, { depth = false, samples = 0 } = {}) {
     t.rbs.forEach((rb) => gl.deleteRenderbuffer(rb));
   };
   return t;
+}
+
+/* Depth-only target for the shadow pass, sampled with hardware comparison. */
+export function shadowTarget(gl, size) {
+  const tex = gl.createTexture(), fbo = gl.createFramebuffer();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texStorage2D(gl.TEXTURE_2D, 1, gl.DEPTH_COMPONENT24, size, size);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, tex, 0);
+  gl.drawBuffers([gl.NONE]); gl.readBuffer(gl.NONE);
+  return { tex, fbo, size };
+}
+
+/* Environment cube map drawn by a shader, one face at a time, then mip-mapped so rough surfaces can read a blurred copy. */
+export function envCube(gl, prog, size) {
+  const tex = gl.createTexture(), fbo = gl.createFramebuffer(), levels = Math.log2(size) + 1;
+  gl.bindTexture(gl.TEXTURE_CUBE_MAP, tex);
+  gl.texStorage2D(gl.TEXTURE_CUBE_MAP, levels, gl.RGBA16F, size, size);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.viewport(0, 0, size, size); gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+  gl.useProgram(prog.p); gl.bindVertexArray(null);
+  for (let f = 0; f < 6; f++) {
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X + f, tex, 0);
+    gl.uniform1i(prog.u.uFace, f);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+  gl.deleteFramebuffer(fbo);
+  return { tex, mips: levels - 1 };
+}
+
+/* Orthographic projection, for the shadow light. */
+export function ortho(out, l, r, b, t, n, f) {
+  out.fill(0);
+  out[0] = 2 / (r - l); out[5] = 2 / (t - b); out[10] = -2 / (f - n);
+  out[12] = -(r + l) / (r - l); out[13] = -(t + b) / (t - b); out[14] = -(f + n) / (f - n); out[15] = 1;
+  return out;
+}
+
+/* Indexed mesh buffers. */
+export function meshBuffers(gl, data) {
+  const vbo = gl.createBuffer(), ibo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferData(gl.ARRAY_BUFFER, data.vertices, gl.STATIC_DRAW);
+  return { vbo, ibo, indices: data.indices, count: data.indices.length, type: data.indices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT };
 }
