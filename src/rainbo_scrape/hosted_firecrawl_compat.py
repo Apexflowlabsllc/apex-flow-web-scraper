@@ -242,6 +242,140 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         return web.json_response({"success": True, "data": selected,
                                  "creditsUsed": payload.get("credits_used", 0)})
 
+    parse_formats = [
+        {"format": "pdf", "kind": "document", "extensions": [".pdf"],
+         "mimeTypes": ["application/pdf"], "available": True},
+        {"format": "docx", "kind": "document", "extensions": [".docx"],
+         "mimeTypes": ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"], "available": True},
+        {"format": "html", "kind": "document", "extensions": [".html", ".htm"],
+         "mimeTypes": ["text/html"], "available": True},
+        {"format": "text", "kind": "document", "extensions": [".txt"],
+         "mimeTypes": ["text/plain"], "available": True},
+        {"format": "json", "kind": "document", "extensions": [".json"],
+         "mimeTypes": ["application/json"], "available": True},
+        {"format": "xml", "kind": "document", "extensions": [".xml"],
+         "mimeTypes": ["application/xml", "text/xml"], "available": True},
+    ]
+    parse_format_names = {"markdown", "text", "links", "html", "rawHtml", "pages", "metadata"}
+    max_parse_bytes = 12 * 1024 * 1024
+
+    async def read_part_limited(part, limit):
+        chunks, total = [], 0
+        while True:
+            chunk = await part.read_chunk(size=64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > limit:
+                return None
+            chunks.append(chunk)
+        return b"".join(chunks)
+
+    async def parse_document(request):
+        if request.content_type != "multipart/form-data":
+            return error("Content-Type must be multipart/form-data with a file field", "invalid_request", 415)
+        if request.content_length is not None and request.content_length > max_parse_bytes + 131072:
+            return error("Upload exceeds the 12 MiB file limit", "upload_too_large", 413)
+        reader = await request.multipart()
+        file_body, filename, content_type, option_text = None, None, None, None
+        while True:
+            part = await reader.next()
+            if part is None:
+                break
+            if part.name == "file":
+                if file_body is not None:
+                    return error("Upload exactly one file", "invalid_request")
+                filename = ((part.filename or "upload").replace("\\", "/").rsplit("/", 1)[-1][:255]
+                            or "upload")
+                content_type = (part.headers.get("Content-Type") or "application/octet-stream").split(";", 1)[0].lower()
+                file_body = await read_part_limited(part, max_parse_bytes)
+                if file_body is None:
+                    return error("Upload exceeds the 12 MiB file limit", "upload_too_large", 413)
+            elif part.name == "options":
+                if option_text is not None:
+                    return error("Provide options once", "invalid_request")
+                raw_options = await read_part_limited(part, 65536)
+                if raw_options is None:
+                    return error("options exceeds the 64 KiB limit", "invalid_request", 413)
+                try:
+                    option_text = raw_options.decode("utf-8")
+                except UnicodeDecodeError:
+                    return error("options must be UTF-8 JSON", "invalid_request")
+            else:
+                return error("Only file and options multipart fields are supported", "unsupported_option")
+        if file_body is None or not file_body:
+            return error("A non-empty file field is required", "invalid_request")
+        try:
+            options = json.loads(option_text) if option_text is not None else {}
+        except json.JSONDecodeError:
+            return error("options must contain valid JSON", "invalid_request")
+        if not isinstance(options, dict):
+            return error("options must be a JSON object", "invalid_request")
+        extra = set(options) - {"formats", "onlyMainContent"}
+        if extra:
+            return error("Unsupported parse options: " + ", ".join(sorted(extra)), "unsupported_option")
+        if options.get("onlyMainContent", True) is not True:
+            return error("onlyMainContent:false is not supported by the isolated document parser", "unsupported_option")
+        formats = options.get("formats", ["markdown"])
+        if not isinstance(formats, list) or not formats:
+            return error("formats must be a non-empty list", "invalid_request")
+        requested = []
+        for item in formats:
+            kind = item if isinstance(item, str) else item.get("type") if isinstance(item, dict) else None
+            if isinstance(item, dict) and set(item) != {"type"}:
+                return error("Parse formats accept only a type field", "unsupported_option")
+            if kind not in parse_format_names:
+                return error("Supported parse outputs are " + ", ".join(sorted(parse_format_names)),
+                             "unsupported_option")
+            if kind not in requested:
+                requested.append(kind)
+
+        if file_body.startswith(b"%PDF-"):
+            content_type = "application/pdf"
+        elif file_body.startswith(b"PK\x03\x04") and (filename.lower().endswith(".docx") or "wordprocessingml" in content_type):
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        account = request["account"]
+        try:
+            hosted.billing.charge(account, "page")
+        except Exception as exc:
+            if hasattr(exc, "needed"):
+                raise ScrapeError("insufficient_credits", str(exc)) from exc
+            raise
+        try:
+            from .parser import parse as parse_bytes
+            parsed = await parse_bytes(file_body, "https://upload.invalid/" + filename,
+                                       content_type, include_html="html" in requested,
+                                       include_raw_html="rawHtml" in requested)
+        except BaseException:
+            hosted.billing.refund(account, 1)
+            raise
+
+        metadata = {"filename": filename, "contentType": content_type,
+                    "bytes": len(file_body), "sourceSha256": parsed.get("source_sha256")}
+        if parsed.get("title"):
+            metadata["title"] = parsed["title"]
+        if parsed.get("pages") is not None:
+            metadata["numPages"] = len(parsed["pages"])
+        data = {"metadata": metadata}
+        if "markdown" in requested and parsed.get("markdown") is not None:
+            data["markdown"] = parsed["markdown"]
+        if "text" in requested and parsed.get("text") is not None:
+            data["text"] = parsed["text"]
+        if "links" in requested:
+            data["links"] = [item.get("url") if isinstance(item, dict) else item
+                              for item in parsed.get("links", [])]
+        if "html" in requested and parsed.get("html") is not None:
+            data["html"] = parsed["html"]
+        if "rawHtml" in requested and parsed.get("raw_html") is not None:
+            data["rawHtml"] = parsed["raw_html"]
+        if "pages" in requested and parsed.get("pages") is not None:
+            data["pages"] = [{"pageNumber": page["page"], "markdown": page.get("text", "")}
+                              for page in parsed["pages"]]
+        return web.json_response({"success": True, "data": data, "creditsUsed": 1})
+
+    async def parse_format_list(request):
+        return web.json_response({"success": True, "data": {"formats": parse_formats}})
+
     async def map_route(request):
         body = await request.json()
         if not isinstance(body, dict):
@@ -671,6 +805,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         return wrapped
 
     app.router.add_post("/v2/scrape", wrap(scrape))
+    app.router.add_post("/v2/parse", wrap(parse_document))
+    app.router.add_get("/v2/parse/formats", wrap(parse_format_list))
     app.router.add_post("/v2/map", wrap(map_route))
     app.router.add_post("/v2/search", wrap(search))
     app.router.add_post("/v2/crawl", wrap(crawl))

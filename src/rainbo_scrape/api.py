@@ -175,7 +175,8 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         except (ValueError, KeyError, TypeError, ScrapeError) as exc:
             details = failure(exc, getattr(exc, "asked_archive", False))
             response = fail(400, str(exc), details.pop("code"), **{k: v for k, v in details.items() if k != "retryable"})
-        response.headers.update({"X-Content-Type-Options": "nosniff", "Cache-Control": "no-store",
+        cache_control = "private, max-age=3600" if request.path == "/v2/parse/formats" else "no-store"
+        response.headers.update({"X-Content-Type-Options": "nosniff", "Cache-Control": cache_control,
                                  "X-Request-Id": secrets.token_hex(8),
                                  "X-Credits-Remaining": str(billing.remaining(account))})
         if hosted:

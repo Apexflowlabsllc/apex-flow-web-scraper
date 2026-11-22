@@ -1,5 +1,8 @@
 import asyncio
+import io
 import json
+from aiohttp import FormData
+from pypdf import PdfWriter
 
 from rainbo_scrape.billing import _hash
 from test_hosted import hosted
@@ -48,6 +51,79 @@ async def test_v2_requires_auth_and_rejects_unsupported_formats(hosted):
     assert response.status == 400
     payload = await response.json()
     assert payload["success"] is False and payload["code"] == "unsupported_option"
+
+
+async def test_v2_parse_upload_formats_and_credit_metering(hosted):
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    form = FormData()
+    document = b"A plain document for parsing." + b" " * 100_000
+    form.add_field("file", document, filename="notes.txt", content_type="text/plain")
+    form.add_field("options", json.dumps({"formats": ["markdown", "text", "pages"]}),
+                   content_type="application/json")
+    response = await client.post("/v2/parse", headers=headers, data=form)
+    payload = await response.json()
+    assert response.status == 200
+    assert payload["success"] is True
+    assert payload["data"]["markdown"] == document.decode()
+    assert payload["data"]["text"] == document.decode()
+    assert payload["data"]["metadata"]["filename"] == "notes.txt"
+    assert payload["creditsUsed"] == 1
+    assert h.billing.remaining(account) == 109999
+
+    pdf_buffer = io.BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.write(pdf_buffer)
+    pdf_form = FormData()
+    pdf_form.add_field("file", pdf_buffer.getvalue(), filename="one-page.pdf", content_type="application/pdf")
+    pdf_form.add_field("options", json.dumps({"formats": ["pages", "metadata"]}),
+                       content_type="application/json")
+    pdf_response = await client.post("/v2/parse", headers=headers, data=pdf_form)
+    pdf_payload = await pdf_response.json()
+    assert pdf_response.status == 200
+    assert pdf_payload["data"]["metadata"]["numPages"] == 1
+    assert pdf_payload["data"]["pages"] == [{"pageNumber": 1, "markdown": ""}]
+    assert h.billing.remaining(account) == 109998
+
+    formats = await client.get("/v2/parse/formats", headers=headers)
+    available = await formats.json()
+    assert formats.status == 200
+    assert formats.headers["Cache-Control"] == "private, max-age=3600"
+    assert {item["format"] for item in available["data"]["formats"]} >= {"pdf", "docx", "html", "text"}
+
+
+async def test_v2_parse_rejects_unsupported_options_without_charging(hosted):
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    form = FormData()
+    form.add_field("file", b"text", filename="notes.txt", content_type="text/plain")
+    form.add_field("options", json.dumps({"skipTlsVerification": True}), content_type="application/json")
+    response = await client.post("/v2/parse", headers=headers, data=form)
+    payload = await response.json()
+    assert response.status == 400
+    assert payload["code"] == "unsupported_option"
+    assert h.billing.remaining(account) == 110000
+
+
+async def test_v2_parse_refunds_credit_when_document_parser_fails(hosted, monkeypatch):
+    from rainbo_scrape.policy import ScrapeError
+    import rainbo_scrape.parser as parser
+
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+
+    async def fail(*args, **kwargs):
+        raise ScrapeError("pdf_invalid", "Unreadable PDF")
+
+    monkeypatch.setattr(parser, "parse", fail)
+    form = FormData()
+    form.add_field("file", b"%PDF-invalid", filename="bad.pdf", content_type="application/pdf")
+    response = await client.post("/v2/parse", headers=headers, data=form)
+    payload = await response.json()
+    assert response.status == 400
+    assert payload["code"] == "pdf_invalid"
+    assert h.billing.remaining(account) == 110000
 
 
 async def test_v2_json_format_maps_schema_prompt_and_paid_metering(hosted, monkeypatch):

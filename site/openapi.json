@@ -2238,6 +2238,44 @@
         }
       }
     },
+    "/v2/parse": {
+      "post": {
+        "operationId": "firecrawlCompatParseUpload",
+        "summary": "Parse an uploaded document",
+        "description": "Parses one uploaded PDF, DOCX, HTML, text, JSON, or XML document. Maximum file size is 12 MiB; the operation costs one credit. Supported options are formats and onlyMainContent=true.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {"type": "string", "format": "binary"},
+                  "options": {"type": "string", "description": "Optional JSON object encoded as a multipart field. Supports formats and onlyMainContent=true."}
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Parsed document; costs one credit", "content": {"application/json": {"schema": {"type": "object"}}}},
+          "400": {"description": "Invalid document or unsupported option"},
+          "402": {"description": "Insufficient credits"},
+          "413": {"description": "Upload exceeds 12 MiB"}
+        }
+      }
+    },
+    "/v2/parse/formats": {
+      "get": {
+        "operationId": "firecrawlCompatParseFormats",
+        "summary": "List supported upload formats",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "responses": {"200": {"description": "Supported upload formats; cached privately for one hour", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
     "/v2/scrape": {
       "post": {
         "operationId": "firecrawlCompatScrape",

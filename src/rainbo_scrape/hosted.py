@@ -182,7 +182,9 @@ class Hosted:
             except Exception:
                 logging.exception("request failed path=%s", request.path)
                 response = web.json_response({"error": "Service temporarily unavailable. Please retry."}, status=503)
-            response.headers.update({"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
+            cache_control = "private, max-age=3600" if request.path == "/v2/parse/formats" else "no-store"
+            response.headers.update({"Cache-Control": cache_control,
+                                     "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
             return response
         app.middlewares.insert(0, errors)
 
