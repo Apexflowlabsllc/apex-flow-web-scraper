@@ -51,6 +51,16 @@ def test_chrome_is_removed_but_page_title_header_kept():
     assert "cookies" not in out and "Home About" not in out and "Copyright" not in out
 
 
+def test_isolated_auth_link_in_generic_header_is_removed_but_content_is_kept():
+    out = md('<body><div class="row header-box"><h1>Quotes to Scrape</h1>'
+             '<p><a href="/login">Login</a></p></div>'
+             '<main><p>Login is required to save your profile.</p><p>Quote content.</p></main></body>',
+             "https://quotes.toscrape.com/page/2/")
+    assert "Quotes to Scrape" in out and "Quote content" in out
+    assert "[Login](https://quotes.toscrape.com/login)" not in out
+    assert "Login is required to save your profile" in out
+
+
 def test_many_articles_listing_uses_whole_page_not_one_card():
     cards = "".join(f"<article><h3>Item {i}</h3><p>${i}</p></article>" for i in range(5))
     out = md(f"<body><div>{cards}</div></body>")

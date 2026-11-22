@@ -16,12 +16,17 @@ export function getMcpCommand(os = platform()) {
 }
 export const MCP_COMMAND = getMcpCommand();
 
-export function getClientTargets({ home = homedir(), appData = process.env.APPDATA, os = platform() } = {}) {
+export function getClientTargets({ home = homedir(), appData = process.env.APPDATA, xdgConfigHome = process.env.XDG_CONFIG_HOME, os = platform(), cwd = process.cwd() } = {}) {
   const claudeDesktop = os === "win32"
     ? join(appData || join(home, "AppData", "Roaming"), "Claude", "claude_desktop_config.json")
     : os === "darwin"
       ? join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
       : join(home, ".config", "Claude", "claude_desktop_config.json");
+  const zedSettings = os === "win32"
+    ? join(appData || join(home, "AppData", "Roaming"), "Zed", "settings.json")
+    : os === "darwin"
+      ? join(home, "Library", "Application Support", "Zed", "settings.json")
+      : join(xdgConfigHome || join(home, ".config"), "zed", "settings.json");
   return [
     { id: "codex", label: "OpenAI Codex CLI", format: "toml", path: join(home, ".codex", "config.toml"), detect: join(home, ".codex") },
     { id: "claude-code", label: "Claude Code", format: "jsonc", path: join(home, ".claude.json"), detect: join(home, ".claude"), entryType: "stdio" },
@@ -30,10 +35,13 @@ export function getClientTargets({ home = homedir(), appData = process.env.APPDA
     { id: "gemini", label: "Gemini CLI", format: "jsonc", path: join(home, ".gemini", "settings.json"), detect: join(home, ".gemini") },
     { id: "windsurf", label: "Windsurf", format: "jsonc", path: join(home, ".codeium", "windsurf", "mcp_config.json"), detect: join(home, ".codeium", "windsurf") },
     { id: "copilot", label: "GitHub Copilot CLI", format: "jsonc", path: join(home, ".copilot", "mcp-config.json"), detect: join(home, ".copilot"), entryType: "stdio" },
+    { id: "cline", label: "Cline", format: "jsonc", path: join(home, ".cline", "data", "settings", "cline_mcp_settings.json"), detect: join(home, ".cline"), entryType: "stdio" },
+    { id: "roo-code", label: "Roo Code (workspace)", format: "jsonc", path: join(cwd, ".roo", "mcp.json"), detect: join(cwd, ".roo"), entryType: "stdio" },
+    { id: "zed", label: "Zed", format: "jsonc", path: zedSettings, detect: dirname(zedSettings), rootKey: "context_servers" },
   ];
 }
 
-export function jsoncWithMcpServer(source, { force = false, entry = MCP_COMMAND } = {}) {
+export function jsoncWithMcpServer(source, { force = false, entry = MCP_COMMAND, rootKey = "mcpServers" } = {}) {
   const text = source.trim() ? source : "{}\n";
   const errors = [];
   const data = parse(text, errors, { allowTrailingComma: true, disallowComments: false });
@@ -41,12 +49,12 @@ export function jsoncWithMcpServer(source, { force = false, entry = MCP_COMMAND 
   if (data !== undefined && (data === null || Array.isArray(data) || typeof data !== "object")) {
     throw new Error("The MCP settings file must contain a JSON object; no changes were made.");
   }
-  const existing = data?.mcpServers?.[SERVER_NAME];
+  const existing = data?.[rootKey]?.[SERVER_NAME];
   if (existing && !force) {
     if (JSON.stringify(existing) === JSON.stringify(entry)) return { text, changed: false, reason: "already configured" };
     throw new Error(`An existing ${SERVER_NAME} entry was found; use --force to replace it.`);
   }
-  const edits = modify(text, ["mcpServers", SERVER_NAME], entry, {
+  const edits = modify(text, [rootKey, SERVER_NAME], entry, {
     formattingOptions: { insertSpaces: true, tabSize: 2, eol: text.includes("\r\n") ? "\r\n" : "\n" },
   });
   return { text: applyEdits(text, edits), changed: true };
@@ -88,7 +96,7 @@ export function installClient(target, { force = false, dryRun = false, os = plat
   const oldText = existsSync(target.path) ? readFileSync(target.path, "utf8") : "";
   const result = target.format === "toml"
     ? tomlWithMcpServer(oldText, { force, os })
-    : jsoncWithMcpServer(oldText, { force, entry: { ...(target.entryType ? { type: target.entryType } : {}), ...getMcpCommand(target.os) } });
+    : jsoncWithMcpServer(oldText, { force, rootKey: target.rootKey, entry: { ...(target.entryType ? { type: target.entryType } : {}), ...getMcpCommand(target.os) } });
   if (!result.changed || dryRun) return { ...result, backup: null };
   mkdirSync(dirname(target.path), { recursive: true });
   const backup = makeBackup(target.path);
@@ -102,7 +110,7 @@ export function installClient(target, { force = false, dryRun = false, os = plat
 function printHelp() {
   stdout.write(`Apex Flow Web Scraper ${process.env.npm_package_version || ""}\n\n`);
   stdout.write("Commands:\n  setup [--all | --client <name>] [--yes] [--force] [--dry-run]\n  mcp\n  clients\n\n");
-  stdout.write("Clients: codex, claude-code, claude-desktop, cursor, gemini, windsurf, copilot\n");
+  stdout.write("Clients: codex, claude-code, claude-desktop, cursor, gemini, windsurf, copilot, cline, roo-code, zed\n");
   stdout.write("The MCP bridge reads APEX_SCRAPER_API_KEY from its environment. It never writes the key into client settings.\n");
 }
 
@@ -123,7 +131,7 @@ function parseArgs(argv) {
 
 export async function runSetup(options, { home = homedir(), appData = process.env.APPDATA, os = platform(), io = { stdin, stdout, stderr } } = {}) {
   const targets = getClientTargets({ home, appData, os });
-  const aliases = { claude: "claude-code", vscode: "copilot", "github-copilot": "copilot" };
+  const aliases = { claude: "claude-code", vscode: "copilot", "github-copilot": "copilot", roo: "roo-code" };
   let selected;
   if (options.client) {
     const id = aliases[options.client] || options.client;

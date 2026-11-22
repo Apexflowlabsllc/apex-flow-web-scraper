@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import { getMcpCommand, installClient, jsoncWithMcpServer, MCP_COMMAND, SERVER_NAME, tomlWithMcpServer } from "./bin/apex-flow-web-scraper.mjs";
+import { getClientTargets, getMcpCommand, installClient, jsoncWithMcpServer, MCP_COMMAND, SERVER_NAME, tomlWithMcpServer } from "./bin/apex-flow-web-scraper.mjs";
 
 const scratchBase = resolve(process.cwd(), "work", "installer-tests");
 mkdirSync(scratchBase, { recursive: true });
@@ -37,6 +37,28 @@ test("JSONC integration is idempotent and refuses to overwrite a conflicting ent
   assert.equal(jsoncWithMcpServer(once).changed, false);
   assert.throws(() => jsoncWithMcpServer('{"mcpServers":{"apex-flow-web-scraper":{"command":"custom"}}}'), /--force/);
   assert.deepEqual(JSON.parse(jsoncWithMcpServer('{"mcpServers":{"apex-flow-web-scraper":{"command":"custom"}}}', { force: true }).text).mcpServers[SERVER_NAME], MCP_COMMAND);
+});
+
+test("Zed context_servers format keeps unrelated settings and never embeds a key", () => {
+  const result = jsoncWithMcpServer('{\n  "theme": "One Dark",\n  "context_servers": {"other": {"command":"node"}}\n}', {
+    rootKey: "context_servers", entry: { command: "npx", args: ["-y", "apex-flow-web-scraper", "mcp"], env: {} },
+  });
+  const value = JSON.parse(result.text);
+  assert.equal(value.theme, "One Dark");
+  assert.deepEqual(value.context_servers.other, { command: "node" });
+  assert.deepEqual(value.context_servers[SERVER_NAME], { command: "npx", args: ["-y", "apex-flow-web-scraper", "mcp"], env: {} });
+  assert.doesNotMatch(JSON.stringify(value), /API_KEY|Bearer/);
+});
+
+test("target registry includes individually selectable Cline, Roo Code and Zed installs", () => {
+  const home = "E:/fixture-home";
+  const cwd = "E:/fixture-project";
+  const targets = getClientTargets({ home, cwd, appData: "E:/fixture-appdata", xdgConfigHome: "E:/fixture-config", os: "win32" });
+  const byId = Object.fromEntries(targets.map((target) => [target.id, target]));
+  assert.equal(byId.cline.path, join(home, ".cline", "data", "settings", "cline_mcp_settings.json"));
+  assert.equal(byId["roo-code"].path, join(cwd, ".roo", "mcp.json"));
+  assert.equal(byId.zed.path, join("E:/fixture-appdata", "Zed", "settings.json"));
+  assert.equal(byId.zed.rootKey, "context_servers");
 });
 
 test("Codex TOML integration appends a stdio server and does not duplicate it", () => {
