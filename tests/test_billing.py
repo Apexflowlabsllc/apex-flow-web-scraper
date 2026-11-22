@@ -37,6 +37,27 @@ def test_reserve_records_exact_provider_credits_under_operation_kind(tmp_path):
     assert b.db.execute("SELECT kind,credits FROM usage WHERE account=?", (acct,)).fetchone() == ("search", 210)
 
 
+def test_idempotent_reservation_survives_retry_settlement_and_refund(tmp_path):
+    b = Billing(tmp_path / "b.db")
+    acct = b.create_account("a@example.com")
+
+    assert b.reserve_idempotent(acct, "job:0", 3) == "new"
+    assert b.reserve_idempotent(acct, "job:0", 3) == "reserved"
+    assert b.remaining(acct) == 997
+    b.settle_idempotent(acct, "job:0", 1)
+    b.settle_idempotent(acct, "job:0", 1)
+    assert b.remaining(acct) == 999
+
+    assert b.reserve_idempotent(acct, "job:1", 3) == "new"
+    b.refund_idempotent(acct, "job:1")
+    b.refund_idempotent(acct, "job:1")
+    assert b.remaining(acct) == 999
+    assert b.reserve_idempotent(acct, "job:1", 3) == "reserved"
+    assert b.remaining(acct) == 996
+    with pytest.raises(ValueError, match="different reservation"):
+        b.reserve_idempotent(acct, "job:0", 1)
+
+
 def test_plan_change_resets_period(tmp_path):
     b = Billing(tmp_path / "b.db")
     acct = b.create_account("a@example.com")

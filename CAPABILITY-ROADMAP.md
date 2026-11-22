@@ -212,7 +212,8 @@ search-first volume. [Google guidance for generative search](https://developers.
    required: multi-process load/fault testing, webhook callbacks, broader
    response-schema coverage, and a reviewed production release before customers
    can use it live. If a worker dies after an upstream scrape succeeds but
-   before its result is persisted, recovery may repeat that scrape and charge.
+   before its result is persisted, recovery may repeat the upstream scrape, but
+   a durable per-job/per-URL billing key prevents charging that URL twice.
 3. **Build safe persistent local sessions:** owner login, MFA, explicit human
    challenge handling, encrypted site-bound state, expiry, scope and
    revocation. Keep sessions off the hosted service and out of chat.

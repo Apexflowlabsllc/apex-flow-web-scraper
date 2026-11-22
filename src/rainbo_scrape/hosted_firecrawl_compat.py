@@ -779,7 +779,10 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                         return
                     chunk = [url for _, url in pending]
                     call_options = {key: value for key, value in options.items() if not key.startswith("_")}
-                    response = await batch_for(account, {"urls": chunk, **call_options})
+                    response = await batch_for(
+                        account, {"urls": chunk, **call_options},
+                        idempotency_keys=[f"firecrawl-batch:{job}:{index}" for index, _ in pending],
+                    )
                     payload = unpack(response)
                     if response.status == 429 or response.status >= 500:
                         if attempt < 4:
@@ -947,6 +950,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         hosted.db.execute("DELETE FROM firecrawl_batch_pages WHERE job IN (SELECT id FROM firecrawl_batch_jobs WHERE created<?)",
                           (time.time() - 7 * 86400,))
         hosted.db.execute("DELETE FROM firecrawl_batch_jobs WHERE created<?", (time.time() - 7 * 86400,))
+        hosted.billing.db.execute("DELETE FROM idempotent_reservations WHERE created<?", (time.time() - 7 * 86400,))
         job = "batch_" + secrets.token_hex(12)
         created = time.time()
         hosted.db.execute("INSERT INTO firecrawl_batch_jobs(id,account,status,urls,options,total,created) VALUES(?,?, 'scraping', ?,?,?,?)",

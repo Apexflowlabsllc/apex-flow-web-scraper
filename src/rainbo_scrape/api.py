@@ -195,7 +195,7 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         body = await request.json()
         return await perform(request["account"], body)
 
-    async def perform(account, body, named=True):
+    async def perform(account, body, named=True, idempotency_key=None):
         """named: the customer gave this exact address (single scrape, batch). Crawl-discovered pages pass False."""
         nonlocal total_active, rendering_active
         if not isinstance(body, dict) or not isinstance(body.get("url"), str) or set(body) - ALLOWED:
@@ -255,7 +255,10 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
             if hosted:
                 from .hosted_features import admit_attempt
                 admit_attempt(hosted, account)
-            billing.reserve(account, worst)
+            if idempotency_key is None:
+                billing.reserve(account, worst)
+            else:
+                billing.reserve_idempotent(account, idempotency_key, worst)
         except QuotaExceeded as exc:
             return fail(402, str(exc), **buy)
         q.append(now)
@@ -292,9 +295,15 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
             if hosted:
                 response_result, pagination = paginate(response_result, page, max_tokens=max_tokens)
             actual = credits_for(body, rendered=bool(result.get("rendered")))
-            billing.refund(account, worst - actual)
+            if idempotency_key is None:
+                billing.refund(account, worst - actual)
+            else:
+                billing.settle_idempotent(account, idempotency_key, actual)
         except BaseException:
-            billing.refund(account, worst)
+            if idempotency_key is None:
+                billing.refund(account, worst)
+            else:
+                billing.refund_idempotent(account, idempotency_key)
             raise
         finally:
             active[account] -= 1
@@ -320,23 +329,27 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
     async def batch(request):
         return await batch_for(request["account"], await request.json())
 
-    async def batch_for(account, body):
+    async def batch_for(account, body, idempotency_keys=None):
         started = time.monotonic()
         if not isinstance(body, dict):
             raise ValueError("Expected a JSON object")
         urls = body.pop("urls", None)
         if not isinstance(urls, list) or not 1 <= len(urls) <= 10 or any(not isinstance(u,str) for u in urls) or set(body) - (ALLOWED - {"url"}):
             raise ValueError("Supply 1–10 urls and supported scrape options")
+        if idempotency_keys is not None and (not isinstance(idempotency_keys, list) or len(idempotency_keys) != len(urls)
+                                               or any(not isinstance(key, str) or not key for key in idempotency_keys)):
+            raise ValueError("Invalid internal batch idempotency keys")
         # Run as many pages at once as the plan allows; results stay in the order the URLs were given.
         slots = max(1, min(len(urls), billing.limits(account)["concurrency"]))
         done = {}
         pending = iter(enumerate(urls))
         stop = False
 
-        async def one(url):
+        async def one(index, url):
             try:
                 async with asyncio.timeout(max(0.1, 80-(time.monotonic()-started))):
-                    response = await perform(account, {**body, "url": url})
+                    key = idempotency_keys[index] if idempotency_keys is not None else None
+                    response = await perform(account, {**body, "url": url}, idempotency_key=key)
                 return {"url": url, "status": response.status, **json.loads(response.body)}
             except TimeoutError:
                 return {"url": url, "status": 504, "code": "timeout", "retryable": True,
@@ -355,7 +368,7 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
             for index, url in pending:
                 if stop:
                     return
-                item = await one(url)
+                item = await one(index, url)
                 if item["status"] in (429, 504):
                     stop = True  # capacity or deadline reached: the rest is returned as unprocessed for a retry
                 done[index] = item

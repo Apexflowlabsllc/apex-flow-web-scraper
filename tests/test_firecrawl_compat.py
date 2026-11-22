@@ -412,6 +412,9 @@ async def test_firecrawl_batch_resumes_saved_pages_after_service_restart(hosted)
     urls = ["https://example.com/saved", "https://example.com/pending"]
     now = time.time()
     await old_client.close()
+    pending_key = f"firecrawl-batch:{job}:1"
+    h.billing.reserve_idempotent(account, pending_key, 3)
+    h.billing.settle_idempotent(account, pending_key, 1)
     h.billing.charge(account, "page", 1)
     h.db.execute(
         "INSERT INTO firecrawl_batch_jobs(id,account,status,urls,options,total,completed,credits,created,finished,lease_until,lease_token) "
@@ -442,6 +445,8 @@ async def test_firecrawl_batch_resumes_saved_pages_after_service_restart(hosted)
         assert payload["status"] == "completed"
         assert payload["completed"] == payload["total"] == 2
         assert payload["creditsUsed"] == 2
+        assert h.billing.remaining(account) == 109998
+        assert h.billing.db.execute("SELECT SUM(credits) FROM usage WHERE account=?", (account,)).fetchone()[0] == 2
         assert [row["markdown"] for row in payload["data"]] == ["# Saved", "# Recovered"]
         assert calls == [urls[1]]
     finally:

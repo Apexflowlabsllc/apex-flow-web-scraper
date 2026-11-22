@@ -75,6 +75,10 @@ class Billing:
         if "api_key_hash" not in columns:
             self.db.execute("ALTER TABLE usage ADD COLUMN api_key_hash TEXT")
         self.db.execute("CREATE INDEX IF NOT EXISTS usage_account_key_ts ON usage(account,api_key_hash,ts)")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS idempotent_reservations (
+            key_hash TEXT PRIMARY KEY, account TEXT NOT NULL, kind TEXT NOT NULL,
+            reserved INTEGER NOT NULL, state TEXT NOT NULL, created REAL NOT NULL
+        )""")
         key_columns = {row[1] for row in self.db.execute("PRAGMA table_info(keys)")}
         if "key_id" not in key_columns:
             self.db.execute("ALTER TABLE keys ADD COLUMN key_id TEXT")
@@ -160,6 +164,89 @@ class Billing:
     def reserve(self, account, credits, kind="page"):
         """Reserve before I/O so concurrent requests cannot overspend."""
         return self.charge(account, kind, exact_credits=credits)
+
+    def reserve_idempotent(self, account, key, credits, kind="page"):
+        """Reserve once for a durable operation; return its prior state on retry."""
+        if not isinstance(key, str) or not key or kind not in COSTS or isinstance(credits, bool) or not isinstance(credits, int) or credits < 0:
+            raise ValueError("invalid idempotent reservation")
+        key_hash = _hash("idempotent-reservation:" + key)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute(
+                "SELECT account,kind,reserved,state FROM idempotent_reservations WHERE key_hash=?", (key_hash,)
+            ).fetchone()
+            if row:
+                old_account, old_kind, old_credits, state = row
+                if (old_account, old_kind, old_credits) != (account, kind, credits):
+                    raise ValueError("idempotency key reused with different reservation")
+                if state == "refunded":
+                    self._charge_in_transaction(account, kind, credits)
+                    self.db.execute("UPDATE idempotent_reservations SET state='reserved',created=? WHERE key_hash=?",
+                                    (time.time(), key_hash))
+                    state = "reserved"
+                self.db.execute("COMMIT")
+                return state
+            self._charge_in_transaction(account, kind, credits)
+            self.db.execute(
+                "INSERT INTO idempotent_reservations(key_hash,account,kind,reserved,state,created) VALUES(?,?,?,?,?,?)",
+                (key_hash, account, kind, credits, "reserved", time.time()),
+            )
+            self.db.execute("COMMIT")
+            return "new"
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
+
+    def _charge_in_transaction(self, account, kind, credits):
+        plan, used = self.db.execute("SELECT plan,used FROM accounts WHERE id=?", (account,)).fetchone()
+        left = PLANS[plan]["credits"] - used
+        if credits > left:
+            raise QuotaExceeded(credits, left)
+        self.db.execute("UPDATE accounts SET used=used+? WHERE id=?", (credits, account))
+        self.db.execute("INSERT INTO usage(ts,account,kind,credits,api_key_hash) VALUES (?,?,?,?,?)",
+                        (time.time(), account, kind, credits, _usage_key_hash.get()))
+
+    def settle_idempotent(self, account, key, actual):
+        if isinstance(actual, bool) or not isinstance(actual, int) or actual < 0:
+            raise ValueError("invalid settled credits")
+        key_hash = _hash("idempotent-reservation:" + key)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute("SELECT reserved,state FROM idempotent_reservations WHERE key_hash=? AND account=?",
+                                  (key_hash, account)).fetchone()
+            if not row:
+                raise ValueError("idempotent reservation not found")
+            reserved, state = row
+            if actual > reserved:
+                raise ValueError("settled credits exceed reservation")
+            if state == "reserved":
+                self._refund_in_transaction(account, reserved - actual)
+                self.db.execute("UPDATE idempotent_reservations SET state='settled' WHERE key_hash=?", (key_hash,))
+            self.db.execute("COMMIT")
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
+
+    def refund_idempotent(self, account, key):
+        key_hash = _hash("idempotent-reservation:" + key)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute("SELECT reserved,state FROM idempotent_reservations WHERE key_hash=? AND account=?",
+                                  (key_hash, account)).fetchone()
+            if row and row[1] == "reserved":
+                self._refund_in_transaction(account, row[0])
+                self.db.execute("UPDATE idempotent_reservations SET state='refunded' WHERE key_hash=?", (key_hash,))
+            self.db.execute("COMMIT")
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
+
+    def _refund_in_transaction(self, account, credits):
+        if credits <= 0:
+            return
+        self.db.execute("UPDATE accounts SET used=MAX(0,used-?) WHERE id=?", (credits, account))
+        self.db.execute("INSERT INTO usage(ts,account,kind,credits,api_key_hash) VALUES (?,?,?,?,?)",
+                        (time.time(), account, "refund", -credits, _usage_key_hash.get()))
 
     def refund(self, account, credits):
         if credits <= 0:
