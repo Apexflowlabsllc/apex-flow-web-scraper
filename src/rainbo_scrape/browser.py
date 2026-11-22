@@ -106,6 +106,14 @@ async def render(fetcher, url, wait_selector=None, scrolls=0, screenshot=False):
                         quiet_since = time.monotonic()
                     elif time.monotonic() - quiet_since >= 0.35:
                         break
+                # Content-settle wait: apps that paint a skeleton first keep filling in text after the
+                # network goes quiet. Wait while the visible text is still growing (max 4 s more).
+                grown, settle_end, stable = -1, time.monotonic() + 4, 0
+                while time.monotonic() < settle_end and stable < 2:
+                    size = await page.evaluate("document.body ? document.body.innerText.length : 0")
+                    stable = stable + 1 if size <= grown * 1.05 else 0
+                    grown = max(grown, size)
+                    await asyncio.sleep(0.25)
             for _ in range(scrolls):
                 await page.evaluate("window.scrollBy(0, window.innerHeight)")
                 await page.wait_for_timeout(300)
