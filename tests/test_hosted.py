@@ -32,7 +32,9 @@ async def hosted(tmp_path, monkeypatch):
         if path == "billing_portal/sessions": return {"url":"https://billing.stripe.com/p/session/fixture"}
         raise AssertionError(path)
     h.stripe = stripe
+    scrape_calls = []
     async def scrape(url, **kwargs):
+        scrape_calls.append((url, kwargs))
         if url.endswith("failure"): raise ValueError("fixture failed")
         await asyncio.sleep(0.01)
         result = {"markdown":"# Fixture", "rendered":False}
@@ -45,6 +47,7 @@ async def hosted(tmp_path, monkeypatch):
         if kwargs.get("extract"):
             result["extracted"] = {"data": {"heading": "Fixture"}, "valid": True, "errors": []}
         return result
+    h.scrape_calls = scrape_calls
     client=TestClient(TestServer(make_app(billing,scrape,hosted=h)))
     await client.start_server()
     yield h,client,session,sub,nonce,calls

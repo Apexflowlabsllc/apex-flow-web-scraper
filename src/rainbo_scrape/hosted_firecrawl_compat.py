@@ -260,6 +260,17 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 raise ValueError(f"Firecrawl action {kind!r} is not supported by Apex's bounded read-only browser actions")
         return translated
 
+    def translate_wait_for(actions, wait_for):
+        """Map Firecrawl's initial wait to Apex's bounded rendered-page action."""
+        if isinstance(wait_for, bool) or not isinstance(wait_for, int) or not 0 <= wait_for <= 5000:
+            raise ValueError("waitFor must be an integer from 0 to 5000 milliseconds")
+        translated = [] if actions is None else translate_actions(actions)
+        if wait_for:
+            if len(translated) >= 8:
+                raise ValueError("waitFor plus actions may contain at most 8 browser actions")
+            translated.insert(0, {"type": "wait", "ms": wait_for})
+        return translated
+
     def json_extract_spec(item):
         """Translate Firecrawl's JSON format to Apex's provider-backed schema extractor."""
         if not isinstance(item, dict) or item.get("type") != "json":
@@ -307,7 +318,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         body = await request.json()
         if not isinstance(body, dict):
             return error("Request body must be a JSON object")
-        allowed = {"url", "formats", "onlyMainContent", "maxAge", "screenshot", "actions",
+        allowed = {"url", "formats", "onlyMainContent", "maxAge", "screenshot", "actions", "waitFor",
                    "origin", "blockAds", "removeBase64Images", "storeInCache", "fastMode", "mobile"}
         extra = set(body) - allowed
         if extra:
@@ -354,9 +365,11 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             apex_body["extract"] = extract_spec
         if "maxAge" in body:
             apex_body["max_age"] = body["maxAge"]
-        if body.get("actions") is not None:
+        if body.get("actions") is not None or "waitFor" in body:
             try:
-                apex_body["actions"] = translate_actions(body["actions"])
+                actions = translate_wait_for(body.get("actions"), body.get("waitFor", 0))
+                if actions:
+                    apex_body["actions"] = actions
             except ValueError as exc:
                 return error(str(exc))
         want_screenshot = "screenshot" in parsed or body.get("screenshot", False)
@@ -636,12 +649,16 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         scrape_options = body.get("scrapeOptions", {})
         if not isinstance(scrape_options, dict):
             return error("scrapeOptions must be an object")
-        supported_scrape = {"formats", "onlyMainContent"}
+        supported_scrape = {"formats", "onlyMainContent", "waitFor", "actions"}
         extra_scrape = set(scrape_options) - supported_scrape
         if extra_scrape:
             return error("Unsupported scrapeOptions: " + ", ".join(sorted(extra_scrape)))
         if scrape_options.get("onlyMainContent", True) is not True:
             return error("onlyMainContent:false is not supported")
+        try:
+            crawl_actions = translate_wait_for(scrape_options.get("actions"), scrape_options.get("waitFor", 0))
+        except ValueError as exc:
+            return error(str(exc))
         formats = scrape_options.get("formats", [{"type": "markdown"}])
         if not isinstance(formats, list) or not formats:
             return error("Crawl formats must be a non-empty list")
@@ -666,6 +683,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                           if item in {"markdown", "html", "rawHtml", "links", "screenshot"}})
         start_body = {"url": body.get("url"), "limit": body.get("limit", 25), "render": "auto",
                       "outputs": outputs, "max_depth": body.get("maxDiscoveryDepth", 3)}
+        if crawl_actions:
+            start_body["actions"] = crawl_actions
         for source, target in (("includePaths", "include_paths"), ("excludePaths", "exclude_paths"),
                                ("regexOnFullURL", "regex_on_full_url"),
                                ("ignoreQueryParameters", "ignore_query_parameters")):
@@ -1081,7 +1100,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         max_urls = PAGE_LIMITS.get(plan[0] if plan else "", 100)
         if len(urls) > max_urls:
             return error(f"This plan supports at most {max_urls} URLs per batch job", "batch_limit", 413)
-        allowed = {"urls", "formats", "onlyMainContent", "maxAge", "screenshot", "actions",
+        allowed = {"urls", "formats", "onlyMainContent", "maxAge", "screenshot", "actions", "waitFor",
                    "ignoreInvalidURLs", "origin", "blockAds", "removeBase64Images", "storeInCache",
                    "fastMode", "mobile", "webhook"}
         extra = set(body) - allowed
@@ -1133,9 +1152,11 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             apex_options["extract"] = extract_spec
         if "maxAge" in body:
             apex_options["max_age"] = body["maxAge"]
-        if body.get("actions") is not None:
+        if body.get("actions") is not None or "waitFor" in body:
             try:
-                apex_options["actions"] = translate_actions(body["actions"])
+                actions = translate_wait_for(body.get("actions"), body.get("waitFor", 0))
+                if actions:
+                    apex_options["actions"] = actions
             except ValueError as exc:
                 return error(str(exc))
         if "screenshot" in selected or body.get("screenshot", False):

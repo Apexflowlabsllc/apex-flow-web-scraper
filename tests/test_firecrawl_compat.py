@@ -344,12 +344,13 @@ async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hoste
     h, client, headers = await _auth(hosted)
     api_key = headers["Authorization"][7:]
     app = Firecrawl(api_key=api_key, api_url=str(client.make_url("/")).rstrip("/"), max_retries=1)
-    scraped = await asyncio.to_thread(app.v2.scrape, "https://example.com", formats=["markdown"])
+    scraped = await asyncio.to_thread(app.v2.scrape, "https://example.com", formats=["markdown"], wait_for=1200)
     assert scraped.markdown == "# Fixture"
+    assert h.scrape_calls[-1][1]["actions"] == [{"type": "wait", "ms": 1200}]
     assert "ad blocking is not implemented by Apex" in scraped.warning
     assert "origin attribution is not recorded by Apex" in scraped.warning
 
-    started = await asyncio.to_thread(app.v2.start_batch_scrape, ["https://example.com"])
+    started = await asyncio.to_thread(app.v2.start_batch_scrape, ["https://example.com"], wait_for=800)
     status = None
     for _ in range(30):
         status = await asyncio.to_thread(app.v2.get_batch_scrape_status, started.id)
@@ -359,12 +360,18 @@ async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hoste
     assert status is not None and status.status == "completed"
     assert status.completed == status.total == 1
     assert status.data[0].markdown == "# Fixture"
+    assert h.scrape_calls[-1][1]["actions"] == [{"type": "wait", "ms": 800}]
     assert "origin attribution is not recorded by Apex" in status.data[0].warning
 
     unsupported = await client.post("/v2/scrape", headers=headers,
                                     json={"url": "https://example.com", "mobile": True})
     assert unsupported.status == 400
     assert (await unsupported.json())["code"] == "unsupported_option"
+
+    invalid_wait = await client.post("/v2/scrape", headers=headers,
+                                     json={"url": "https://example.com", "waitFor": 5001})
+    assert invalid_wait.status == 400
+    assert "waitFor must be an integer from 0 to 5000" in (await invalid_wait.json())["error"]
 
 
 def test_firecrawl_batch_claim_is_atomic_and_stale_owners_are_fenced():
@@ -659,16 +666,20 @@ def test_openapi_keeps_compatibility_routes_at_top_level_and_documents_batch_web
     webhook = paths["/v2/batch/scrape"]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]["webhook"]
     assert webhook["required"] == ["url"]
     assert webhook["properties"]["events"]["items"]["enum"] == ["started", "page", "completed"]
+    scrape_options = paths["/v2/scrape"]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]
+    batch_options = paths["/v2/batch/scrape"]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]
+    crawl_options = paths["/v2/crawl"]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]["scrapeOptions"]["properties"]
+    assert {scrape_options["waitFor"]["maximum"], batch_options["waitFor"]["maximum"], crawl_options["waitFor"]["maximum"]} == {5000}
 
 
 async def test_v2_crawl_lifecycle_reuses_durable_apex_job(hosted, monkeypatch):
     import rainbo_scrape.llm as llm
 
-    _, client, headers = await _auth(hosted)
+    h, client, headers = await _auth(hosted)
     response = await client.post("/v2/crawl", headers=headers,
                                 json={"url": "https://example.com/start", "limit": 1,
                                       "maxDiscoveryDepth": 0,
-                                      "scrapeOptions": {"formats": [{"type": "markdown"}]}})
+                                      "scrapeOptions": {"formats": [{"type": "markdown"}], "waitFor": 500}})
     payload = await response.json()
     assert response.status == 200 and payload["success"] is True
     job = payload["id"]
@@ -682,6 +693,7 @@ async def test_v2_crawl_lifecycle_reuses_durable_apex_job(hosted, monkeypatch):
     assert status_payload["status"] == "completed"
     assert status_payload["completed"] == status_payload["total"] == 1
     assert status_payload["data"][0]["markdown"] == "# Fixture"
+    assert h.scrape_calls[-1][1]["actions"] == [{"type": "wait", "ms": 500}]
 
     monkeypatch.setattr(llm, "providers", lambda: [("fixture", "https://fixture.invalid", "unused", "fixture")])
     response = await client.post("/v2/crawl", headers=headers, json={

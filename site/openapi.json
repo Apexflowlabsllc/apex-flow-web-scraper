@@ -2440,6 +2440,12 @@
                   "onlyMainContent": {
                     "type": "boolean"
                   },
+                  "waitFor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5000,
+                    "description": "Wait up to 5000 milliseconds after page load before extraction. Applied as a bounded browser wait; requires rendering."
+                  },
                   "maxAge": {
                     "type": "integer",
                     "minimum": 0,
@@ -2900,6 +2906,20 @@
                         "enum": [
                           true
                         ]
+                      },
+                      "waitFor": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 5000,
+                        "description": "Wait up to 5000 milliseconds after page load before extraction; applied to each page as a bounded browser wait."
+                      },
+                      "actions": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                          "type": "object"
+                        },
+                        "description": "Up to eight bounded click, wait or scroll actions applied to each page."
                       }
                     },
                     "additionalProperties": false
@@ -3222,6 +3242,12 @@
                     "enum": [
                       true
                     ]
+                  },
+                  "waitFor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5000,
+                    "description": "Wait up to 5000 milliseconds after page load before extraction. Applied as a bounded browser wait; requires rendering."
                   },
                   "maxAge": {
                     "type": "integer",

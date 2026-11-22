@@ -29,8 +29,9 @@ test("official Firecrawl SDK can target the Apex v2 compatibility API", async ()
   const address = server.address();
   const app = new Firecrawl({ apiKey: "apex-fixture-key", apiUrl: `http://127.0.0.1:${address.port}`, maxRetries: 1 });
   try {
-    const scraped = await app.scrape("https://example.com");
+    const scraped = await app.scrape("https://example.com", { waitFor: 1200 });
     assert.equal(scraped.markdown, "# Apex");
+    assert.equal(requests.find((request) => request.url === "/v2/scrape").body.waitFor, 1200);
 
     const mapped = await app.map("https://example.com");
     assert.equal(mapped.links[0].url, "https://example.com/docs");
