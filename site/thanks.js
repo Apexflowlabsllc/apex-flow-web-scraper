@@ -10,7 +10,7 @@ async function claim() {
     if (!r.ok || !d.key) throw new Error(d.error || 'We could not verify this checkout. Please contact support.');
     key = d.key;
     document.getElementById('title').textContent = 'Your API is ready.';
-    document.getElementById('message').textContent = 'Access verified. Save your key and start building.';
+    document.getElementById('message').textContent = 'Access verified. Try a public page in the dashboard, or save your key to use it in your own code.';
     document.getElementById('api-key').textContent = '••••••••••••••••••••••••';
     document.getElementById('dashboard-link').href = '/dashboard.html?session_id=' + encodeURIComponent(session);
     document.getElementById('summary').textContent = `${d.plan[0].toUpperCase()+d.plan.slice(1)} · ${d.credits_left.toLocaleString()} credits available`;
