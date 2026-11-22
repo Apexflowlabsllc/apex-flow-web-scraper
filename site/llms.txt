@@ -16,7 +16,7 @@
 - Fetches public addresses only.
 
 ## Measured results (dated; not a current head-to-head)
-- The latest saved Apex benchmark run is package 0.8.0 from 13 Nov 2026: 27/30 URLs fetched, 88/94 reference checks passed, median 1.56 s. Four checks referenced headlines that had changed since the reference set was written; those checks must be refreshed.
+- Latest Apex-only run, current 0.11.0 branch code (22 Nov 2026): 27/30 URLs fetched, 83/94 reference checks passed, median 1.16 s, with rendering disabled. Two URLs were robots-denied and one returned an HTTP error. Seven failed checks depend on JavaScript rendering; four reference checks use dated headlines that changed. All other checks passed. This is not a Firecrawl head-to-head; see BENCHMARK-2026-11-22.md.
 - The comparable Firecrawl run is from 5 Nov 2026, not the current release: on 24 URLs with hand-scored reference checks, Apex 0.2.0 scored 91/93 and Firecrawl scored 85/93. Firecrawl returned 30/30 pages while Apex returned 26/30 on that run. The benchmark has not been rerun against current Firecrawl, so these numbers are historical evidence only, not a current superiority claim. See BENCHMARK-2026-11-05.md and tests/benchmark/.
 
 ## Hosted service and limits

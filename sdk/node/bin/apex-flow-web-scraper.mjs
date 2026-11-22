@@ -35,7 +35,7 @@ export function getClientTargets({ home = homedir(), appData = process.env.APPDA
     { id: "gemini", label: "Gemini CLI", format: "jsonc", path: join(home, ".gemini", "settings.json"), detect: join(home, ".gemini") },
     { id: "windsurf", label: "Windsurf", format: "jsonc", path: join(home, ".codeium", "windsurf", "mcp_config.json"), detect: join(home, ".codeium", "windsurf") },
     { id: "copilot", label: "GitHub Copilot CLI", format: "jsonc", path: join(home, ".copilot", "mcp-config.json"), detect: join(home, ".copilot"), entryType: "stdio" },
-    { id: "cline", label: "Cline", format: "jsonc", path: join(home, ".cline", "data", "settings", "cline_mcp_settings.json"), detect: join(home, ".cline"), entryType: "stdio" },
+    { id: "cline", label: "Cline CLI", format: "jsonc", path: join(home, ".cline", "data", "settings", "cline_mcp_settings.json"), detect: join(home, ".cline"), entryType: "stdio" },
     { id: "roo-code", label: "Roo Code (workspace)", format: "jsonc", path: join(cwd, ".roo", "mcp.json"), detect: join(cwd, ".roo"), entryType: "stdio" },
     { id: "zed", label: "Zed", format: "jsonc", path: zedSettings, detect: dirname(zedSettings), rootKey: "context_servers" },
   ];

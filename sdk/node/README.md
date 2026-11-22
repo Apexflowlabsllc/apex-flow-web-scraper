@@ -7,7 +7,9 @@ Node.js 18+ clients for the hosted API, AI-client setup, and a self-hosted works
 After the npm package is published, run the interactive installer to add a local
 stdio MCP bridge to detected clients. It supports Codex CLI, Claude Code,
 Claude Desktop, Cursor, Gemini CLI, Windsurf, GitHub Copilot CLI, Cline,
-Roo Code (workspace config), and Zed. Each can be selected with `--client`.
+Roo Code (workspace config), and Zed. Cline CLI can be selected with
+`--client cline`; the Cline IDE extension also supports a direct remote setup
+from its MCP Servers panel. Each installer target is individually selectable.
 
 ```bash
 npx -y apex-flow-web-scraper setup

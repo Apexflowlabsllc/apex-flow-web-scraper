@@ -44,16 +44,17 @@ For agents that support the open Agent Skills format, this repository also inclu
 
 ## Price per page
 
-Apex prices are live on the [pricing page](https://webscraper.apexflowlabs.com/#pricing). Firecrawl figures are its annual-billing prices from firecrawl.dev/pricing, re-read on 13 November 2026 (monthly billing is $19 / $99 / $399); check theirs for current figures.
+Apex prices are live on the [pricing page](https://webscraper.apexflowlabs.com/#pricing). Firecrawl's public pricing was checked on 21 November 2026; its [pricing page](https://www.firecrawl.dev/pricing) lists a recurring 1,000-credit monthly free tier, paid plans, and paid-plan pay-as-you-go. Credits and feature costs differ, so compare your own workload before treating these page counts as equivalent.
 
-| Monthly spend | Apex pages | Firecrawl pages |
+| Spend or plan | Apex plain pages | Firecrawl plain pages |
 |---|---|---|
+| Free | 1,000 credits once | 1,000 credits each month |
 | $5 once, no subscription | 35,000 | no one-time option listed |
-| about $15 | 110,000 ($15) | 5,000 ($16) |
-| about $80 | 850,000 ($79) | 100,000 ($83) |
-| about $300 | 3,750,000 ($299) | 500,000 ($333) |
+| about $16/month | 110,000 ($15) | 5,000 ($16 annual) or 5,000 ($19 monthly) |
+| about $80/month | 850,000 ($79) | 100,000 ($83 annual) or 100,000 ($99 monthly) |
+| about $300/month | 3,750,000 ($299) | 500,000 ($333 annual) or 500,000 ($399 monthly) |
 
-Field extraction by CSS selector costs no extra credits. Failed and blocked pages cost nothing. There are no automatic overage charges.
+Field extraction by CSS selector costs no extra credits. Failed requests return their reserved credits; there are no automatic Apex overage charges. Firecrawl offers pay-as-you-go on paid plans, which can keep a workload running when the included credits run out.
 
 ## What you get
 
@@ -214,11 +215,12 @@ python -m pip install -e '.[test]'
 python -m pytest -q
 ```
 
-44 tests passed in the launch Windows environment, including local fixture
-rendering with installed Brave. Browser tests can depend on Brave availability.
-Tests cover policy, cache/ETag, response limits, atomic accounting, recovery,
-cancellation, recipes and private-web boundaries. Upstream dependency suites
-were not run. A dated Firecrawl comparison is in `BENCHMARK-2026-11-05.md`.
+On 22 November 2026, the current review branch passed 148 Python tests and 18
+Node tests. The suite covers policy, cache/ETag, response limits, atomic
+accounting, recovery, cancellation, recipes, private-web boundaries, SDKs and
+client installers. Upstream dependency suites were not run. Browser-dependent
+tests require Brave availability. A dated Firecrawl comparison is in
+`BENCHMARK-2026-11-05.md`.
 
 Access challenge pages are detected and reported with an `access_challenge`
 error. The current release does not provide an isolated signed-in account
@@ -242,7 +244,16 @@ Read the [documentation](https://webscraper.apexflowlabs.com/docs.html),
 See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged capability plan and [ACCESS-PLATFORM-PLAN.md](ACCESS-PLATFORM-PLAN.md) for the proxy infrastructure and owner-controlled challenge-handling design.
 
 
-## Measured (0.2.0, 30-URL benchmark, 5 Nov 2026)
+## Latest Apex-only benchmark (0.11.0 branch code, 22 Nov 2026)
+
+27/30 URLs fetched, 83/94 reference checks passed, median 1.16 s per successful
+URL with rendering disabled. Two sources denied robots-compliant access, one
+returned an HTTP error, seven missed JavaScript-only content because rendering
+was disabled, and four headline references were stale. All other reference
+checks passed. This is not a Firecrawl head-to-head. Method and limits:
+`BENCHMARK-2026-11-22.md`.
+
+## Historical comparison (0.2.0, 30-URL benchmark, 5 Nov 2026)
 
 Update, 13 November 2026 (hosted API 0.7.0): the four URLs that run could not fetch were requested again through the live API. text.npr.org and zillow.com were read live; reuters.com/world and glassdoor.com were refused live and returned labelled Internet Archive copies (captured 17 October 2026 and 28 August 2023). The other 26 URLs were not re-run.
 
