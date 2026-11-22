@@ -20,7 +20,7 @@
     "apex-flow-web-scraper": "./bin/apex-flow-web-scraper.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "scripts": {
     "test": "node --test"

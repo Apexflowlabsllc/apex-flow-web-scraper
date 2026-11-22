@@ -1,6 +1,6 @@
 # Apex Flow Web Scraper for Node.js
 
-Node.js 18+ clients for the hosted API, AI-client setup, and a self-hosted workspace.
+Node.js 22+ clients for the hosted API, AI-client setup, and a self-hosted workspace.
 
 ## Add the hosted scraper to AI clients
 

@@ -20,7 +20,7 @@ print(monitor["estimated_max_credits_per_30_days"])
 # Store monitor["signing_secret"] securely; the API returns it only once.
 ```
 
-Node.js 18+ (npm package publication is pending):
+Node.js 22+ (npm package publication is pending):
 
 ```bash
 # Available after the npm release
@@ -62,7 +62,7 @@ The npm package is not published yet. The checked-out source includes a `setup -
 
 The source installer currently lives on draft PR #34. To try it before that PR is merged, clone its branch below. After it is merged, use the default branch instead.
 
-Clone and configure a local AI client (Node.js 18+):
+Clone and configure a local AI client (Node.js 22+):
 
 ```bash
 APEX_FLOW_SCRAPER_CHECKOUT=/path/to/apex-flow-web-scraper

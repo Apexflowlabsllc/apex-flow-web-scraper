@@ -137,7 +137,7 @@ python -m pip install apex-flow-web-scraper</pre><pre>from rainbo_scrape.hosted_
 apex = Apex()   # reads APEX_SCRAPER_API_KEY
 print(apex.scrape("https://example.com", outputs=["markdown"])["result"]["markdown"])
 for page in apex.crawl("https://www.sqlite.org/docs.html", limit=25):
-    print(page["url"], page["status"])</pre><p>Node 18+: install from npm after publication, then import the hosted client.</p><pre># Available after npm publication
+    print(page["url"], page["status"])</pre><p>Node 22+: install from npm after publication, then import the hosted client.</p><pre># Available after npm publication
 npm install apex-flow-web-scraper</pre><pre>import { Apex } from "apex-flow-web-scraper/hosted";
 const apex = new Apex();
 const { result } = await apex.scrape("https://example.com", { outputs: ["markdown"] });
