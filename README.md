@@ -275,7 +275,7 @@ Read the [documentation](https://webscraper.apexflowlabs.com/docs.html),
 
 ## Roadmap
 
-See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged capability plan and [ACCESS-PLATFORM-PLAN.md](ACCESS-PLATFORM-PLAN.md) for the proxy infrastructure and owner-controlled challenge-handling design.
+See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged capability plan, [FIRECRAWL-PARITY-MATRIX-2026-11-22.md](FIRECRAWL-PARITY-MATRIX-2026-11-22.md) for the sourced feature/access comparison, and [ACCESS-PLATFORM-PLAN.md](ACCESS-PLATFORM-PLAN.md) for the proxy infrastructure and owner-controlled challenge-handling design.
 
 
 ## Latest Apex-only benchmark (0.11.0 branch code, 22 Nov 2026)
@@ -286,6 +286,9 @@ returned an HTTP error, seven missed JavaScript-only content because rendering
 was disabled, and four headline references were stale. All other reference
 checks passed. This is not a Firecrawl head-to-head. Method and limits:
 `BENCHMARK-2026-11-22.md`.
+For permissioned owned-site comparisons, see the offline signed
+[gold-set evaluator and run format](tests/benchmark/GOLDSET-GUIDE.md). No
+signed external-source gold set or current head-to-head result is claimed.
 
 ## Historical comparison (0.2.0, 30-URL benchmark, 5 Nov 2026)
 

@@ -195,15 +195,24 @@ search-first volume. [Google guidance for generative search](https://developers.
 
 ## Immediate next three builds
 
-1. Create the signed, permissioned, multi-layout gold-set evaluator and surface
-   coverage, per-field accuracy, confidence intervals and failure causes in the
-   workspace.
-2. Replace the current one-shot render with a local visible session workflow:
-   owner login, MFA, explicit human challenge handling, encrypted site-bound
-   session, expiry, scope and revocation. Keep all sessions off the server and
-   out of chat.
-3. Add recipe drift detection and a reviewed repair proposal. Do not silently
-   change a schema or mark a blocked page as an extraction success.
+1. **Evaluator implemented in branch:** `tests/benchmark/goldset_evaluator.py`
+   verifies signed permission-scoped manifests and reports reach, field
+   coverage, field accuracy, Wilson confidence intervals, failures, latency,
+   and reported cost. Its format and limitations are in
+   `tests/benchmark/GOLDSET-GUIDE.md`. Still required: owner-authorized,
+   multi-layout gold data and an identical-condition cross-vendor run.
+2. **Build a migration path:** document and implement a tested Firecrawl v2
+   compatibility mode for the subset Apex supports; list unsupported features
+   explicitly and preserve source receipts and billing semantics.
+3. **Build safe persistent local sessions:** owner login, MFA, explicit human
+   challenge handling, encrypted site-bound state, expiry, scope and
+   revocation. Keep sessions off the hosted service and out of chat.
+
+The current public feature-surface comparison is tracked in
+`FIRECRAWL-PARITY-MATRIX-2026-11-22.md`. Its top gaps remain general web search,
+durable browser sessions, autonomous research, large-scale data providers,
+async batch throughput, keyless team access and measured service capacity.
+Do not treat the matrix as proof of feature equivalence or production release.
 
 Only after these gates should we scope customer-owned proxies, first-party
 network infrastructure, OCR, teams and managed hosting. This sequence delivers
