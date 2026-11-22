@@ -3,7 +3,7 @@
 **Prepared:** 2026-11-22 (Pacific)
 **Project:** `E:\apex\work\codex-brief-20261121\scraper`  
 **Branch:** `codex/handoff-2026-11-21-scraper`  
-**Branch head at this handoff refresh:** see the commit ID recorded in the refreshed ZIP manifest and current branch history.
+**Latest implementation commit included:** `bcc1ae5` (`Run rendered Brave coverage in CI`)
 **Pull request:** [#34 — Upgrade Web Scraper hero and AI distribution](https://github.com/Apexflowlabsllc/apex-flow-web-scraper/pull/34)
 
 ## Assignment
@@ -15,6 +15,7 @@ The user wants a visually distinctive, highly animated crawler product, broader 
 ## Current verified state
 
 - PR #34 is **open and draft**. GitHub Actions CI now covers Python 3.11–3.13, Node SDK 22/24, the n8n community node, and a dedicated installed-Brave rendering fixture. The first CI run exposed a missing-Brave assumption in the generic Python matrix; the fixture is now conditional there and run explicitly in the Brave job. Confirm the latest run after these changes before treating CI as green. Keep the PR draft until independently reviewed.
+- The CI run for `bcc1ae5` is currently running; it includes the Python matrix, Node 22/24, n8n lint/typecheck/tests/shipped-dependency audit, and the isolated Brave rendering fixture. Its final outcome must be read from GitHub before describing CI as passing.
 - No production deployment or package publication has occurred. These branch changes are not live in production.
 - Full Python suite: **209 passed, 23 warnings** at `4b86a26`; focused Firecrawl compatibility suite **23 passed**. Root Node package suite: **28 passed** at `4b86a26`, including the authenticated MCP doctor fixture, Vercel AI SDK MCP client loop, and official Firecrawl Node SDK 4.54.0 contract test. The n8n package at `a7caa11` passes official CLI 0.57.4 lint/build, TypeScript typecheck, **8 contract tests**, `npm audit --omit=dev` (zero production vulnerabilities), and `npm pack --dry-run` (12 files). The complete development dependency tree reports 35 npm advisories (19 high, 16 moderate), rooted in the CLI/tooling tree; these are excluded from the package tarball. An isolated local n8n 2.48.7 runtime was launched with `n8n-node dev` and a temporary user profile under `E:\...\work`; `/healthz` returned 200 and authenticated `/types/nodes.json` returned 200 with the Apex node, `apexFlowApi` credential, and scrape/batch actions present. The preview was stopped. This confirms catalog loading but not visual editor rendering, workflow execution, credential testing against the hosted API, or other n8n versions. OpenAPI parses as JSON with 43 top-level paths, including all 17 `/v2/*` operations.
 - Current committed changes include dashboard API-key controls; create/list/revoke REST endpoints; one-time key display; a 25-active-key limit; a replacement-key guard before revoking the last active one; and a gateway-protected, aggregate funnel report at `/api/internal/funnel`.
