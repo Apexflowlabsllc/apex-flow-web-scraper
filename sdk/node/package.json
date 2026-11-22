@@ -9,12 +9,22 @@
     "./hosted": "./hosted.mjs",
     "./mcp": "./mcp-bridge.mjs"
   },
-  "files": ["bin/", "index.mjs", "hosted.mjs", "mcp-bridge.mjs", "README.md"],
+  "files": [
+    "bin/",
+    "index.mjs",
+    "hosted.mjs",
+    "mcp-bridge.mjs",
+    "README.md"
+  ],
   "bin": {
     "apex-flow-web-scraper": "./bin/apex-flow-web-scraper.mjs"
   },
-  "engines": { "node": ">=18" },
-  "scripts": { "test": "node --test" },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "jsonc-parser": "^3.3.1"
@@ -26,6 +36,18 @@
     "directory": "sdk/node"
   },
   "homepage": "https://webscraper.apexflowlabs.com/docs.html#sdk",
-  "bugs": { "url": "https://github.com/Apexflowlabsllc/apex-flow-web-scraper/issues" },
-  "keywords": ["web-scraping", "web-crawler", "markdown", "mcp", "ai-agents", "apex-flow"]
+  "bugs": {
+    "url": "https://github.com/Apexflowlabsllc/apex-flow-web-scraper/issues"
+  },
+  "keywords": [
+    "web-scraping",
+    "web-crawler",
+    "markdown",
+    "mcp",
+    "ai-agents",
+    "apex-flow"
+  ],
+  "devDependencies": {
+    "firecrawl": "4.54.0"
+  }
 }

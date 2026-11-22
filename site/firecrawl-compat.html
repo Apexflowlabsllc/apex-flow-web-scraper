@@ -34,6 +34,21 @@
   -H "Content-Type: application/json" \
   -d '{"url":"https://example.com","formats":["markdown","links"]}'</code></pre>
 
+    <h2>Reuse the official SDK</h2>
+    <p>The current official Firecrawl Node and Python clients accept a custom API origin. Point an existing client at Apex and use an Apex API key to try the supported routes. The current Node SDK is tested against Apex's documented response shapes. This verifies selected calls; it does not establish full Firecrawl SDK parity.</p>
+    <pre><code>import { Firecrawl } from "firecrawl";
+
+const scraper = new Firecrawl({
+  apiKey: process.env.APEX_SCRAPER_API_KEY,
+  apiUrl: "https://webscraper.apexflowlabs.com",
+});
+
+const page = await scraper.scrape("https://example.com", {
+  formats: ["markdown"],
+});
+console.log(page.markdown);</code></pre>
+    <p>Python uses the same base origin with <code>Firecrawl(api_key=..., api_url="https://webscraper.apexflowlabs.com")</code>. See the official <a href="https://github.com/firecrawl/firecrawl/tree/main/apps/js-sdk/firecrawl">Node SDK</a> and <a href="https://github.com/firecrawl/firecrawl/tree/main/apps/python-sdk">Python SDK</a> documentation.</p>
+
     <h2>Limits and semantics</h2>
     <ul>
       <li>Apex meters requests using Apex credits and rate/concurrency limits. Rendered pages, search, and other options can have different credit costs; read <code>creditsUsed</code> and the Apex usage endpoint.</li>

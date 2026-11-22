@@ -322,6 +322,7 @@ async def test_v2_map_search_and_batch_expose_exact_supported_subset(hosted, mon
             break
         await asyncio.sleep(0.01)
     assert status_payload["status"] == "completed"
+    assert status_payload["success"] is True
     assert status_payload["completed"] == status_payload["total"] == 1
     assert status_payload["data"][0]["markdown"] == "# Fixture"
 

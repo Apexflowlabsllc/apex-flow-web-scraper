@@ -84,6 +84,24 @@ console.log(monitor.estimated_max_credits_per_30_days);
 
 See the [hosted API guide](https://webscraper.apexflowlabs.com/docs.html#sdk) and [signed monitoring guide](https://webscraper.apexflowlabs.com/monitoring.html) for batches, change tracking, extraction, webhooks, and error handling.
 
+### Reuse the official Firecrawl SDK
+
+For migration tests, install Firecrawl's official SDK and point its `apiUrl` to Apex's API origin. The documented Firecrawl v2 adapter subset is listed in the [compatibility contract](https://webscraper.apexflowlabs.com/firecrawl-compat.html); unsupported options fail explicitly.
+
+```js
+import { Firecrawl } from "firecrawl";
+
+const scraper = new Firecrawl({
+  apiKey: process.env.APEX_SCRAPER_API_KEY,
+  apiUrl: "https://webscraper.apexflowlabs.com",
+});
+
+const result = await scraper.scrape("https://example.com", { formats: ["markdown"] });
+console.log(result.markdown);
+```
+
+This bridge is a tested migration path, not a claim of full feature equivalence. The SDK's official configuration is documented in the [Firecrawl Node SDK](https://github.com/firecrawl/firecrawl/tree/main/apps/js-sdk/firecrawl); the Apex package's own clients remain available when you want Apex-specific methods.
+
 ## Self-hosted workspace
 
 Run `rainbo-scrape web` on your machine, then import the local workspace client:

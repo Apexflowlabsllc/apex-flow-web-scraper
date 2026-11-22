@@ -822,7 +822,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         now = time.time()
         iso = lambda stamp: datetime.fromtimestamp(stamp, timezone.utc).isoformat().replace("+00:00", "Z") if stamp else None
         next_url = f"/v2/batch/scrape/{job_id}?skip={end}" if more else None
-        return web.json_response({"status": row[1], "total": total, "completed": completed,
+        return web.json_response({"success": True, "status": row[1], "total": total, "completed": completed,
                                   "creditsUsed": credits, "createdAt": iso(created),
                                   "completedAt": iso(finished), "expiresAt": iso(created + 7 * 86400),
                                   "duration": max(0, (finished or now) - created), "next": next_url, "data": data})

@@ -13,7 +13,7 @@ not a sales claim.
 |---|---|---|---|
 | Single-page scrape | API/SDK/MCP scrape with Markdown, HTML, links, metadata, screenshots, JSON schema, actions and render controls | `/v1/scrape`; Markdown, text, links, chunks, evidence, schema/CSS extraction, main-content HTML and bounded raw HTML, screenshots, one-request browser actions, source receipt, optional archive fallback; draft `/v2/scrape` supports markdown/html/rawHtml/links/screenshot, provider-backed JSON schema/prompt extraction, and bounded actions | **Partial.** Broaden format semantics, validate against official SDK clients and same permitted fixtures; hosted JSON needs configured provider and paid-plan credits. |
 | Crawl and maps | Async crawl jobs/status/cancel/errors/active list; map endpoint and URL filters | `/v1/crawl`, status and cancellation, sitemap-backed map, same-origin policy and plan caps; draft `/v2` create/status/active list/cancel/errors and map adapters; v2 crawl accepts bounded include/exclude regexes, full-URL matching and query-parameter deduplication | **Partial.** Add response pagination parity and same-client lifecycle tests. |
-| Batch | Async batch scrape with status and error retrieval | Draft v2 create/status/cancel/error routes, persisted per-URL results, per-URL errors and plan-bounded URL counts; workers reuse metered native batch slices and account concurrency | **Partial.** Custom concurrency, webhook callbacks, multi-process queue claiming, restart resume and same-client SDK validation remain. A process restart safely marks in-flight jobs failed while retaining completed page rows. |
+| Batch | Async batch scrape with status and error retrieval | Draft v2 create/status/cancel/error routes, persisted per-URL results, per-URL errors and plan-bounded URL counts; workers reuse metered native batch slices and account concurrency; the official Firecrawl Node SDK 4.54.0 exercises batch creation/status against the documented v2 wire contract | **Partial.** One official Node SDK path is contract-tested; Python and other SDK versions still need integration tests. Custom concurrency, webhooks, multi-process queue claiming and restart resume remain. A process restart safely marks in-flight jobs failed while retaining completed page rows. |
 | Search | General web search; separate research, developer, government and paper indexes | Hosted `/v1/websearch` depends on an optional configured provider; `/v1/search` searches only the customer's own recently saved pages; draft `/v2/search` maps only configured web search | **Major gap.** Deliver a dependable first-party or licensed general-web search path, with rank/source evidence and measured freshness. Do not imply saved-page search searches the web. |
 | Structured extraction | JSON/schema modes, multipart document parse, format discovery, and specialized data indexes | CSS recipes and provider-backed JSON Schema extraction; draft `/v2/parse` accepts bounded PDF, DOCX, HTML, text, JSON, and XML uploads, with `/v2/parse/formats` discovery and Markdown/text/link/page/metadata outputs | **Partial.** Apex's upload cap is 12 MiB and one credit per file. Image OCR, raw binary, audio/video, PII redaction, broad format/provider coverage, and typed SDK parity remain gaps. Improve document accuracy and gold-set evidence. |
 | Persistent browser and Interact | Browser sandbox sessions, code/actions in session, session list/delete, interact endpoints | Draft `/v2/interact` has short-lived in-memory browser sessions, session list/delete, public-origin allowlists and bounded read-only click/wait/scroll actions; 3-credit create/action charges, two browser slots and one session per account per API process | **Partial.** No CDP/live view, arbitrary code, cookie profiles, signed-in use, or multi-process session affinity; session state is lost on process restart. Needs durable isolated browser workers, authenticated test domain, quotas/load tests and richer safe interactions. |
@@ -34,11 +34,13 @@ not a sales claim.
    signed permissioned gold-set evaluator at `tests/benchmark/`. Next create a
    gold set only for Apex-owned or explicitly authorized sources, run Apex and
    competitors under identical conditions, publish raw data and uncertainty.
-2. **Win migration and reach.** The branch now has a documented, tested
-   Firecrawl v2 adapter subset for `scrape`, `map`, configured `search`,
-   `crawl`, and asynchronous `batch/scrape` create/status/cancel/errors. Expand
-   the adapter against the official schema and test real Firecrawl SDK clients
-   locally before using a drop-in compatibility claim.
+2. **Win migration and reach.** The branch has a documented, tested Firecrawl
+   v2 adapter subset for `scrape`, `map`, configured `search`, `crawl`, and
+   asynchronous `batch/scrape` create/status/cancel/errors. Node tests exercise
+   the official `firecrawl` 4.54.0 client against the selected v2 request and
+   response shapes. Expand cross-language/version coverage and the adapter
+   against the full official schema before making any broader compatibility
+   claim.
 3. **Make JavaScript access useful across steps.** Draft `/v2/interact` now
    keeps a guarded public-site browser context alive across calls, with origin
    binding, expiry, revocation, resource ceilings and bounded declarative

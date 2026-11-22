@@ -69,6 +69,24 @@ Developer API examples are available for:
 - [Google ADK](examples/google-adk-mcp.py)
 - [xAI/Grok's native Python SDK](examples/xai-native-mcp.py) and [Responses API](examples/xai-responses-mcp.py)
 
+### Migrate an existing Firecrawl SDK client
+
+Keep the official Firecrawl SDK and point its API URL at Apex. The adapter covers a documented subset of Firecrawl v2; unsupported options return an explicit error instead of being silently ignored. Hosted whole-web search still requires an operator-configured Apex provider. See the [compatibility contract](site/firecrawl-compat.html) before switching production traffic.
+
+```js
+import { Firecrawl } from "firecrawl";
+
+const scraper = new Firecrawl({
+  apiKey: process.env.APEX_SCRAPER_API_KEY,
+  apiUrl: "https://webscraper.apexflowlabs.com",
+});
+
+const page = await scraper.scrape("https://example.com", { formats: ["markdown"] });
+console.log(page.markdown);
+```
+
+The same pattern works with Firecrawl's Python SDK using `api_url`. Current official examples: [JavaScript SDK](https://github.com/firecrawl/firecrawl/tree/main/apps/js-sdk/firecrawl) and [Python SDK](https://github.com/firecrawl/firecrawl/tree/main/apps/python-sdk). The adapter contract test uses the official Node SDK against its v2 API shapes; it does not claim full SDK parity.
+
 Both Grok API examples restrict MCP access to `scrape_page`; see [xAI's remote MCP documentation](https://docs.x.ai/developers/tools/remote-mcp) for current API support. Model calls can use vendor tokens and scraping calls use Apex credits. ChatGPT's built-in MCP connections have separate plan and workspace requirements.
 
 ### Scheduled change monitors
