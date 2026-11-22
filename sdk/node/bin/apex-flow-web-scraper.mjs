@@ -4,14 +4,15 @@ import { stdin, stdout, stderr } from "node:process";
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { applyEdits, modify, parse } from "jsonc-parser";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { startMcpBridge } from "../mcp-bridge.mjs";
 
 export const SERVER_NAME = "apex-flow-web-scraper";
-export function getMcpCommand(os = platform()) {
+export function getMcpCommand(os = platform(), { source = false } = {}) {
+  if (source) return { command: process.execPath, args: [fileURLToPath(new URL("../mcp-bridge.mjs", import.meta.url))] };
   return os === "win32"
     ? { command: "cmd", args: ["/c", "npx", "-y", "apex-flow-web-scraper", "mcp"] }
     : { command: "npx", args: ["-y", "apex-flow-web-scraper", "mcp"] };
@@ -43,14 +44,28 @@ export function getClientTargets({ home = homedir(), appData = process.env.APPDA
     { id: "cline", label: "Cline CLI", format: "jsonc", path: join(home, ".cline", "data", "settings", "cline_mcp_settings.json"), detect: join(home, ".cline"), entryType: "stdio" },
     { id: "roo-code", label: "Roo Code (workspace)", format: "jsonc", path: join(cwd, ".roo", "mcp.json"), detect: join(cwd, ".roo"), entryType: "stdio" },
     { id: "continue", label: "Continue (workspace)", format: "jsonc", path: join(cwd, ".continue", "mcpServers", `${SERVER_NAME}.json`), detect: join(cwd, ".continue"), rootKey: "mcpServers" },
-    { id: "opencode", label: "OpenCode", format: "jsonc", path: opencodeSettings, detect: dirname(opencodeSettings), rootKey: ["mcp", "servers"], entryFactory: ({ os: targetOs }) => {
-      const command = getMcpCommand(targetOs);
-      return { type: "local", command: [command.command, ...command.args], environment: { APEX_SCRAPER_API_KEY: "{env:APEX_SCRAPER_API_KEY}" } };
+    { id: "opencode", label: "OpenCode", format: "jsonc", path: opencodeSettings, detect: dirname(opencodeSettings), rootKey: ["mcp", "servers"], entryFactory: ({ os: targetOs, source }) => {
+      const command = getMcpCommand(targetOs, { source });
+      return { type: "local", command: [command.command, ...command.args], environment: {
+        APEX_SCRAPER_API_KEY: "{env:APEX_SCRAPER_API_KEY}",
+        BRAVE_SEARCH_API_KEY: "{env:BRAVE_SEARCH_API_KEY}",
+        TAVILY_API_KEY: "{env:TAVILY_API_KEY}",
+        EXA_API_KEY: "{env:EXA_API_KEY}",
+        APEX_SEARCH_PROVIDER: "{env:APEX_SEARCH_PROVIDER}",
+      } };
     } },
     { id: "amazon-q", label: "Amazon Q Developer (legacy MCP config)", format: "jsonc", path: join(home, ".aws", "amazonq", "mcp.json"), detect: join(home, ".aws", "amazonq") },
     { id: "jetbrains-air", label: "JetBrains Air", format: "jsonc", path: jetbrainsAirSettings, detect: dirname(jetbrainsAirSettings) },
     { id: "zed", label: "Zed", format: "jsonc", path: zedSettings, detect: dirname(zedSettings), rootKey: "context_servers" },
-    { id: "kiro", label: "Kiro IDE and CLI", format: "jsonc", path: join(home, ".kiro", "settings", "mcp.json"), detect: join(home, ".kiro"), rootKey: "mcpServers", entryFactory: () => ({ url: "https://webscraper.apexflowlabs.com/v1/mcp", headers: { Authorization: "Bearer ${APEX_SCRAPER_API_KEY}" } }) },
+    { id: "kiro", label: "Kiro IDE and CLI", format: "jsonc", path: join(home, ".kiro", "settings", "mcp.json"), detect: join(home, ".kiro"), rootKey: "mcpServers", entryFactory: ({ os: targetOs = platform(), source = false } = {}) => source
+      ? { ...getMcpCommand(targetOs, { source }), env: {
+        APEX_SCRAPER_API_KEY: "${APEX_SCRAPER_API_KEY}",
+        BRAVE_SEARCH_API_KEY: "${BRAVE_SEARCH_API_KEY}",
+        TAVILY_API_KEY: "${TAVILY_API_KEY}",
+        EXA_API_KEY: "${EXA_API_KEY}",
+        APEX_SEARCH_PROVIDER: "${APEX_SEARCH_PROVIDER}",
+      } }
+      : { url: "https://webscraper.apexflowlabs.com/v1/mcp", headers: { Authorization: "Bearer ${APEX_SCRAPER_API_KEY}" } } },
   ];
 }
 
@@ -75,17 +90,18 @@ export function jsoncWithMcpServer(source, { force = false, entry = MCP_COMMAND,
   return { text: applyEdits(text, edits), changed: true };
 }
 
-export function tomlWithMcpServer(source, { force = false, os = platform(), remoteUrl, authEnvVar = "APEX_SCRAPER_API_KEY" } = {}) {
+export function tomlWithMcpServer(source, { force = false, os = platform(), remoteUrl, authEnvVar = "APEX_SCRAPER_API_KEY", sourceBridge = false } = {}) {
   const section = "[mcp_servers.apex_flow_web_scraper]";
   const lines = source.split(/\r?\n/);
   const header = /^\s*\[\[?\s*mcp_servers\s*\.\s*(?:apex_flow_web_scraper|\"apex_flow_web_scraper\"|'apex_flow_web_scraper')\s*\]\]?\s*(?:#.*)?$/;
   const childHeader = /^\s*\[\[?\s*mcp_servers\s*\.\s*(?:apex_flow_web_scraper|\"apex_flow_web_scraper\"|'apex_flow_web_scraper')\s*\.\s*[^\]]+\]\]?\s*(?:#.*)?$/;
   const start = lines.findIndex((line) => header.test(line));
   if (start >= 0 && !force) return { text: source, changed: false, reason: "already configured; review the existing section manually" };
-  const command = getMcpCommand(os);
+  const command = getMcpCommand(os, { source: sourceBridge });
   const block = remoteUrl
     ? [section, `url = ${JSON.stringify(remoteUrl)}`, `headers = { "Authorization" = ${JSON.stringify("Bearer ${" + authEnvVar + "}")} }`]
-    : [section, `command = ${JSON.stringify(command.command)}`, `args = ${JSON.stringify(command.args)}`];
+    : [section, `command = ${JSON.stringify(command.command)}`, `args = ${JSON.stringify(command.args)}`,
+      ...(sourceBridge ? ['env = { APEX_SCRAPER_API_KEY = "${APEX_SCRAPER_API_KEY}", BRAVE_SEARCH_API_KEY = "${BRAVE_SEARCH_API_KEY}", TAVILY_API_KEY = "${TAVILY_API_KEY}", EXA_API_KEY = "${EXA_API_KEY}", APEX_SEARCH_PROVIDER = "${APEX_SEARCH_PROVIDER}" }'] : [])];
   if (start >= 0) {
     let end = start + 1;
     while (end < lines.length) {
@@ -109,11 +125,11 @@ function makeBackup(path) {
   return backup;
 }
 
-export function installClient(target, { force = false, dryRun = false, os = platform() } = {}) {
+export function installClient(target, { force = false, dryRun = false, os = platform(), source = false } = {}) {
   const oldText = existsSync(target.path) ? readFileSync(target.path, "utf8") : "";
   const result = target.format === "toml"
-    ? tomlWithMcpServer(oldText, { force, os, remoteUrl: target.remoteUrl, authEnvVar: target.authEnvVar })
-    : jsoncWithMcpServer(oldText, { force, rootKey: target.rootKey, entry: target.entryFactory ? target.entryFactory({ os }) : { ...(target.entryType ? { type: target.entryType } : {}), ...getMcpCommand(os) } });
+    ? tomlWithMcpServer(oldText, { force, os, remoteUrl: source ? undefined : target.remoteUrl, authEnvVar: target.authEnvVar, sourceBridge: source })
+    : jsoncWithMcpServer(oldText, { force, rootKey: target.rootKey, entry: target.entryFactory ? target.entryFactory({ os, source }) : { ...(target.entryType ? { type: target.entryType } : {}), ...getMcpCommand(os, { source }) } });
   if (!result.changed || dryRun) return { ...result, backup: null };
   mkdirSync(dirname(target.path), { recursive: true });
   const backup = makeBackup(target.path);
@@ -126,9 +142,10 @@ export function installClient(target, { force = false, dryRun = false, os = plat
 
 function printHelp() {
   stdout.write(`Apex Flow Web Scraper ${process.env.npm_package_version || ""}\n\n`);
-  stdout.write("Commands:\n  setup [--all | --client <name>] [--yes] [--force] [--dry-run]\n  doctor\n  mcp\n  clients\n\n");
+  stdout.write("Commands:\n  setup [--all | --client <name>] [--source] [--yes] [--force] [--dry-run]\n  doctor\n  mcp\n  clients\n\n");
   stdout.write("Clients: codex, claude-code, claude-desktop, grok, cursor, gemini, windsurf, copilot, cline, roo-code, continue, opencode, amazon-q, jetbrains-air, zed, kiro\n");
-  stdout.write("The MCP bridge reads APEX_SCRAPER_API_KEY from its environment. It never writes the key into client settings.\n");
+  stdout.write("The MCP bridge reads APEX_SCRAPER_API_KEY from its environment. It never writes credentials into client settings.\n");
+  stdout.write("--source configures the local bridge from this checkout instead of using the published npm package. Keep the checkout in place.\n");
 }
 
 export async function runDoctor({
@@ -173,7 +190,7 @@ export async function runDoctor({
 }
 
 function parseArgs(argv) {
-  const options = { command: argv[0] || "help", all: false, client: null, yes: false, force: false, dryRun: false };
+  const options = { command: argv[0] || "help", all: false, client: null, yes: false, force: false, dryRun: false, source: false };
   for (let i = 1; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--all") options.all = true;
@@ -181,6 +198,7 @@ function parseArgs(argv) {
     else if (arg === "--yes" || arg === "-y") options.yes = true;
     else if (arg === "--force") options.force = true;
     else if (arg === "--dry-run") options.dryRun = true;
+    else if (arg === "--source") options.source = true;
     else if (arg === "--help" || arg === "-h") options.command = "help";
     else throw new Error(`Unknown option: ${arg}`);
   }
@@ -213,11 +231,12 @@ export async function runSetup(options, { home = homedir(), appData = process.en
     rl.close();
     if (!/^y(es)?$/i.test(answer.trim())) return { selected: selected.map((target) => target.id), applied: false };
   }
-  const results = selected.map((target) => ({ target, result: installClient(target, { force: options.force, os }) }));
+    const results = selected.map((target) => ({ target, result: installClient(target, { force: options.force, os, source: options.source }) }));
   for (const { target, result } of results) {
     if (result.changed) io.stdout.write(`Configured ${target.label}: ${target.path}${result.backup ? ` (backup: ${result.backup})` : ""}\n`);
     else io.stdout.write(`${target.label}: ${result.reason}\n`);
   }
+  if (options.source) io.stdout.write("These clients launch the bridge from this checkout. Keep the checkout at the same path.\n");
   if (!process.env.APEX_SCRAPER_API_KEY) io.stdout.write("Next: set APEX_SCRAPER_API_KEY in the environment inherited by your AI clients, then restart them.\n");
   io.stdout.write("The API key was not saved in any client configuration.\n");
   return { selected: selected.map((target) => target.id), applied: true };

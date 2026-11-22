@@ -58,7 +58,18 @@ headers = { "Authorization" = "Bearer ${APEX_SCRAPER_API_KEY}" }
 
 Grok expands the environment variable when loading headers, so the key stays out of the config file. Use `grok mcp doctor apex_flow_web_scraper` to check the connection.
 
-The npm package is not published yet. Its prepared installer has individual targets for Codex CLI, Claude Code/Desktop, Grok CLI, Cursor, Gemini CLI, Windsurf, GitHub Copilot CLI and VS Code, Cline, Roo Code, Continue, OpenCode, Amazon Q Developer, JetBrains Air, Zed, and Kiro IDE/CLI. For example, select Grok with `npx -y apex-flow-web-scraper setup --client grok`, preview targets with `npx -y apex-flow-web-scraper setup --all --dry-run`, or, after package publication, verify authenticated MCP tool discovery without running a scrape using `npx -y apex-flow-web-scraper doctor`. The installer backs up existing settings, preserves unrelated servers, and keeps the API key out of configuration files.
+The npm package is not published yet. The checked-out source includes a `setup --source` mode for all 16 MCP client targets, so teams can use the installer now without waiting for npm publication. It backs up settings, preserves unrelated servers, prompts before writing, and stores environment references instead of credentials. Keep the source checkout at the same path after setup. The copyable install command follows.
+
+Clone and configure a local AI client (Node.js 18+):
+
+```bash
+APEX_FLOW_SCRAPER_CHECKOUT=/path/to/apex-flow-web-scraper
+git clone https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git "$APEX_FLOW_SCRAPER_CHECKOUT"
+npm ci --prefix "$APEX_FLOW_SCRAPER_CHECKOUT/sdk/node"
+node "$APEX_FLOW_SCRAPER_CHECKOUT/sdk/node/bin/apex-flow-web-scraper.mjs" setup --source --client claude-code
+```
+
+Set `APEX_SCRAPER_API_KEY` in the AI app environment before launch. For local BYOK search, also set one provider key (`BRAVE_SEARCH_API_KEY`, `TAVILY_API_KEY`, or `EXA_API_KEY`) there. If multiple are set, choose one with `APEX_SEARCH_PROVIDER=brave|tavily|exa`. The configured clients launch from this checkout, which must remain at the same path. For Roo Code or Continue workspace settings, run the installer command from the target project directory.
 
 The local stdio bridge exposes `web_search_byok` for direct Brave, Tavily, or Exa search using a provider key in the local AI client's environment. Select one provider key, or set `APEX_SEARCH_PROVIDER` when multiple keys are present. The provider bills your account directly; its key is never sent to Apex. Pass returned URLs to `scrape_page` to fetch them with Apex credits. This is separate from hosted `web_search`, which uses Apex's operator-configured provider and credit billing.
 

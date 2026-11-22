@@ -36,6 +36,33 @@ inherited by the AI client, then restart it. The bridge connects to the hosted
 Streamable HTTP MCP endpoint; scraping is still run by Apex Flow's hosted service.
 `npm install apex-flow-web-scraper` is not available until the package release.
 
+### Install from the public source repository
+
+You can use the prepared installer before the npm release by running it from a
+local clone. Configured AI clients launch the bridge from that checkout, so
+keep the checkout at the same path. The installer backs up settings, preserves
+unrelated servers, prompts before writing, and stores only environment-variable
+references for credentials.
+
+```bash
+APEX_FLOW_SCRAPER_CHECKOUT=/path/to/apex-flow-web-scraper
+git clone https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git "$APEX_FLOW_SCRAPER_CHECKOUT"
+npm ci --prefix "$APEX_FLOW_SCRAPER_CHECKOUT/sdk/node"
+node "$APEX_FLOW_SCRAPER_CHECKOUT/sdk/node/bin/apex-flow-web-scraper.mjs" setup --source --client claude-code
+```
+
+Use `setup --source` without `--client` to detect supported clients, or add
+`--all` to configure every listed target. Set `APEX_SCRAPER_API_KEY` in each
+AI client's environment before launching it. For direct web search, also set
+exactly one of `BRAVE_SEARCH_API_KEY`, `TAVILY_API_KEY`, or `EXA_API_KEY` in
+the environment the bridge receives. If multiple provider keys are present,
+set `APEX_SEARCH_PROVIDER=brave|tavily|exa`. Grok and Kiro can also run the
+source bridge over local stdio; Kiro requires approval for each environment
+variable reference used by the server. For Roo Code or Continue workspace
+settings, run the installer command from the target project directory so it
+writes config there. The provider key stays on the local machine and search is
+billed by that provider. Scraping result pages uses Apex credits.
+
 Kiro uses its native remote MCP endpoint. To let Kiro expand `${APEX_SCRAPER_API_KEY}`
 from your environment, approve that variable in Kiro's **Mcp Approved Env Vars**
 setting; Kiro may show a warning until it is approved. See the

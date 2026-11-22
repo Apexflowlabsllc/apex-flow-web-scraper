@@ -75,6 +75,22 @@ test("Kiro remote MCP setup preserves existing servers and uses an approved envi
   assert.doesNotMatch(JSON.stringify(value), /rs_live_|your-api-key/i);
 });
 
+test("Kiro source setup uses local stdio and environment references without embedding credentials", () => {
+  const target = getClientTargets({ home: "E:/fixture-home", os: "win32" }).find((item) => item.id === "kiro");
+  const value = target.entryFactory({ os: "win32", source: true });
+  assert.equal(value.command, process.execPath);
+  assert.equal(value.args.length, 1);
+  assert.ok(existsSync(value.args[0]));
+  assert.deepEqual(value.env, {
+    APEX_SCRAPER_API_KEY: "${APEX_SCRAPER_API_KEY}",
+    BRAVE_SEARCH_API_KEY: "${BRAVE_SEARCH_API_KEY}",
+    TAVILY_API_KEY: "${TAVILY_API_KEY}",
+    EXA_API_KEY: "${EXA_API_KEY}",
+    APEX_SEARCH_PROVIDER: "${APEX_SEARCH_PROVIDER}",
+  });
+  assert.doesNotMatch(JSON.stringify(value), /Bearer |rs_live_|your-api-key/i);
+});
+
 test("target registry includes individually selectable Cline, Roo Code, Continue, OpenCode, Amazon Q, JetBrains Air, Zed and Kiro installs", () => {
   const home = "E:/fixture-home";
   const cwd = "E:/fixture-project";
@@ -107,8 +123,31 @@ test("OpenCode target builds its native local-server command and secret referenc
   assert.deepEqual(target.entryFactory({ os: "win32" }), {
     type: "local",
     command: ["cmd", "/c", "npx", "-y", "apex-flow-web-scraper", "mcp"],
-    environment: { APEX_SCRAPER_API_KEY: "{env:APEX_SCRAPER_API_KEY}" },
+    environment: {
+      APEX_SCRAPER_API_KEY: "{env:APEX_SCRAPER_API_KEY}",
+      BRAVE_SEARCH_API_KEY: "{env:BRAVE_SEARCH_API_KEY}",
+      TAVILY_API_KEY: "{env:TAVILY_API_KEY}",
+      EXA_API_KEY: "{env:EXA_API_KEY}",
+      APEX_SEARCH_PROVIDER: "{env:APEX_SEARCH_PROVIDER}",
+    },
   });
+});
+
+test("source MCP command starts the checked-out bridge with the current Node executable", () => {
+  const command = getMcpCommand("win32", { source: true });
+  assert.equal(command.command, process.execPath);
+  assert.equal(command.args.length, 1);
+  assert.ok(existsSync(command.args[0]));
+  assert.match(command.args[0], /mcp-bridge\.mjs$/);
+  assert.doesNotMatch(JSON.stringify(command), /npx|apex-flow-web-scraper mcp/);
+});
+
+test("Grok source setup writes a local stdio server with environment references", () => {
+  const result = tomlWithMcpServer("", { os: "win32", sourceBridge: true });
+  assert.ok(result.text.includes(`command = ${JSON.stringify(process.execPath)}`));
+  assert.match(result.text, /mcp-bridge\.mjs/);
+  assert.ok(result.text.includes('BRAVE_SEARCH_API_KEY = "${BRAVE_SEARCH_API_KEY}"'));
+  assert.doesNotMatch(result.text, /npx|rs_live_|your-api-key/i);
 });
 
 test("Codex TOML integration appends a stdio server and does not duplicate it", () => {
@@ -165,4 +204,17 @@ test("installer dry-run does not create config files", () => {
   const result = installClient({ id: "gemini", label: "Gemini CLI", format: "jsonc", path: file }, { dryRun: true });
   assert.equal(result.changed, true);
   assert.equal(existsSync(file), false);
+});
+
+test("source installer points clients at the checkout without saving API keys", () => {
+  const home = isolatedHome();
+  const file = join(home, ".cursor", "mcp.json");
+  const target = { id: "cursor", label: "Cursor", format: "jsonc", path: file };
+  const result = installClient(target, { source: true });
+  assert.equal(result.changed, true);
+  const server = JSON.parse(readFileSync(file, "utf8")).mcpServers[SERVER_NAME];
+  assert.equal(server.command, process.execPath);
+  assert.equal(server.args.length, 1);
+  assert.ok(existsSync(server.args[0]));
+  assert.doesNotMatch(JSON.stringify(server), /API_KEY|Bearer |rs_live_|your-api-key/i);
 });
