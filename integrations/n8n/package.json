@@ -1,0 +1,52 @@
+{
+  "name": "n8n-nodes-apex-flow-web-scraper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Use Apex Flow Web Scraper from n8n workflows.",
+  "license": "MIT",
+  "homepage": "https://webscraper.apexflowlabs.com/docs.html",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git",
+    "directory": "integrations/n8n"
+  },
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "apex-flow",
+    "web-scraping",
+    "web-crawling",
+    "ai-agents"
+  ],
+  "engines": {
+    "node": ">=18.17"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-node-assets.mjs",
+    "prepack": "npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "pack:dry-run": "npm pack --dry-run"
+  },
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "nodes": [
+      "dist/nodes/ApexFlow/ApexFlow.node.js"
+    ],
+    "credentials": [
+      "dist/credentials/ApexFlowApi.credentials.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "n8n-workflow": "^2.16.0",
+    "typescript": "^5.9.0"
+  },
+  "overrides": {
+    "zod": "^4.6.6"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "node": "n8n-nodes-apex-flow-web-scraper.apexFlow",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Data & Storage", "Development"],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://webscraper.apexflowlabs.com/docs.html#api",
+        "languages": ["en"]
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://webscraper.apexflowlabs.com/docs.html",
+        "languages": ["en"]
+      }
+    ]
+  }
+}

@@ -69,6 +69,7 @@ Developer API examples are available for:
 - [Google ADK](examples/google-adk-mcp.py)
 - [xAI/Grok's native Python SDK](examples/xai-native-mcp.py) and [Responses API](examples/xai-responses-mcp.py)
 - [Vercel AI SDK 7](sdk/node/examples/vercel-ai-sdk-mcp.mjs) with the official `@ai-sdk/mcp` client and Streamable HTTP
+- Draft [n8n community node](integrations/n8n/README.md) for scrape, map, web search, crawl lifecycle and batch creation. It is not published or tested in a live n8n instance.
 
 ### Migrate an existing Firecrawl SDK client
 
