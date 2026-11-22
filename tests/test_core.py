@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 import pytest
 from aiohttp import web, ClientSession
-from rainbo_scrape.settings import Settings
+from rainbo_scrape.settings import Settings, brave_path
 from rainbo_scrape.policy import ScrapeError, canonical_url, check_url, check_address, PublicResolver
 from rainbo_scrape.extract import extract, validate_recipe
 from rainbo_scrape.network import Fetcher
@@ -234,6 +234,7 @@ def test_job_boundary(settings,field,value):
         validate_request({"urls":["https://example.com"],field:value},settings)
 
 
+@pytest.mark.skipif(not brave_path(), reason="installed Brave is required")
 async def test_rendered_brave_fixture(settings,site):
     from rainbo_scrape.engine import one_page
     result = await one_page(settings,Store(settings),site[0]+"/dynamic", "always")

@@ -3,7 +3,7 @@
 **Prepared:** 2026-11-22 (Pacific)
 **Project:** `E:\apex\work\codex-brief-20261121\scraper`  
 **Branch:** `codex/handoff-2026-11-21-scraper`  
-**Latest committed product-code commit:** `a7caa11` (`Validate n8n node with official tooling`)
+**Branch head at this handoff refresh:** see the commit ID recorded in the refreshed ZIP manifest and current branch history.
 **Pull request:** [#34 — Upgrade Web Scraper hero and AI distribution](https://github.com/Apexflowlabsllc/apex-flow-web-scraper/pull/34)
 
 ## Assignment
@@ -14,7 +14,7 @@ The user wants a visually distinctive, highly animated crawler product, broader 
 
 ## Current verified state
 
-- PR #34 is **open and draft**; the latest product commit on this branch is `ed51fba`. Handoff-only documentation commits may follow. GitHub reports **no checks** for the branch. Keep it draft until independently reviewed.
+- PR #34 is **open and draft**. GitHub Actions CI now covers Python 3.11–3.13, Node SDK 22/24, the n8n community node, and a dedicated installed-Brave rendering fixture. The first CI run exposed a missing-Brave assumption in the generic Python matrix; the fixture is now conditional there and run explicitly in the Brave job. Confirm the latest run after these changes before treating CI as green. Keep the PR draft until independently reviewed.
 - No production deployment or package publication has occurred. These branch changes are not live in production.
 - Full Python suite: **209 passed, 23 warnings** at `4b86a26`; focused Firecrawl compatibility suite **23 passed**. Root Node package suite: **28 passed** at `4b86a26`, including the authenticated MCP doctor fixture, Vercel AI SDK MCP client loop, and official Firecrawl Node SDK 4.54.0 contract test. The n8n package at `a7caa11` passes official CLI 0.57.4 lint/build, TypeScript typecheck, **8 contract tests**, `npm audit --omit=dev` (zero production vulnerabilities), and `npm pack --dry-run` (12 files). The complete development dependency tree reports 35 npm advisories (19 high, 16 moderate), rooted in the CLI/tooling tree; these are excluded from the package tarball. An isolated local n8n 2.48.7 runtime was launched with `n8n-node dev` and a temporary user profile under `E:\...\work`; `/healthz` returned 200 and authenticated `/types/nodes.json` returned 200 with the Apex node, `apexFlowApi` credential, and scrape/batch actions present. The preview was stopped. This confirms catalog loading but not visual editor rendering, workflow execution, credential testing against the hosted API, or other n8n versions. OpenAPI parses as JSON with 43 top-level paths, including all 17 `/v2/*` operations.
 - Current committed changes include dashboard API-key controls; create/list/revoke REST endpoints; one-time key display; a 25-active-key limit; a replacement-key guard before revoking the last active one; and a gateway-protected, aggregate funnel report at `/api/internal/funnel`.
@@ -31,7 +31,7 @@ The user wants a visually distinctive, highly animated crawler product, broader 
 - Earlier work on this branch includes Firecrawl-style document parsing, crawl active listing, v2 credit usage, schema-based extraction, bounded browser sessions, crawl filters and errors, SDK/CLI/Agent Skill work, and the animated product hero. See the existing parity matrix and PR body for the full list and limits.
 - The dashboard key panel is collapsed by default and keeps the key in the current tab's memory. A new secret is shown once and can be copied by an explicit user action.
 - Production Vercel environment variable **names only** were inspected without decrypting values. The current production list showed `SCRAPER_GATEWAY_SECRET` and `STRIPE_SECRET_KEY`; no search-provider key was present. No provider was configured during this review. Do not request or reveal secret values.
-- The newest Vercel deployment previously found for this branch was READY at older commit `16a7d76`; there was no preview for the prior branch head. That older preview redirects unauthenticated visits to Vercel SSO. This turn did not recheck Vercel. GitHub reports no checks as of the prior read. Production remains unchanged; this turn did not deploy. The latest product commit is `9d8e5f5`; this handoff documentation and package refresh follows.
+- The newest Vercel deployment previously found for this branch was READY at older commit `16a7d76`; there was no preview for the prior branch head. That older preview redirects unauthenticated visits to Vercel SSO. This turn did not recheck Vercel. Production remains unchanged; this turn did not deploy.
 - A read-only Claude Opus review was attempted through the available Claude Flow route, but execution stopped because no LLM provider is configured in this environment. No Claude review findings are available yet.
 - Vercel Web Analytics queries returned `web_analytics_not_enabled`. The branch now includes a private first-party daily funnel report using existing aggregate events; the report describes event-count ratios, not unique people or cohort conversion. See `ops/FUNNEL-REPORT.md`.
 
