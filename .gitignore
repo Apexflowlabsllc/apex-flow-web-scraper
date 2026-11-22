@@ -6,6 +6,7 @@ __pycache__/
 build/
 dist/
 data/
+!src/rainbo_scrape/data/
 *.sqlite3*
 .env*
 tests/benchmark/out/
