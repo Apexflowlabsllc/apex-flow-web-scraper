@@ -4,7 +4,10 @@ This preserves Apex billing and source-safety rules. Unsupported input is
 rejected instead of being accepted and silently ignored. See the site guide for
 the exact supported subset; this is not a claim of complete SDK compatibility.
 """
+import asyncio
 import json
+import logging
+import secrets
 import time
 from datetime import datetime, timezone
 
@@ -12,7 +15,20 @@ from aiohttp import web
 from .policy import ScrapeError
 
 
-def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_for, crawl_cancel_for):
+def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_for, crawl_cancel_for,
+            batch_for, hosted):
+    batch_tasks = {}
+    hosted.db.executescript("""
+        CREATE TABLE IF NOT EXISTS firecrawl_batch_jobs(
+            id TEXT PRIMARY KEY, account TEXT NOT NULL, status TEXT NOT NULL, urls TEXT NOT NULL,
+            options TEXT NOT NULL, total INTEGER NOT NULL, completed INTEGER NOT NULL DEFAULT 0,
+            credits INTEGER NOT NULL DEFAULT 0, created REAL NOT NULL, finished REAL);
+        CREATE TABLE IF NOT EXISTS firecrawl_batch_pages(
+            job TEXT NOT NULL, seq INTEGER NOT NULL, url TEXT NOT NULL, status INTEGER NOT NULL,
+            payload TEXT NOT NULL, credits INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(job,seq));
+        CREATE INDEX IF NOT EXISTS firecrawl_batch_account ON firecrawl_batch_jobs(account,created);
+    """)
+    hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='failed',finished=? WHERE status='scraping'", (time.time(),))
     def error(message, code="unsupported_option", status=400):
         return web.json_response({"success": False, "error": message, "code": code}, status=status)
 
@@ -279,9 +295,208 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             return failure
         return web.json_response({"success": True, "id": payload.get("id"), "status": payload.get("status")})
 
+    def batch_status(job, account):
+        row = hosted.db.execute(
+            "SELECT id,status,total,completed,credits,created,finished FROM firecrawl_batch_jobs WHERE id=? AND account=?",
+            (job, account)).fetchone()
+        if not row:
+            raise web.HTTPNotFound(text=json.dumps({"error": "Batch scrape job not found."}), content_type="application/json")
+        return row
+
+    async def run_batch(job, account, urls, options):
+        def save_page(index, url, item):
+            status = item.get("status", 502)
+            credits = item.get("credits_used", 0) if status == 200 else 0
+            result = item.get("result") if status == 200 else None
+            if isinstance(result, dict):
+                result = page_data(result, credits,
+                                   screenshot=options.get("screenshot", False)
+                                   or "screenshot" in options.get("_compat_formats", []))
+                for field in ("markdown", "links", "screenshot"):
+                    if field not in options.get("_compat_formats", []) and not (
+                            field == "screenshot" and options.get("screenshot", False)):
+                        result.pop(field, None)
+            else:
+                result = {"metadata": {"url": url, "sourceURL": url, "statusCode": status,
+                                       "error": item.get("error", "Scrape failed")}}
+            hosted.db.execute("INSERT OR REPLACE INTO firecrawl_batch_pages VALUES(?,?,?,?,?,?)",
+                              (job, index, url, status, json.dumps(result), credits))
+            hosted.db.execute("UPDATE firecrawl_batch_jobs SET completed=completed+1,credits=credits+? WHERE id=?",
+                              (credits, job))
+
+        try:
+            for start in range(0, len(urls), 10):
+                state = hosted.db.execute("SELECT status FROM firecrawl_batch_jobs WHERE id=?", (job,)).fetchone()
+                if not state or state[0] != "scraping":
+                    return
+                pending = [(start + offset, url) for offset, url in enumerate(urls[start:start + 10])]
+                attempt = 0
+                while pending:
+                    state = hosted.db.execute("SELECT status FROM firecrawl_batch_jobs WHERE id=?", (job,)).fetchone()
+                    if not state or state[0] != "scraping":
+                        return
+                    chunk = [url for _, url in pending]
+                    call_options = {key: value for key, value in options.items() if not key.startswith("_")}
+                    response = await batch_for(account, {"urls": chunk, **call_options})
+                    payload = unpack(response)
+                    if response.status == 429 or response.status >= 500:
+                        if attempt < 4:
+                            await asyncio.sleep(min(15, 2 ** attempt))
+                            attempt += 1
+                            continue
+                        for index, url in pending:
+                            save_page(index, url, {"status": response.status,
+                                                   "error": payload.get("error", "Batch service remained unavailable"),
+                                                   "code": payload.get("code", "retry_exhausted")})
+                        break
+                    if response.status != 200:
+                        for index, url in pending:
+                            save_page(index, url, {"status": response.status,
+                                                   "error": payload.get("error", "Batch request failed"),
+                                                   "code": payload.get("code", "request_failed")})
+                        break
+                    entries = payload.get("results", []) if response.status == 200 else []
+                    positions = {}
+                    for pair in pending:
+                        positions.setdefault(pair[1], []).append(pair)
+                    retry = []
+                    for item in entries:
+                        if not isinstance(item, dict):
+                            continue
+                        candidates = positions.get(item.get("url"), [])
+                        if not candidates:
+                            continue
+                        index, url = candidates.pop(0)
+                        if item.get("status") == 429 and attempt < 4:
+                            retry.append((index, url))
+                        else:
+                            save_page(index, url, item)
+                    for candidates in positions.values():
+                        retry.extend(candidates)
+                    if not retry:
+                        break
+                    if attempt >= 4:
+                        for index, url in retry:
+                            save_page(index, url, {"status": 429,
+                                                   "error": "Batch capacity remained unavailable after retries",
+                                                   "code": "retry_exhausted"})
+                        break
+                    pending = retry
+                    await asyncio.sleep(min(15, 2 ** attempt))
+                    attempt += 1
+            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='completed',finished=? WHERE id=? AND status='scraping'",
+                              (time.time(), job))
+        except asyncio.CancelledError:
+            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='cancelled',finished=? WHERE id=? AND status='scraping'",
+                              (time.time(), job))
+            raise
+        except Exception:
+            logging.exception("Firecrawl-compatible batch failed job=%s", job)
+            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='failed',finished=? WHERE id=? AND status='scraping'",
+                              (time.time(), job))
+        finally:
+            batch_tasks.pop(job, None)
+
     async def batch_scrape(request):
-        return error("Firecrawl-compatible async batch is not implemented. Use Apex /v1/batch for its ordered, bounded synchronous batch API.",
-                     "compatibility_not_implemented", 501)
+        body = await request.json()
+        if not isinstance(body, dict):
+            return error("Request body must be a JSON object", "invalid_request")
+        urls = body.get("urls")
+        if not isinstance(urls, list) or not urls or any(not isinstance(url, str) or not url.strip() for url in urls):
+            return error("urls must be a non-empty array of URL strings", "invalid_request")
+        plan = hosted.db.execute("SELECT plan FROM accounts WHERE id=?", (request["account"],)).fetchone()
+        from .hosted_crawl import PAGE_LIMITS
+        max_urls = PAGE_LIMITS.get(plan[0] if plan else "", 100)
+        if len(urls) > max_urls:
+            return error(f"This plan supports at most {max_urls} URLs per batch job", "batch_limit", 413)
+        allowed = {"urls", "formats", "onlyMainContent", "maxAge", "screenshot", "actions",
+                   "ignoreInvalidURLs"}
+        extra = set(body) - allowed
+        if extra:
+            return error("Unsupported Apex compatibility options: " + ", ".join(sorted(extra)))
+        if body.get("ignoreInvalidURLs", False) is not False:
+            return error("ignoreInvalidURLs:true is not supported; invalid or unsafe destinations are reported per URL")
+        if body.get("onlyMainContent", True) is not True:
+            return error("onlyMainContent:false is not supported; Apex returns the main content")
+        formats = body.get("formats", ["markdown"])
+        if not isinstance(formats, list) or not formats:
+            return error("formats must be a non-empty list")
+        selected = []
+        for item in formats:
+            kind = item if isinstance(item, str) else item.get("type") if isinstance(item, dict) else None
+            if isinstance(item, dict) and set(item) - {"type"}:
+                return error("Format-specific options are not supported by this compatibility subset")
+            if kind not in {"markdown", "links", "screenshot"}:
+                return error(f"Format {kind!r} is not supported; supported formats are markdown, links, screenshot")
+            selected.append(kind)
+        if "maxAge" in body and (isinstance(body["maxAge"], bool) or not isinstance(body["maxAge"], int)
+                                 or not 0 <= body["maxAge"] <= 31536000000):
+            return error("maxAge must be milliseconds from 0 to 31536000000")
+        if "screenshot" in body and not isinstance(body["screenshot"], bool):
+            return error("screenshot must be a boolean")
+        apex_options = {"outputs": sorted(set(selected)), "render": "auto"}
+        if "maxAge" in body:
+            apex_options["max_age"] = body["maxAge"]
+        if body.get("actions") is not None:
+            try:
+                apex_options["actions"] = translate_actions(body["actions"])
+            except ValueError as exc:
+                return error(str(exc))
+        if "screenshot" in selected or body.get("screenshot", False):
+            apex_options["screenshot"] = True
+        apex_options["_compat_formats"] = selected
+        hosted.db.execute("DELETE FROM firecrawl_batch_pages WHERE job IN (SELECT id FROM firecrawl_batch_jobs WHERE created<?)",
+                          (time.time() - 7 * 86400,))
+        hosted.db.execute("DELETE FROM firecrawl_batch_jobs WHERE created<?", (time.time() - 7 * 86400,))
+        job = "batch_" + secrets.token_hex(12)
+        created = time.time()
+        hosted.db.execute("INSERT INTO firecrawl_batch_jobs(id,account,status,urls,options,total,created) VALUES(?,?, 'scraping', ?,?,?,?)",
+                          (job, request["account"], json.dumps(urls), json.dumps(apex_options), len(urls), created))
+        batch_tasks[job] = asyncio.create_task(run_batch(job, request["account"], urls, apex_options))
+        return web.json_response({"success": True, "id": job,
+                                  "url": f"/v2/batch/scrape/{job}",
+                                  "status": "scraping"}, status=200)
+
+    async def batch_status_route(request):
+        job_id = request.match_info["job"]
+        row = batch_status(job_id, request["account"])
+        total, completed, credits, created, finished = row[2], row[3], row[4], row[5], row[6]
+        skip_raw = request.query.get("skip", "0")
+        if not skip_raw.isdigit():
+            return error("skip must be a non-negative integer", "invalid_request")
+        skip = int(skip_raw)
+        data = [json.loads(item[0]) for item in hosted.db.execute(
+            "SELECT payload FROM firecrawl_batch_pages WHERE job=? AND seq>=? ORDER BY seq LIMIT 50", (job_id, skip))]
+        end = skip + len(data)
+        more = hosted.db.execute("SELECT 1 FROM firecrawl_batch_pages WHERE job=? AND seq>=? LIMIT 1", (job_id, end)).fetchone()
+        now = time.time()
+        iso = lambda stamp: datetime.fromtimestamp(stamp, timezone.utc).isoformat().replace("+00:00", "Z") if stamp else None
+        next_url = f"/v2/batch/scrape/{job_id}?skip={end}" if more else None
+        return web.json_response({"status": row[1], "total": total, "completed": completed,
+                                  "creditsUsed": credits, "createdAt": iso(created),
+                                  "completedAt": iso(finished), "expiresAt": iso(created + 7 * 86400),
+                                  "duration": max(0, (finished or now) - created), "next": next_url, "data": data})
+
+    async def batch_errors(request):
+        row = batch_status(request.match_info["job"], request["account"])
+        records = []
+        for seq, url, status, payload in hosted.db.execute(
+                "SELECT seq,url,status,payload FROM firecrawl_batch_pages WHERE job=? AND status!=200 ORDER BY seq LIMIT 500",
+                (row[0],)):
+            item = json.loads(payload)
+            records.append({"id": f"{row[0]}-{seq}", "url": url, "status": status,
+                            "error": item.get("metadata", {}).get("error", "Scrape failed")})
+        return web.json_response({"errors": records})
+
+    async def batch_cancel(request):
+        row = batch_status(request.match_info["job"], request["account"])
+        if row[1] == "scraping":
+            task = batch_tasks.get(row[0])
+            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='cancelled',finished=? WHERE id=? AND status='scraping'",
+                              (time.time(), row[0]))
+            if task:
+                task.cancel()
+        return web.json_response({"status": "cancelled" if row[1] == "scraping" else row[1]})
 
     def wrap(handler):
         async def wrapped(request):
@@ -300,3 +515,6 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
     app.router.add_get("/v2/crawl/{job}", wrap(crawl_status))
     app.router.add_delete("/v2/crawl/{job}", wrap(crawl_cancel))
     app.router.add_post("/v2/batch/scrape", wrap(batch_scrape))
+    app.router.add_get("/v2/batch/scrape/{job}/errors", wrap(batch_errors))
+    app.router.add_get("/v2/batch/scrape/{job}", wrap(batch_status_route))
+    app.router.add_delete("/v2/batch/scrape/{job}", wrap(batch_cancel))

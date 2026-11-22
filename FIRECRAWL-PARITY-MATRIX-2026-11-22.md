@@ -13,7 +13,7 @@ not a sales claim.
 |---|---|---|---|
 | Single-page scrape | API/SDK/MCP scrape with Markdown, HTML, links, metadata, screenshots, JSON schema, actions and render controls | `/v1/scrape`; Markdown, text, links, chunks, evidence, schema/CSS extraction, screenshots, one-request browser actions, source receipt, optional archive fallback; draft `/v2/scrape` compatibility for markdown/links/screenshot and bounded action subset | **Partial.** Add HTML/raw/JSON modes and full option semantics; validate against the official SDK and same permitted fixtures. |
 | Crawl and maps | Async crawl jobs/status/cancel/errors; map endpoint and URL filters | `/v1/crawl`, status and cancellation, sitemap-backed map, same-origin policy and plan caps; draft `/v2` create/status/cancel and map adapters | **Partial.** Add filter semantics, error retrieval, response pagination parity and same-client lifecycle tests. |
-| Batch | Async batch scrape with status and error retrieval | Synchronous, ordered batch up to 10 URLs with per-URL status and unprocessed tail; draft compatibility path explicitly returns 501 | **Partial.** Durable async batch jobs, configurable scale, callbacks and restart recovery. |
+| Batch | Async batch scrape with status and error retrieval | Draft v2 create/status/cancel/error routes, persisted per-URL results, per-URL errors and plan-bounded URL counts; workers reuse metered native batch slices and account concurrency | **Partial.** Custom concurrency, webhook callbacks, multi-process queue claiming, restart resume and same-client SDK validation remain. A process restart safely marks in-flight jobs failed while retaining completed page rows. |
 | Search | General web search; separate research, developer, government and paper indexes | Hosted `/v1/websearch` depends on an optional configured provider; `/v1/search` searches only the customer's own recently saved pages; draft `/v2/search` maps only configured web search | **Major gap.** Deliver a dependable first-party or licensed general-web search path, with rank/source evidence and measured freshness. Do not imply saved-page search searches the web. |
 | Structured extraction | JSON/schema modes, parse endpoints and specialized data indexes | CSS recipes, JSON Schema extraction in source, PDF/DOCX parsing and several vertical package tools | **Partial.** Improve schema coverage, document parsing, typed validation, evidence, retries and gold-set accuracy. |
 | Persistent browser and Interact | Browser sandbox sessions, code/actions in session, session list/delete, interact endpoints | Isolated one-request rendering with bounded click/wait/scroll actions; no retained session | **Gap.** Add owner-controlled local sessions with per-domain allowlists, expiry, revocation, secret isolation, budgets and audit receipts. No cookie import, CAPTCHA solving or access-control evasion. |
@@ -33,8 +33,8 @@ not a sales claim.
    gold set only for Apex-owned or explicitly authorized sources, run Apex and
    competitors under identical conditions, publish raw data and uncertainty.
 2. **Win migration and reach.** The branch now has a documented, tested
-   Firecrawl v2 adapter subset for `scrape`, `map`, configured `search`, and
-   `crawl`; asynchronous `batch/scrape` remains explicitly unsupported. Expand
+   Firecrawl v2 adapter subset for `scrape`, `map`, configured `search`,
+   `crawl`, and asynchronous `batch/scrape` create/status/cancel/errors. Expand
    the adapter against the official schema and test real Firecrawl SDK clients
    locally before using a drop-in compatibility claim.
 3. **Make JavaScript access useful across steps.** Build isolated, local,

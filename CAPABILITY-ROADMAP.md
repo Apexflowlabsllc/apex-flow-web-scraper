@@ -204,10 +204,12 @@ search-first volume. [Google guidance for generative search](https://developers.
 2. **Migration adapter started in branch:** Firecrawl-shaped `/v2/scrape`,
    `/v2/map`, `/v2/search`, and crawl create/status/cancel routes now translate
    to Apex's existing metered features and reject unsupported options. The
-   async batch route returns an explicit 501. Five endpoint tests cover the
-   current subset. Still required: same-client compatibility tests, more
-   response-schema coverage, broader endpoints, and a reviewed production
-   release before customers can use it live.
+   async batch now stores account-scoped job status and per-URL results/errors,
+   supports cancellation, and bounds job size to plan limits. The worker reuses
+   the metered native batch path. Still required: restart resume, queue claiming
+   across processes, callbacks, same-client compatibility tests, broader
+   response-schema coverage, and a reviewed production release before customers
+   can use it live.
 3. **Build safe persistent local sessions:** owner login, MFA, explicit human
    challenge handling, encrypted site-bound state, expiry, scope and
    revocation. Keep sessions off the hosted service and out of chat.

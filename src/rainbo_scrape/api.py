@@ -383,11 +383,11 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         from . import hosted_monitors
         operations.update(hosted_monitors.install(hosted, app, perform, monitor_sender))
         from . import hosted_firecrawl_compat
-        compat_operations = ("/scrape", "/map", "/websearch", "/crawl", "/crawl/status", "/crawl/cancel")
+        compat_operations = ("/scrape", "/map", "/websearch", "/crawl", "/crawl/status", "/crawl/cancel", "/batch")
         # Lightweight test and embedding hosts may provide only a subset of hosted operations.
         # Register the compatibility surface only when its complete backing API is present.
         if all(path in operations for path in compat_operations):
-            hosted_firecrawl_compat.install(app, *(operations[path] for path in compat_operations))
+            hosted_firecrawl_compat.install(app, *(operations[path] for path in compat_operations), hosted)
         install(app, billing, operations, hosted.site)
     return app
 

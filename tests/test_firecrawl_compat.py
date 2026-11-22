@@ -23,6 +23,10 @@ async def test_v2_scrape_uses_firecrawl_envelope_and_apex_metering(hosted):
     assert payload["data"]["markdown"] == "# Fixture"
     assert payload["data"]["metadata"]["apexCreditsUsed"] == payload["creditsUsed"] == 1
     assert h.billing.remaining(h.billing.account_for(headers["Authorization"][7:])) == 109999
+    unsupported = await client.post("/v2/batch/scrape", headers=headers,
+                                    json={"urls": ["https://example.com"], "maxConcurrency": 1})
+    assert unsupported.status == 400
+    assert (await unsupported.json())["code"] == "unsupported_option"
 
 
 async def test_v2_requires_auth_and_rejects_unimplemented_formats(hosted):
@@ -60,8 +64,46 @@ async def test_v2_map_search_and_batch_expose_exact_supported_subset(hosted, mon
 
     response = await client.post("/v2/batch/scrape", headers=headers,
                                 json={"urls": ["https://example.com"]})
-    assert response.status == 501
-    assert (await response.json())["code"] == "compatibility_not_implemented"
+    assert response.status == 200
+    job = (await response.json())["id"]
+    for _ in range(20):
+        status = await client.get(f"/v2/batch/scrape/{job}", headers=headers)
+        status_payload = await status.json()
+        if status_payload["status"] != "scraping":
+            break
+        await asyncio.sleep(0.01)
+    assert status_payload["status"] == "completed"
+    assert status_payload["completed"] == status_payload["total"] == 1
+    assert status_payload["data"][0]["markdown"] == "# Fixture"
+
+
+async def test_v2_batch_reports_per_url_errors_and_supports_cancel(hosted):
+    _, client, headers = await _auth(hosted)
+    response = await client.post("/v2/batch/scrape", headers=headers, json={
+        "urls": ["https://example.com/ok", "https://example.com/failure"],
+        "formats": ["markdown"],
+    })
+    job = (await response.json())["id"]
+    for _ in range(30):
+        status = await client.get(f"/v2/batch/scrape/{job}", headers=headers)
+        status_payload = await status.json()
+        if status_payload["status"] != "scraping":
+            break
+        await asyncio.sleep(0.01)
+    assert status_payload["status"] == "completed"
+    assert status_payload["completed"] == 2
+    assert "links" not in status_payload["data"][0]
+    response = await client.get(f"/v2/batch/scrape/{job}/errors", headers=headers)
+    errors = await response.json()
+    assert len(errors["errors"]) == 1
+    assert errors["errors"][0]["url"] == "https://example.com/failure"
+
+    response = await client.post("/v2/batch/scrape", headers=headers, json={
+        "urls": ["https://example.com/slow"] * 5,
+    })
+    job = (await response.json())["id"]
+    response = await client.delete(f"/v2/batch/scrape/{job}", headers=headers)
+    assert response.status == 200 and (await response.json())["status"] == "cancelled"
 
 
 async def test_v2_crawl_lifecycle_reuses_durable_apex_job(hosted):

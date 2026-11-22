@@ -2660,17 +2660,37 @@
     },
     "/v2/batch/scrape": {
       "post": {
-        "operationId": "firecrawlCompatBatchNotImplemented",
-        "summary": "Async batch compatibility status",
-        "description": "Returns 501 compatibility_not_implemented. Use the native ordered, synchronous /v1/batch API (up to ten URLs).",
+        "operationId": "firecrawlCompatBatchScrape",
+        "summary": "Start an asynchronous batch scrape",
+        "description": "Creates an account-scoped asynchronous batch job. Supports markdown, links and screenshot formats, maxAge, and bounded read-only browser actions. URL count follows the account plan. Custom concurrency and webhooks are not supported.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
           }
         ],
         "responses": {
-          "501": {
-            "description": "Async Firecrawl-compatible batch is not implemented",
+          "200": {
+            "description": "Batch job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or unsupported option",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Batch exceeds the account plan limit",
             "content": {
               "application/json": {
                 "schema": {
@@ -2686,12 +2706,69 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "urls"
+                ],
                 "properties": {
                   "urls": {
                     "type": "array",
+                    "minItems": 1,
                     "items": {
                       "type": "string",
                       "format": "uri"
+                    }
+                  },
+                  "formats": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "markdown",
+                            "links",
+                            "screenshot"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "markdown",
+                                "links",
+                                "screenshot"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "onlyMainContent": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "maxAge": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31536000000
+                  },
+                  "screenshot": {
+                    "type": "boolean"
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "type": "object"
                     }
                   }
                 }
@@ -2699,6 +2776,145 @@
             }
           }
         }
+      }
+    },
+    "/v2/batch/scrape/{job}": {
+      "get": {
+        "operationId": "firecrawlCompatBatchStatus",
+        "summary": "Get batch status and results",
+        "description": "Returns account-scoped batch status and a page of completed results. Use next to retrieve subsequent result pages.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch status and results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such batch job for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "firecrawlCompatCancelBatch",
+        "summary": "Cancel batch",
+        "description": "Cancels an active account-owned batch job. Completed page results are retained.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such batch job for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v2/batch/scrape/{job}/errors": {
+      "get": {
+        "operationId": "firecrawlCompatBatchErrors",
+        "summary": "Get batch errors",
+        "description": "Returns per-URL errors for an account-owned batch job.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-URL batch errors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such batch job for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     }
   }
