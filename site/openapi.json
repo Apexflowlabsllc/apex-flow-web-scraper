@@ -2454,7 +2454,7 @@
       "get": {
         "operationId": "firecrawlCompatHistoricalCreditUsage",
         "summary": "Historical credit usage",
-        "description": "Returns monthly account-wide totals. byApiKey=true is not supported because this service does not retain per-key attribution.",
+        "description": "Returns monthly account-wide totals by default. Set byApiKey=true for per-key totals. Legacy usage recorded before key-level attribution was added is returned with a null apiKeyId.",
         "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
         "parameters": [{"name": "byApiKey", "in": "query", "schema": {"type": "boolean", "default": false}}],
         "responses": {
@@ -2463,7 +2463,9 @@
             "periods": {"type": "array", "items": {"type": "object", "properties": {
               "startDate": {"type": "string", "format": "date-time"},
               "endDate": {"type": "string", "format": "date-time"},
-              "totalCredits": {"type": "integer"}
+              "totalCredits": {"type": "integer"},
+              "apiKeyId": {"type": ["string", "null"], "description": "Stable opaque key identifier; null for unattributed legacy usage."},
+              "apiKeyLabel": {"type": ["string", "null"], "description": "User-provided key label, when available."}
             }}}
           }}}}},
           "400": {"description": "Invalid or unsupported option"}

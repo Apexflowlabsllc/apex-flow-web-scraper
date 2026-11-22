@@ -171,9 +171,22 @@ async def test_v2_credit_usage_and_historical_usage_are_account_scoped(hosted):
     assert history_payload["success"] is True
     assert history_payload["periods"][-1]["totalCredits"] >= 12
 
+    first_key = headers["Authorization"][7:]
+    second_key = h.billing.new_key(account, "secondary")
+    for key, suffix in ((first_key, "first-key"), (second_key, "second-key")):
+        result = await client.post("/v2/scrape", headers={"Authorization": f"Bearer {key}"},
+                                   json={"url": f"https://example.com/{suffix}"})
+        assert result.status == 200
+
     by_key = await client.get("/v2/team/credit-usage/historical?byApiKey=true", headers=headers)
-    assert by_key.status == 400
-    assert (await by_key.json())["code"] == "unsupported_option"
+    by_key_payload = await by_key.json()
+    assert by_key.status == 200
+    attributed = [period for period in by_key_payload["periods"] if period["apiKeyId"]]
+    assert len(attributed) == 2
+    assert "secondary" in {period["apiKeyLabel"] for period in attributed}
+    assert {period["totalCredits"] for period in attributed} == {1}
+    assert any(period["apiKeyId"] is None and period["totalCredits"] >= 19
+               for period in by_key_payload["periods"])
 
 
 async def test_v2_json_format_maps_schema_prompt_and_paid_metering(hosted, monkeypatch):

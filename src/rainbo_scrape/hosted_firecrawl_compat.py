@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
+from .billing import public_usage_key_id
 from .policy import ScrapeError
 
 INTERACT_SERVICE_KEY = web.AppKey("interact_service", object)
@@ -393,21 +394,28 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if by_api_key not in {"true", "false"}:
             return error("byApiKey must be true or false", "invalid_request")
         if by_api_key == "true":
-            return error("Historical usage is account-scoped; per-key attribution is not available yet.",
-                         "unsupported_option")
-        rows = hosted.db.execute(
-            "SELECT strftime('%Y-%m',ts,'unixepoch'),SUM(credits) FROM usage WHERE account=? "
-            "GROUP BY 1 ORDER BY 1", (request["account"],)).fetchall()
+            rows = hosted.db.execute(
+                "SELECT strftime('%Y-%m',u.ts,'unixepoch'),u.api_key_hash,k.label,SUM(u.credits) "
+                "FROM usage u LEFT JOIN keys k ON k.hash=u.api_key_hash WHERE u.account=? "
+                "GROUP BY 1,2,3 ORDER BY 1,2", (request["account"],)).fetchall()
+        else:
+            rows = hosted.db.execute(
+                "SELECT strftime('%Y-%m',ts,'unixepoch'),NULL,NULL,SUM(credits) FROM usage "
+                "WHERE account=? GROUP BY 1 ORDER BY 1", (request["account"],)).fetchall()
         periods = []
-        for month, credits in rows:
+        for month, key_hash, key_label, credits in rows:
             if not month:
                 continue
             start = datetime.strptime(month, "%Y-%m").replace(tzinfo=timezone.utc)
             end = (start.replace(year=start.year + 1, month=1) if start.month == 12
                    else start.replace(month=start.month + 1)) - timedelta(seconds=1)
-            periods.append({"startDate": start.isoformat().replace("+00:00", "Z"),
-                            "endDate": end.isoformat().replace("+00:00", "Z"),
-                            "totalCredits": max(0, credits or 0)})
+            period = {"startDate": start.isoformat().replace("+00:00", "Z"),
+                      "endDate": end.isoformat().replace("+00:00", "Z"),
+                      "totalCredits": credits or 0}
+            if by_api_key == "true":
+                period["apiKeyId"] = public_usage_key_id(key_hash)
+                period["apiKeyLabel"] = key_label
+            periods.append(period)
         return web.json_response({"success": True, "periods": periods})
 
     async def map_route(request):

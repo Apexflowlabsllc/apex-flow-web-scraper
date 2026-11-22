@@ -7,7 +7,7 @@ import time
 from collections import defaultdict, deque
 from functools import partial
 from aiohttp import web
-from .billing import Billing, QuotaExceeded, cost_of
+from .billing import Billing, QuotaExceeded, cost_of, reset_usage_key_hash, set_usage_key_hash, _hash
 from .client import ascrape
 from .policy import ScrapeError
 
@@ -170,11 +170,15 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
                             headers={"Retry-After": "60", "Cache-Control": "no-store"})
             requests.append(now)
         request["account"] = account
+        usage_token = set_usage_key_hash(_hash(key))
         try:
-            response = await handler(request)
-        except (ValueError, KeyError, TypeError, ScrapeError) as exc:
-            details = failure(exc, getattr(exc, "asked_archive", False))
-            response = fail(400, str(exc), details.pop("code"), **{k: v for k, v in details.items() if k != "retryable"})
+            try:
+                response = await handler(request)
+            except (ValueError, KeyError, TypeError, ScrapeError) as exc:
+                details = failure(exc, getattr(exc, "asked_archive", False))
+                response = fail(400, str(exc), details.pop("code"), **{k: v for k, v in details.items() if k != "retryable"})
+        finally:
+            reset_usage_key_hash(usage_token)
         cache_control = "private, max-age=3600" if request.path == "/v2/parse/formats" else "no-store"
         response.headers.update({"X-Content-Type-Options": "nosniff", "Cache-Control": cache_control,
                                  "X-Request-Id": secrets.token_hex(8),
