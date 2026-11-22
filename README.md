@@ -40,6 +40,8 @@ curl https://webscraper.apexflowlabs.com/v1/scrape \
 
 The npm package is not published yet. Its prepared installer will configure Codex CLI, Claude Code/Desktop, Cursor, Gemini CLI, Windsurf and GitHub Copilot CLI individually or in one pass. For OpenAI Responses API apps, use the [remote-MCP example](examples/openai-responses-mcp.py); examples are also available for the [Anthropic Messages API](examples/anthropic-messages-mcp.py) and [Google ADK](examples/google-adk-mcp.py). These are developer API integrations. ChatGPT's built-in MCP connections have separate plan and workspace requirements.
 
+For agents that support the open Agent Skills format, this repository also includes a portable skill and dependency-free Python CLI. After it is merged to the public default branch, install it with `npx skills add Apexflowlabsllc/apex-flow-web-scraper --skill apex-flow-web-scraper`; set `APEX_SCRAPER_API_KEY` in the agent's environment. The skill covers page reads, batches, changes-only comparisons, maps, crawls, usage and saved-page search.
+
 ## Price per page
 
 Apex prices are live on the [pricing page](https://webscraper.apexflowlabs.com/#pricing). Firecrawl figures are its annual-billing prices from firecrawl.dev/pricing, re-read on 13 November 2026 (monthly billing is $19 / $99 / $399); check theirs for current figures.
