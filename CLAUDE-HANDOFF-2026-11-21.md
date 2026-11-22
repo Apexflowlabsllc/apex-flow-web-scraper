@@ -1,6 +1,6 @@
 # Claude Code handoff: Apex Flow Web Scraper
 
-**Prepared:** 2026-11-22 (Pacific)  
+**Prepared:** 2026-11-22 (Pacific)
 **Project:** `E:\apex\work\codex-brief-20261121\scraper`  
 **Branch:** `codex/handoff-2026-11-21-scraper`  
 **Product/code revision reviewed:** `f28a7837ad7afc5785a3aa939613e2723d196260`
