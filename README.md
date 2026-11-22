@@ -246,5 +246,5 @@ Not built: a whole-web search index of our own.
 - `scrape(url, chunks=800)`: heading-aware Markdown chunks for RAG, code blocks never split.
 - Every result carries a `receipt`: requested and final URL, status, fetch time, user agent, content hash, robots.txt decision.
 - `rainbo-scrape llms-txt https://your-site.com --pages 30 [--full]`: writes llms.txt / llms-full.txt for a site you operate.
-- `rainbo-scrape crawl-web <seed>`: open-web crawl, up to 1,000 pages a job, robots.txt obeyed. Built, not yet run at scale.
+- `rainbo-scrape crawl-web <seed>`: crawl up to 1,000 linked public pages per job, with robots.txt, Crawl-delay and per-host pacing respected.
 - `sdk/node`: Node clients for a local workspace and the hosted API (in this repository, not yet on npm).
