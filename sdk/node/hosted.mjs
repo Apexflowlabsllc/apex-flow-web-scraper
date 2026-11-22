@@ -58,6 +58,14 @@ export class Apex {
   batch(urls, options = {}) { return this.#call("POST", "/batch", { urls, ...options }); }
   // What changed since this account last read each URL, without page bodies.
   changes(urls, render = "never") { return this.batch(urls, { render, outputs: ["diff"] }); }
+  createMonitor(url, webhookUrl, intervalSeconds = 86400, confirmRecurring = false) {
+    return this.#call("POST", "/monitors/create", { url, webhook_url: webhookUrl, interval_seconds: intervalSeconds, confirm_recurring: confirmRecurring });
+  }
+  monitors() { return this.#call("GET", "/monitors/list"); }
+  pauseMonitor(id) { return this.#call("POST", "/monitors/pause", { id }); }
+  resumeMonitor(id) { return this.#call("POST", "/monitors/resume", { id }); }
+  deleteMonitor(id) { return this.#call("POST", "/monitors/delete", { id }); }
+  monitorEvents(id, limit = 20) { return this.#call("POST", "/monitors/events", { id, limit }); }
   map(url, limit = 1000, search) { return this.#call("POST", "/map", search ? { url, limit, search } : { url, limit }); }
   search(query, limit = 10) { return this.#call("POST", "/search", { query, limit }); }
   webSearch(query, limit = 10) { return this.#call("POST", "/websearch", { query, limit }); }

@@ -100,6 +100,21 @@ def make_parser() -> argparse.ArgumentParser:
     saved.add_argument("query")
     saved.add_argument("--limit", type=int, default=10)
     commands.add_parser("usage", help="Show account credits, limits, and recent usage")
+
+    monitor = commands.add_parser("monitor", help="Manage scheduled change monitors")
+    monitor_commands = monitor.add_subparsers(dest="monitor_command", required=True)
+    create_monitor = monitor_commands.add_parser("create", help="Create a recurring monitor after explicit user consent")
+    create_monitor.add_argument("url")
+    create_monitor.add_argument("--webhook-url", required=True)
+    create_monitor.add_argument("--interval-seconds", type=int, default=86400)
+    create_monitor.add_argument("--confirm-recurring", action="store_true", required=True)
+    monitor_commands.add_parser("list", help="List this account's monitors")
+    for action in ("pause", "resume", "delete"):
+        command = monitor_commands.add_parser(action, help=f"{action.title()} a scheduled monitor")
+        command.add_argument("monitor_id")
+    events = monitor_commands.add_parser("events", help="Read monitor changes and webhook delivery state")
+    events.add_argument("monitor_id")
+    events.add_argument("--limit", type=int, default=20)
     return parser
 
 
@@ -144,6 +159,19 @@ def execute(args: argparse.Namespace) -> dict:
         return request_json("POST", "/v1/search", {"query": args.query, "limit": args.limit})
     if args.command == "usage":
         return request_json("GET", "/v1/usage")
+    if args.command == "monitor":
+        if args.monitor_command == "create":
+            return request_json("POST", "/v1/monitors/create", {
+                "url": args.url, "webhook_url": args.webhook_url,
+                "interval_seconds": args.interval_seconds, "confirm_recurring": True})
+        if args.monitor_command == "list":
+            return request_json("GET", "/v1/monitors/list")
+        if args.monitor_command in {"pause", "resume", "delete"}:
+            return request_json("POST", f"/v1/monitors/{args.monitor_command}", {"id": args.monitor_id})
+        if args.monitor_command == "events":
+            if not 1 <= args.limit <= 100:
+                raise ApiError("monitor events --limit must be from 1 to 100.", 2)
+            return request_json("POST", "/v1/monitors/events", {"id": args.monitor_id, "limit": args.limit})
     raise ApiError("Unsupported command.", 2)
 
 

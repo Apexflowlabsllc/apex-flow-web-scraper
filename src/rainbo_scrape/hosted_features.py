@@ -78,10 +78,13 @@ def usage_details(h, account):
     days = h.db.execute("""SELECT strftime('%Y-%m-%d',ts,'unixepoch'),SUM(credits),SUM(kind!='refund')
                            FROM usage WHERE account=? AND ts>? GROUP BY 1 ORDER BY 1""", (account, time.time()-14*86400)).fetchall()
     saved = h.db.execute("SELECT COUNT(*) FROM page_versions WHERE account=?", (account,)).fetchone()[0]
+    monitors = h.db.execute("SELECT COUNT(*) FROM monitors WHERE account=? AND state='active'", (account,)).fetchone()[0]
     return {"plan": plan, "credits_total": limits["credits"], "period_end": (order[0] or None) if order else None,
             "limits": {"requests_per_minute": limits["rpm"], "concurrent_scrapes": limits["concurrency"],
-                       "batch_urls": 10, "saved_pages": limits.get("saved_pages", 100), "crawl_pages": crawl_pages},
+                       "batch_urls": 10, "saved_pages": limits.get("saved_pages", 100), "crawl_pages": crawl_pages,
+                       "monitors": limits.get("monitors", 0)},
             "saved_pages": saved,
+            "active_monitors": monitors,
             "daily": [{"day": d, "credits": max(0, c or 0), "requests": n or 0} for d, c, n in days],
             "buy_url": h.site + "/#pricing"}
 

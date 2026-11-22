@@ -32,38 +32,81 @@
           {
             "type": "object",
             "properties": {
-              "type": {"const": "click"},
-              "selector": {"type": "string", "minLength": 1, "maxLength": 500}
+              "type": {
+                "const": "click"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
             },
-            "required": ["type", "selector"],
+            "required": [
+              "type",
+              "selector"
+            ],
             "additionalProperties": false
           },
           {
             "type": "object",
             "properties": {
-              "type": {"const": "wait"},
-              "selector": {"type": "string", "minLength": 1, "maxLength": 500}
+              "type": {
+                "const": "wait"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
             },
-            "required": ["type", "selector"],
+            "required": [
+              "type",
+              "selector"
+            ],
             "additionalProperties": false
           },
           {
             "type": "object",
             "properties": {
-              "type": {"const": "wait"},
-              "ms": {"type": "integer", "minimum": 0, "maximum": 5000}
+              "type": {
+                "const": "wait"
+              },
+              "ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000
+              }
             },
-            "required": ["type", "ms"],
+            "required": [
+              "type",
+              "ms"
+            ],
             "additionalProperties": false
           },
           {
             "type": "object",
             "properties": {
-              "type": {"const": "scroll"},
-              "direction": {"type": "string", "enum": ["down", "up"], "default": "down"},
-              "amount": {"type": "integer", "minimum": 1, "maximum": 10, "default": 1}
+              "type": {
+                "const": "scroll"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "down",
+                  "up"
+                ],
+                "default": "down"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "default": 1
+              }
             },
-            "required": ["type"],
+            "required": [
+              "type"
+            ],
             "additionalProperties": false
           }
         ]
@@ -360,7 +403,9 @@
                   "actions": {
                     "type": "array",
                     "maxItems": 8,
-                    "items": {"$ref": "#/components/schemas/BrowserAction"},
+                    "items": {
+                      "$ref": "#/components/schemas/BrowserAction"
+                    },
                     "description": "Up to 8 click, wait or scroll actions after rendering. At most 10 viewport heights and 10 seconds of explicit waits per request. No caller-supplied JavaScript or direct form-fill/submit action; non-GET/HEAD requests are blocked. No browser session or login state is retained."
                   },
                   "outputs": {
@@ -578,7 +623,9 @@
                   "actions": {
                     "type": "array",
                     "maxItems": 8,
-                    "items": {"$ref": "#/components/schemas/BrowserAction"},
+                    "items": {
+                      "$ref": "#/components/schemas/BrowserAction"
+                    },
                     "description": "Up to 8 click, wait or scroll actions after rendering. At most 10 viewport heights and 10 seconds of explicit waits per request. No caller-supplied JavaScript or direct form-fill/submit action; non-GET/HEAD requests are blocked. No browser session or login state is retained."
                   },
                   "outputs": {
@@ -719,10 +766,21 @@
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
-                  "query": { "type": "string", "minLength": 1, "maxLength": 300 },
-                  "limit": { "type": "integer", "minimum": 1, "maximum": 20, "default": 10 }
+                  "query": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20,
+                    "default": 10
+                  }
                 },
-                "required": ["query"]
+                "required": [
+                  "query"
+                ]
               }
             }
           }
@@ -734,22 +792,42 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": ["results", "credits_used", "credits_left", "note"],
+                  "required": [
+                    "results",
+                    "credits_used",
+                    "credits_left",
+                    "note"
+                  ],
                   "properties": {
                     "results": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "url": { "type": "string", "format": "uri" },
-                          "title": { "type": "string" },
-                          "snippet": { "type": "string" }
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "snippet": {
+                            "type": "string"
+                          }
                         }
                       }
                     },
-                    "credits_used": { "type": "integer", "minimum": 0 },
-                    "credits_left": { "type": "integer", "minimum": 0 },
-                    "note": { "type": "string" }
+                    "credits_used": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "credits_left": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "note": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -759,7 +837,9 @@
             "description": "Search provider is not configured.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           },
@@ -767,7 +847,9 @@
             "description": "Invalid request, insufficient credits, rate limit, or provider failure.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -894,6 +976,10 @@
                         },
                         "saved_pages": {
                           "type": "integer"
+                        },
+                        "monitors": {
+                          "type": "integer",
+                          "description": "Maximum number of scheduled monitor records, including paused monitors, for this plan."
                         }
                       }
                     },
@@ -920,6 +1006,9 @@
                     "buy_url": {
                       "type": "string",
                       "format": "uri"
+                    },
+                    "active_monitors": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -1661,6 +1750,467 @@
         "responses": {
           "200": {
             "description": "Stores",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors": {
+      "post": {
+        "operationId": "createMonitor",
+        "summary": "Create a scheduled page monitor",
+        "description": "Paid plans only. The first successful read establishes a baseline. Scheduled checks obey robots.txt. The response includes a 30-day credit estimate and one-time signing secret.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url",
+                  "webhook_url",
+                  "confirm_recurring"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "webhook_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "HTTPS only; destination must resolve to public addresses when delivered."
+                  },
+                  "interval_seconds": {
+                    "type": "integer",
+                    "minimum": 3600,
+                    "maximum": 2592000,
+                    "default": 86400
+                  },
+                  "confirm_recurring": {
+                    "type": "boolean",
+                    "const": true,
+                    "description": "Explicit consent to recurring credit use; one credit per successful check."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created; store signing_secret securely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listMonitors",
+        "summary": "List scheduled monitors",
+        "responses": {
+          "200": {
+            "description": "Account monitors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/create": {
+      "post": {
+        "operationId": "createMonitorAlias",
+        "summary": "Create a scheduled page monitor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url",
+                  "webhook_url",
+                  "confirm_recurring"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "webhook_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "HTTPS only; destination must resolve to public addresses when delivered."
+                  },
+                  "interval_seconds": {
+                    "type": "integer",
+                    "minimum": 3600,
+                    "maximum": 2592000,
+                    "default": 86400
+                  },
+                  "confirm_recurring": {
+                    "type": "boolean",
+                    "const": true,
+                    "description": "Explicit consent to recurring credit use; one credit per successful check."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created; store signing_secret securely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/list": {
+      "get": {
+        "operationId": "listMonitorsAlias",
+        "summary": "List scheduled monitors",
+        "responses": {
+          "200": {
+            "description": "Account monitors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/pause": {
+      "post": {
+        "operationId": "pauseMonitor",
+        "summary": "Pause a monitor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pause a monitor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/resume": {
+      "post": {
+        "operationId": "resumeMonitor",
+        "summary": "Resume a monitor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resume a monitor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/delete": {
+      "post": {
+        "operationId": "deleteMonitor",
+        "summary": "Delete a monitor and its event history",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delete a monitor and its event history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/events": {
+      "post": {
+        "operationId": "readMonitorEvents",
+        "summary": "Read recent monitor events",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 20
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Events and delivery states.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{id}": {
+      "delete": {
+        "operationId": "deleteMonitorResource",
+        "summary": "Delete a monitor and its event history",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{id}/events": {
+      "get": {
+        "operationId": "listMonitorEvents",
+        "summary": "Read recent monitor events",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Events and delivery states.",
             "content": {
               "application/json": {
                 "schema": {

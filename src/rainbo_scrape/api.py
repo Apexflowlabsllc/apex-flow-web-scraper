@@ -133,7 +133,7 @@ def credits_for(body, rendered):
     return total
 
 
-def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot, search_provider=None, package_loader=None, store_reader=None):
+def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot, search_provider=None, package_loader=None, store_reader=None, monitor_sender=None):
     active = defaultdict(int)
     recent = defaultdict(deque)
     api_recent = defaultdict(deque)
@@ -155,7 +155,8 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         if not account:
             extra = {"docs": hosted.site + "/docs.html", "get_key_url": hosted.site + "/trial.html"} if hosted else {}
             return fail(401, "missing or invalid API key", **extra)
-        if hosted and not hosted.entitled(account):
+        account_management = request.path == "/v1/usage" or request.path.startswith("/v1/monitors")
+        if hosted and not hosted.entitled(account) and not account_management:
             return fail(402, "Subscription is inactive or its paid period has ended. Open billing from your dashboard.",
                         code="inactive_plan", **buy)
         # Search and usage are credit-free, but must not permit unbounded requests.
@@ -379,6 +380,8 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         operations.update(hosted_packages.install(hosted, app, package_loader))
         from . import hosted_stores
         operations.update(hosted_stores.install(hosted, app, store_reader))
+        from . import hosted_monitors
+        operations.update(hosted_monitors.install(hosted, app, perform, monitor_sender))
         install(app, billing, operations, hosted.site)
     return app
 

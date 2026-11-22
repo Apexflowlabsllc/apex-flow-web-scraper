@@ -42,6 +42,7 @@ Use `--render never` for static pages or `--render always` when the page depends
 - Need to find a URL on the open web: `web-search QUERY`. This endpoint depends on the hosted search provider being enabled; if it returns `not_configured`, use an available search tool and then pass its source URLs to `scrape`.
 - Search pages already saved to this account: `saved-search QUERY`; this is not open-web search.
 - Check remaining credits and account limits: `usage`.
+- Schedule recurring change alerts: `monitor create URL --webhook-url HTTPS_URL --interval-seconds 86400 --confirm-recurring`; use `monitor list`, `monitor pause ID`, `monitor resume ID`, `monitor events ID`, and `monitor delete ID` to manage them. Creating a monitor spends credits on each successful check; only create one after the user explicitly authorizes recurring checks. Store the one-time signing secret securely and verify each signed webhook.
 
 Commands accept `--help`. The base URL can be overridden with `APEX_SCRAPER_API_BASE` for an approved compatible deployment.
 
@@ -53,5 +54,8 @@ Commands accept `--help`. The base URL can be overridden with `APEX_SCRAPER_API_
 4. Use CSS `recipe` extraction when stable, known selectors are available; use model-based `extract` only when the requested fields cannot be selected directly.
 5. Crawl only the site and page count needed for the user's task. Respect site access controls; do not attempt CAPTCHA bypass, credential theft, or access to private pages.
 6. Check `credits_left`, `retry_after`, `code`, and `buy_url` on errors before retrying or suggesting a paid plan.
+7. Scheduled monitors run only at the requested cadence, obey robots.txt, and stop when their paid entitlement or credits end. Never create recurring work without explicit user consent.
+
+Read the [signed scheduled monitoring guide](https://webscraper.apexflowlabs.com/monitoring.html) before configuring webhook verification.
 
 The hosted service performs the fetch and rendering. The skill CLI makes authenticated HTTPS requests and has no third-party Python dependencies.

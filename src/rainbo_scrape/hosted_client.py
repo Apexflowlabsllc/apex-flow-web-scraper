@@ -75,6 +75,26 @@ class Apex:
         """What changed since this account last read each URL, without page bodies."""
         return self.batch(urls, render=render, outputs=["diff"])
 
+    def create_monitor(self, url, webhook_url, interval_seconds=86400, confirm_recurring=False):
+        """Start a paid scheduled monitor; store the one-time signing_secret securely."""
+        return self._call("POST", "/monitors/create", {"url": url, "webhook_url": webhook_url,
+                          "interval_seconds": interval_seconds, "confirm_recurring": confirm_recurring})
+
+    def monitors(self):
+        return self._call("GET", "/monitors/list")
+
+    def pause_monitor(self, monitor_id):
+        return self._call("POST", "/monitors/pause", {"id": monitor_id})
+
+    def resume_monitor(self, monitor_id):
+        return self._call("POST", "/monitors/resume", {"id": monitor_id})
+
+    def delete_monitor(self, monitor_id):
+        return self._call("POST", "/monitors/delete", {"id": monitor_id})
+
+    def monitor_events(self, monitor_id, limit=20):
+        return self._call("POST", "/monitors/events", {"id": monitor_id, "limit": limit})
+
     def map(self, url, limit=1000, search=None):
         return self._call("POST", "/map", {"url": url, "limit": limit, "search": search})
 

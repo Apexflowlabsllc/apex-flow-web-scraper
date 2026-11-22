@@ -73,3 +73,29 @@ test("store watch posts to its endpoints", async () => {
     ["POST", "/stores/forget", { store: "shop.example.com" }],
   ]);
 });
+
+test("scheduled monitors use the account-scoped REST endpoints", async () => {
+  const { apex, calls } = fake([
+    { data: { monitor: { id: "mon_1" }, signing_secret: "whsec_fixture" } },
+    { data: { monitors: [{ id: "mon_1" }] } },
+    { data: { monitor: { id: "mon_1", state: "paused" } } },
+    { data: { monitor: { id: "mon_1", state: "active" } } },
+    { data: { events: [] } },
+    { data: { deleted: "mon_1" } },
+  ]);
+  const created = await apex.createMonitor("https://example.com", "https://hooks.example.com", 3600, true);
+  assert.equal(created.signing_secret, "whsec_fixture");
+  await apex.monitors();
+  await apex.pauseMonitor("mon_1");
+  await apex.resumeMonitor("mon_1");
+  await apex.monitorEvents("mon_1", 5);
+  await apex.deleteMonitor("mon_1");
+  assert.deepEqual(calls.map((c) => [c.method, c.url.replace(/^.*\/v1/, ""), c.body]), [
+    ["POST", "/monitors/create", { url: "https://example.com", webhook_url: "https://hooks.example.com", interval_seconds: 3600, confirm_recurring: true }],
+    ["GET", "/monitors/list", undefined],
+    ["POST", "/monitors/pause", { id: "mon_1" }],
+    ["POST", "/monitors/resume", { id: "mon_1" }],
+    ["POST", "/monitors/events", { id: "mon_1", limit: 5 }],
+    ["POST", "/monitors/delete", { id: "mon_1" }],
+  ]);
+});

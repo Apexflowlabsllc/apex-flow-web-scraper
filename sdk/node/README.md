@@ -61,9 +61,19 @@ console.log(dynamic.result.markdown);
 for await (const page of apex.crawl("https://www.sqlite.org/docs.html", 25)) {
   console.log(page.url, page.status);
 }
+
+// Recurring checks require explicit credit consent and an HTTPS webhook.
+const monitor = await apex.createMonitor(
+  "https://example.com/pricing",
+  "https://your-service.example/webhooks/apex",
+  86400,
+  true,
+);
+console.log(monitor.estimated_max_credits_per_30_days);
+// Save monitor.signing_secret securely; it is returned only at creation.
 ```
 
-See the [hosted API guide](https://webscraper.apexflowlabs.com/docs.html#sdk) for batches, change tracking, extraction, and error handling.
+See the [hosted API guide](https://webscraper.apexflowlabs.com/docs.html#sdk) and [signed monitoring guide](https://webscraper.apexflowlabs.com/monitoring.html) for batches, change tracking, extraction, webhooks, and error handling.
 
 ## Self-hosted workspace
 

@@ -23,11 +23,13 @@ Firecrawl's pricing page lists 1,000 free monthly credits, $19/month Hobby with 
 
 The shared Grok review record identified persistent browser action sessions, whole-web search, and signed scheduled change notifications as parity gaps, and suggested more client-specific setup targets. The current branch has since added Grok's own MCP config target and native/Responses API examples. This is a prior review recorded in project memory; Grok was not re-contacted in this turn.
 
+**Branch progress:** the draft now implements paid, opt-in scheduled monitors across REST, hosted MCP, and the Python/Node clients. The first successful check is a baseline; later changes generate signed, bounded-retry HTTPS webhooks. Scheduled checks obey robots.txt, failed reads are not billed, and the monitor pauses on insufficient credits or inactive entitlement. The feature still needs broader fault-injection, multi-process, production-capacity and customer-delivery evidence before any live-service claim.
+
 ## Build order that can create a defensible lead
 
-### 1. Ship paid, durable change monitoring
+### 1. Validate and operate paid, durable change monitoring
 
-Add account-owned monitors with explicit opt-in, visible cadence and credit estimate, pause/resume/delete controls, persistent state across process restarts, bounded retries, and signed idempotent notifications. Reuse the scraper's source receipts and diff engine. Prevent webhook SSRF with HTTPS-only destinations, public-address validation at connect time, no redirects, and strict timeouts. Start with conservative plan quotas and minimum cadence; never promise “real time.”
+The draft implementation now has account-owned monitors with explicit opt-in, visible cadence and credit estimate, pause/resume/delete controls, persisted state, bounded retries and signed notifications. It reuses the scraper's source receipts and diff engine. Webhook delivery requires HTTPS, public-address validation at connect time, no redirects and strict timeouts. Before publishing, validate restart behavior, delivery idempotency, SSRF defenses, retention and capacity; never promise “real time.”
 
 **Acceptance:** schedule survives restart; no duplicate event after retry; every check is metered and failed reads refunded; exhausted accounts pause cleanly; signed webhook can be verified by a customer; owner can delete the monitor and event history; tests cover SSRF, DNS rebinding, redirect, timeout, retries, tenant isolation and billing boundaries.
 

@@ -8,6 +8,16 @@ apex = Apex()                                   # reads APEX_SCRAPER_API_KEY
 page = apex.scrape("https://example.com", outputs=["markdown"], max_tokens=4000)
 for page in apex.crawl("https://www.sqlite.org/docs.html", limit=25):
     print(page["url"], page["status"])
+
+# Scheduled changes (paid plan, explicit recurring-credit confirmation)
+monitor = apex.create_monitor(
+    "https://example.com/pricing",
+    "https://your-service.example/webhooks/apex",
+    interval_seconds=86400,
+    confirm_recurring=True,
+)
+print(monitor["estimated_max_credits_per_30_days"])
+# Store monitor["signing_secret"] securely; the API returns it only once.
 ```
 
 Node.js 18+ (npm package publication is pending):
@@ -58,6 +68,10 @@ Developer API examples are available for:
 - [xAI/Grok's native Python SDK](examples/xai-native-mcp.py) and [Responses API](examples/xai-responses-mcp.py)
 
 Both Grok API examples restrict MCP access to `scrape_page`; see [xAI's remote MCP documentation](https://docs.x.ai/developers/tools/remote-mcp) for current API support. Model calls can use vendor tokens and scraping calls use Apex credits. ChatGPT's built-in MCP connections have separate plan and workspace requirements.
+
+### Scheduled change monitors
+
+Paid plans can create durable monitors that check one public URL at a chosen interval (one hour minimum) and send a signed HTTPS webhook only when its content hash changes. The first successful check establishes a baseline. Each successful plain-page check uses one credit; failed reads are refunded. Scheduled checks obey the source site's `robots.txt`. Creation requires `confirm_recurring: true` and returns a 30-day maximum credit estimate plus a signing secret shown once. Free plans do not include monitors; plan record limits and active counts are returned by `/v1/usage`. See the [signed webhook and monitor API guide](site/monitoring.html).
 
 For agents that support the open Agent Skills format, this repository also includes a portable skill and dependency-free Python CLI. After it is merged to the public default branch, install it with `npx skills add Apexflowlabsllc/apex-flow-web-scraper --skill apex-flow-web-scraper`; set `APEX_SCRAPER_API_KEY` in the agent's environment. The skill covers page reads, batches, changes-only comparisons, maps, crawls, usage and saved-page search.
 

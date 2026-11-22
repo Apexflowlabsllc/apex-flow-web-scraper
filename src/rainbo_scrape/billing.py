@@ -11,11 +11,11 @@ from pathlib import Path
 
 # Price in USD per month, included credits. One credit = one plain (non-rendered) page.
 PLANS = {
-    "free": {"price": 0, "credits": 1000, "rpm": 30, "concurrency": 2, "saved_pages": 100},
-    "pass": {"price": 5, "credits": 35000, "rpm": 60, "concurrency": 6, "saved_pages": 1000},
-    "starter": {"price": 15, "credits": 110000, "rpm": 60, "concurrency": 6, "saved_pages": 1000},
-    "growth": {"price": 79, "credits": 850000, "rpm": 120, "concurrency": 12, "saved_pages": 1000},
-    "scale": {"price": 299, "credits": 3750000, "rpm": 240, "concurrency": 20, "saved_pages": 1000},
+    "free": {"price": 0, "credits": 1000, "rpm": 30, "concurrency": 2, "saved_pages": 100, "monitors": 0},
+    "pass": {"price": 5, "credits": 35000, "rpm": 60, "concurrency": 6, "saved_pages": 1000, "monitors": 5},
+    "starter": {"price": 15, "credits": 110000, "rpm": 60, "concurrency": 6, "saved_pages": 1000, "monitors": 10},
+    "growth": {"price": 79, "credits": 850000, "rpm": 120, "concurrency": 12, "saved_pages": 1000, "monitors": 100},
+    "scale": {"price": 299, "credits": 3750000, "rpm": 240, "concurrency": 20, "saved_pages": 1000, "monitors": 500},
 }
 # Credits per request kind. Rendered pages cost our browser time; proxied pages cost real bandwidth.
 COSTS = {"page": 1, "render": 3, "proxy_page": 8, "proxy_render": 10, "extract": 150, "search": 70}

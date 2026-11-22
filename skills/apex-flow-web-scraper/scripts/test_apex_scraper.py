@@ -56,6 +56,29 @@ class HostedCliTests(unittest.TestCase):
         self.assertEqual(request.full_url, "https://webscraper.apexflowlabs.com/v1/batch")
         self.assertEqual(json.loads(request.data), {"urls": ["https://example.com"], "render": "never", "outputs": ["diff"]})
 
+    @patch("apex_scraper.urlopen", return_value=Response({"monitor": {"id": "mon_1"}, "signing_secret": "whsec_fixture"}))
+    def test_monitor_creation_requires_explicit_recurring_confirmation(self, call):
+        with self.assertRaises(SystemExit):
+            apex_scraper.make_parser().parse_args(["monitor", "create", "https://example.com", "--webhook-url", "https://hooks.example.com"])
+        args = apex_scraper.make_parser().parse_args(["monitor", "create", "https://example.com", "--webhook-url", "https://hooks.example.com", "--interval-seconds", "3600", "--confirm-recurring"])
+        result = apex_scraper.execute(args)
+        request = call.call_args.args[0]
+        self.assertEqual(result["signing_secret"], "whsec_fixture")
+        self.assertEqual(request.full_url, "https://webscraper.apexflowlabs.com/v1/monitors/create")
+        self.assertEqual(json.loads(request.data), {"url": "https://example.com", "webhook_url": "https://hooks.example.com", "interval_seconds": 3600, "confirm_recurring": True})
+
+    @patch("apex_scraper.urlopen", return_value=Response({"events": []}))
+    def test_monitor_events_use_account_scoped_endpoint_and_validate_limit(self, call):
+        args = apex_scraper.make_parser().parse_args(["monitor", "events", "mon_1", "--limit", "12"])
+        self.assertEqual(apex_scraper.execute(args), {"events": []})
+        request = call.call_args.args[0]
+        self.assertEqual(request.full_url, "https://webscraper.apexflowlabs.com/v1/monitors/events")
+        self.assertEqual(json.loads(request.data), {"id": "mon_1", "limit": 12})
+        args = apex_scraper.make_parser().parse_args(["monitor", "events", "mon_1", "--limit", "101"])
+        with self.assertRaisesRegex(apex_scraper.ApiError, "from 1 to 100"):
+            apex_scraper.execute(args)
+        self.assertEqual(call.call_count, 1)
+
     @patch("apex_scraper.urlopen")
     def test_missing_key_fails_before_network_request(self, call):
         os.environ.pop("APEX_SCRAPER_API_KEY")

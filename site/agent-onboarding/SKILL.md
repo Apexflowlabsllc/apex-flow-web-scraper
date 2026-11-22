@@ -24,6 +24,7 @@ Codex: `codex mcp add apex-scraper --url https://webscraper.apexflowlabs.com/v1/
 - Whole site: `POST /v1/crawl {"url":"https://example.com","limit":50}` then `GET /v1/crawl/{id}?offset=N` until `next_offset` is null.
 - Site map: `POST /v1/map`. Named fields without an AI model: add a CSS recipe to a scrape (free). AI schema extraction: add `extract {schema, prompt}` (150 extra credits, paid plans).
 - Changes: each scrape says whether the page is new, unchanged or changed since your last read; request the diff to receive only the changed lines.
+- Scheduled monitoring requires explicit user consent because successful checks use credits repeatedly. Create a paid-plan monitor with `POST /v1/monitors` and `{url, webhook_url, interval_seconds, confirm_recurring:true}`. Use a public HTTPS webhook on port 443 and a cadence of at least one hour. The first successful read is a baseline; later changes emit HMAC-signed events. Store the returned signing secret securely, verify `X-Apex-Signature` over the timestamp plus exact raw body, and deduplicate by event ID. Scheduled checks obey robots.txt and stop when the plan or credits end. See https://webscraper.apexflowlabs.com/monitoring.html.
 - Long pages come back in parts of 256 KiB: follow `pagination.next_page`.
 
 ## Cost and behaviour you should plan around
