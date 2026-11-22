@@ -151,7 +151,7 @@ class Hosted:
                         self.db.execute("UPDATE orders SET period_end=? WHERE session=?", (db_end, session_id))
                     # nonce is already a SHA256 digest, the browser secret is never stored.
                     key = self.key_for(session_id, meta["nonce"])
-                    self.db.execute("INSERT INTO keys(hash,account,label) VALUES (?,?,?)", (_hash(key), account, "Checkout"))
+                    self.billing.register_key(account, key, "Checkout")
                     from .hosted_features import event
                     event(self, "activated", plan)
                     self.db.execute("COMMIT")
@@ -182,7 +182,9 @@ class Hosted:
             except Exception:
                 logging.exception("request failed path=%s", request.path)
                 response = web.json_response({"error": "Service temporarily unavailable. Please retry."}, status=503)
-            response.headers.update({"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
+            cache_control = "private, max-age=3600" if request.path == "/v2/parse/formats" else "no-store"
+            response.headers.update({"Cache-Control": cache_control,
+                                     "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
             return response
         app.middlewares.insert(0, errors)
 

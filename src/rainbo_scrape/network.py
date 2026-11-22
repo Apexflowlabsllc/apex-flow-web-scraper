@@ -72,13 +72,14 @@ class Fetcher:
             if mark:
                 self.last[host] = time.monotonic()
 
-    async def allowed(self, url):
+    async def allowed(self, url, allowed_origins=None):
         p = urlsplit(url)
         origin = f"{p.scheme}://{p.netloc}"
         lock = self.locks.setdefault("robots:"+origin, asyncio.Lock())
         async with lock:
             if origin not in self.robots:
-                response = await self.get(origin+"/robots.txt", robots=False, cache=True)
+                response = await self.get(origin+"/robots.txt", robots=False, cache=True,
+                                          allowed_origins=allowed_origins)
                 parser = RobotFileParser(origin+"/robots.txt")
                 if response["status"] in (401, 403):
                     parser.parse(["User-agent: *", "Disallow: /"])
@@ -96,19 +97,29 @@ class Fetcher:
             if not self.robots[origin].can_fetch("RAINBO-Scrape", url):
                 raise ScrapeError("robots_denied", "Site robots.txt disallows this URL")
 
-    async def get(self, url, *, robots=True, cache=True, max_age=None, throttle=True):
+    @staticmethod
+    def _origin(url):
+        parsed = urlsplit(url)
+        host = parsed.hostname.lower()
+        port = parsed.port
+        default = 443 if parsed.scheme == "https" else 80
+        return f"{parsed.scheme}://{host}" + (f":{port}" if port and port != default else "")
+
+    async def get(self, url, *, robots=True, cache=True, max_age=None, throttle=True, allowed_origins=None):
         """max_age is in milliseconds like Firecrawl maxAge: None uses the default TTL, 0 always revalidates/fetches."""
         started = time.monotonic()
         url = check_url(url, self.settings.allow_test_loopback)
         original = url
         for redirect in range(7):
             check_url(url, self.settings.allow_test_loopback)
+            if allowed_origins is not None and self._origin(url) not in allowed_origins:
+                raise ScrapeError("blocked_origin", "Redirected request origin is outside this request's allowlist")
             if robots:
                 origin = "://".join(urlsplit(url)[:2])
                 if redirect and "://".join(urlsplit(original)[:2]) in self.requested_origins:
                     self.requested_origins.add(origin)
                 try:
-                    await self.allowed(url)
+                    await self.allowed(url, allowed_origins=allowed_origins)
                 except ScrapeError as exc:
                     if exc.code != "robots_denied" or origin not in self.requested_origins:
                         raise
@@ -155,7 +166,10 @@ class Fetcher:
                         if res.status in {301, 302, 303, 307, 308}:
                             if "Location" not in res.headers:
                                 raise ScrapeError("redirect_invalid", "Redirect has no location")
-                            url = check_url(urljoin(url, res.headers["Location"]), self.settings.allow_test_loopback)
+                            redirected = check_url(urljoin(url, res.headers["Location"]), self.settings.allow_test_loopback)
+                            if allowed_origins is not None and self._origin(redirected) not in allowed_origins:
+                                raise ScrapeError("blocked_origin", "Redirect target is outside this request's allowlist")
+                            url = redirected
                             break
                         data = bytearray()
                         async for chunk in res.content.iter_chunked(65536):

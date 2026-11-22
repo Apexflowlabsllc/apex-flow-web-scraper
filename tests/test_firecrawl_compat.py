@@ -1,4 +1,9 @@
 import asyncio
+import io
+import json
+import time
+from aiohttp import FormData
+from pypdf import PdfWriter
 
 from rainbo_scrape.billing import _hash
 from test_hosted import hosted
@@ -9,6 +14,41 @@ async def _auth(hosted):
     await h.fulfill(session["id"])
     key = h.key_for(session["id"], _hash(nonce))
     return h, client, {"Authorization": f"Bearer {key}"}
+
+
+async def test_v1_api_key_management_is_account_scoped_and_returns_secret_once(hosted):
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+
+    initial = await client.get("/v1/keys", headers=headers)
+    initial_payload = await initial.json()
+    assert initial.status == 200
+    assert initial_payload["keys"]
+    assert all("key" not in row and "hash" not in row for row in initial_payload["keys"])
+    original_id = next(row["id"] for row in initial_payload["keys"] if not row["revoked"])
+
+    created = await client.post("/v1/keys", headers=headers, json={"label": "Claude Code"})
+    created_payload = await created.json()
+    assert created.status == 201
+    assert created_payload["key"].startswith("rs_live_")
+    assert created_payload["label"] == "Claude Code"
+    new_headers = {"Authorization": f"Bearer {created_payload['key']}"}
+    assert (await client.get("/v1/usage", headers=new_headers)).status == 200
+
+    other_account = h.billing.create_account("other-keys@example.com")
+    other_key = h.billing.new_key(other_account, "other")
+    other_id = h.db.execute("SELECT key_id FROM keys WHERE hash=?", (_hash(other_key),)).fetchone()[0]
+    cross_account = await client.delete(f"/v1/keys/{other_id}", headers=headers)
+    assert cross_account.status == 404
+    assert h.billing.account_for(other_key) == other_account
+
+    revoked = await client.delete(f"/v1/keys/{created_payload['id']}", headers=headers)
+    assert revoked.status == 200
+    assert (await client.get("/v1/usage", headers=new_headers)).status == 401
+    assert (await client.delete(f"/v1/keys/{created_payload['id']}", headers=headers)).status == 404
+    last_key = await client.delete(f"/v1/keys/{original_id}", headers=headers)
+    assert last_key.status == 409
+    assert h.billing.account_for(headers["Authorization"][7:]) == account
 
 
 async def test_v2_scrape_uses_firecrawl_envelope_and_apex_metering(hosted):
@@ -47,6 +87,141 @@ async def test_v2_requires_auth_and_rejects_unsupported_formats(hosted):
     assert response.status == 400
     payload = await response.json()
     assert payload["success"] is False and payload["code"] == "unsupported_option"
+
+
+async def test_v2_parse_upload_formats_and_credit_metering(hosted):
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    form = FormData()
+    document = b"A plain document for parsing." + b" " * 100_000
+    form.add_field("file", document, filename="notes.txt", content_type="text/plain")
+    form.add_field("options", json.dumps({"formats": ["markdown", "text", "pages"]}),
+                   content_type="application/json")
+    response = await client.post("/v2/parse", headers=headers, data=form)
+    payload = await response.json()
+    assert response.status == 200
+    assert payload["success"] is True
+    assert payload["data"]["markdown"] == document.decode()
+    assert payload["data"]["text"] == document.decode()
+    assert payload["data"]["metadata"]["filename"] == "notes.txt"
+    assert payload["creditsUsed"] == 1
+    assert h.billing.remaining(account) == 109999
+
+    pdf_buffer = io.BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.write(pdf_buffer)
+    pdf_form = FormData()
+    pdf_form.add_field("file", pdf_buffer.getvalue(), filename="one-page.pdf", content_type="application/pdf")
+    pdf_form.add_field("options", json.dumps({"formats": ["pages", "metadata"]}),
+                       content_type="application/json")
+    pdf_response = await client.post("/v2/parse", headers=headers, data=pdf_form)
+    pdf_payload = await pdf_response.json()
+    assert pdf_response.status == 200
+    assert pdf_payload["data"]["metadata"]["numPages"] == 1
+    assert pdf_payload["data"]["pages"] == [{"pageNumber": 1, "markdown": ""}]
+    assert h.billing.remaining(account) == 109998
+
+    formats = await client.get("/v2/parse/formats", headers=headers)
+    available = await formats.json()
+    assert formats.status == 200
+    assert formats.headers["Cache-Control"] == "private, max-age=3600"
+    assert {item["format"] for item in available["data"]["formats"]} >= {"pdf", "docx", "html", "text"}
+
+
+async def test_v2_parse_rejects_unsupported_options_without_charging(hosted):
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    form = FormData()
+    form.add_field("file", b"text", filename="notes.txt", content_type="text/plain")
+    form.add_field("options", json.dumps({"skipTlsVerification": True}), content_type="application/json")
+    response = await client.post("/v2/parse", headers=headers, data=form)
+    payload = await response.json()
+    assert response.status == 400
+    assert payload["code"] == "unsupported_option"
+    assert h.billing.remaining(account) == 110000
+
+
+async def test_v2_parse_refunds_credit_when_document_parser_fails(hosted, monkeypatch):
+    from rainbo_scrape.policy import ScrapeError
+    import rainbo_scrape.parser as parser
+
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+
+    async def fail(*args, **kwargs):
+        raise ScrapeError("pdf_invalid", "Unreadable PDF")
+
+    monkeypatch.setattr(parser, "parse", fail)
+    form = FormData()
+    form.add_field("file", b"%PDF-invalid", filename="bad.pdf", content_type="application/pdf")
+    response = await client.post("/v2/parse", headers=headers, data=form)
+    payload = await response.json()
+    assert response.status == 400
+    assert payload["code"] == "pdf_invalid"
+    assert h.billing.remaining(account) == 110000
+
+
+async def test_v2_active_crawls_lists_only_current_accounts_running_jobs(hosted):
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    other = h.billing.create_account("other-crawl@example.com")
+    created = time.time()
+    h.db.execute("INSERT INTO crawl_jobs(id,account,url,status,page_limit,created,options,done,failed,credits) "
+                 "VALUES(?,?,?,'running',?,?,?,?,?,?)",
+                 ("crawl_owned", account, "https://example.com/", 25, created,
+                  json.dumps({"outputs": ["markdown", "raw_html"]}), 3, 1, 4))
+    h.db.execute("INSERT INTO crawl_jobs(id,account,url,status,page_limit,created,options) "
+                 "VALUES(?,?,?,'running',?,?,?)",
+                 ("crawl_other", other, "https://private.example/", 10, created, "{}"))
+    response = await client.get("/v2/crawl/active", headers=headers)
+    payload = await response.json()
+    assert response.status == 200
+    assert payload["success"] is True
+    assert [crawl["id"] for crawl in payload["crawls"]] == ["crawl_owned"]
+    assert payload["crawls"][0]["completed"] == 3
+    assert payload["crawls"][0]["failed"] == 1
+    assert payload["crawls"][0]["options"]["scrapeOptions"]["formats"] == [
+        {"type": "markdown"}, {"type": "rawHtml"}]
+
+
+async def test_v2_credit_usage_and_historical_usage_are_account_scoped(hosted):
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    h.billing.charge(account, "page", 7)
+    current = await client.get("/v2/team/credit-usage", headers=headers)
+    payload = await current.json()
+    assert current.status == 200
+    assert payload["success"] is True
+    assert payload["data"]["remainingCredits"] == 109993
+    assert payload["data"]["planCredits"] == 110000
+    assert payload["data"]["billingPeriodStart"].endswith("Z")
+    assert payload["data"]["billingPeriodEnd"] is not None
+
+    h.db.execute("INSERT INTO usage(ts,account,kind,credits) VALUES(?,?,?,?)",
+                 (time.time(), account, "fixture", 12))
+    history = await client.get("/v2/team/credit-usage/historical", headers=headers)
+    history_payload = await history.json()
+    assert history.status == 200
+    assert history_payload["success"] is True
+    assert history_payload["periods"][-1]["totalCredits"] >= 12
+
+    first_key = headers["Authorization"][7:]
+    second_key = h.billing.new_key(account, "secondary")
+    for key, suffix in ((first_key, "first-key"), (second_key, "second-key")):
+        result = await client.post("/v2/scrape", headers={"Authorization": f"Bearer {key}"},
+                                   json={"url": f"https://example.com/{suffix}"})
+        assert result.status == 200
+
+    by_key = await client.get("/v2/team/credit-usage/historical?byApiKey=true", headers=headers)
+    by_key_payload = await by_key.json()
+    assert by_key.status == 200
+    attributed = [period for period in by_key_payload["periods"] if period["apiKeyId"]]
+    assert len(attributed) == 2
+    assert "secondary" in {period["apiKeyLabel"] for period in attributed}
+    assert {period["totalCredits"] for period in attributed} == {1}
+    assert any(period["apiKeyId"] is None and period["totalCredits"] >= 19
+               for period in by_key_payload["periods"])
 
 
 async def test_v2_json_format_maps_schema_prompt_and_paid_metering(hosted, monkeypatch):
@@ -219,9 +394,58 @@ async def test_v2_crawl_lifecycle_reuses_durable_apex_job(hosted, monkeypatch):
 
 
 async def test_v2_crawl_does_not_expand_access_scope_or_ignore_robots(hosted):
-    _, client, headers = await _auth(hosted)
-    for options in ({"ignoreRobotsTxt": True}, {"allowExternalLinks": True}, {"includePaths": ["/blog/.*"]}):
+    h, client, headers = await _auth(hosted)
+    for options in ({"ignoreRobotsTxt": True}, {"allowExternalLinks": True}):
         response = await client.post("/v2/crawl", headers=headers,
                                     json={"url": "https://example.com", **options})
         payload = await response.json()
         assert response.status == 400 and payload["success"] is False
+    invalid = await client.post("/v2/crawl", headers=headers,
+                                json={"url": "https://example.com", "includePaths": ["("]})
+    assert invalid.status == 400
+    response = await client.post("/v2/crawl", headers=headers, json={
+        "url": "https://example.com/blog", "limit": 1, "maxDiscoveryDepth": 0,
+        "includePaths": ["^/blog/"], "excludePaths": ["/blog/private"],
+        "regexOnFullURL": False, "ignoreQueryParameters": True,
+    })
+    assert response.status == 200
+    job = (await response.json())["id"]
+    options = json.loads(h.db.execute("SELECT options FROM crawl_jobs WHERE id=?", (job,)).fetchone()[0])
+    assert options["include_paths"] == ["^/blog/"]
+    assert options["exclude_paths"] == ["/blog/private"]
+    assert options["ignore_query_parameters"] is True
+
+
+async def test_v2_crawl_errors_are_account_scoped_and_report_failed_pages(hosted):
+    _, client, headers = await _auth(hosted)
+    response = await client.post("/v2/crawl", headers=headers, json={
+        "url": "https://example.com/failure", "limit": 1, "maxDiscoveryDepth": 0,
+    })
+    job = (await response.json())["id"]
+    for _ in range(20):
+        state = await client.get(f"/v2/crawl/{job}", headers=headers)
+        if (await state.json())["status"] != "scraping":
+            break
+        await asyncio.sleep(0.01)
+    errors = await client.get(f"/v2/crawl/{job}/errors", headers=headers)
+    error_payload = await errors.json()
+    assert errors.status == 200
+    assert error_payload["errors"][0]["url"].endswith("/failure")
+    assert error_payload["errors"][0]["code"] == "invalid_request"
+    assert error_payload["errors"][0]["timestamp"].endswith("Z")
+    assert error_payload["robotsBlocked"] == []
+    missing = await client.get("/v2/crawl/not-a-job/errors", headers=headers)
+    assert missing.status == 404
+
+
+def test_crawl_path_filters_regex_scope_and_query_deduplication():
+    from rainbo_scrape.hosted_crawl import _compile_path_patterns, _crawl_identity, _matches_crawl_url
+
+    include = _compile_path_patterns(["^/docs/(api|guide)/.*$"], "includePaths")
+    exclude = _compile_path_patterns(["/private(/|$)"], "excludePaths")
+    assert _matches_crawl_url("https://docs.example/docs/api/v1?format=json", include, exclude)
+    assert not _matches_crawl_url("https://docs.example/docs/marketing", include, exclude)
+    assert not _matches_crawl_url("https://docs.example/docs/private/page", include, exclude)
+    assert _matches_crawl_url("https://docs.example/docs/private/page", [], exclude, regex_on_full_url=True) is False
+    assert _crawl_identity("https://docs.example/page?a=1#top", True) == "https://docs.example/page"
+    assert _crawl_identity("https://docs.example/page?a=1#top") == "https://docs.example/page?a=1"

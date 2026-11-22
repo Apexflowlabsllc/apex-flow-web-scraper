@@ -10,14 +10,21 @@ import logging
 import os
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
+from .billing import public_usage_key_id
 from .policy import ScrapeError
+
+INTERACT_SERVICE_KEY = web.AppKey("interact_service", object)
 
 
 def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_for, crawl_cancel_for,
             batch_for, hosted):
+    from .interact import InteractService
+    interact = InteractService(hosted)
+    app[INTERACT_SERVICE_KEY] = interact
+    app.on_cleanup.append(interact.close_all)
     batch_tasks = {}
     hosted.db.executescript("""
         CREATE TABLE IF NOT EXISTS firecrawl_batch_jobs(
@@ -236,6 +243,181 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         return web.json_response({"success": True, "data": selected,
                                  "creditsUsed": payload.get("credits_used", 0)})
 
+    parse_formats = [
+        {"format": "pdf", "kind": "document", "extensions": [".pdf"],
+         "mimeTypes": ["application/pdf"], "available": True},
+        {"format": "docx", "kind": "document", "extensions": [".docx"],
+         "mimeTypes": ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"], "available": True},
+        {"format": "html", "kind": "document", "extensions": [".html", ".htm"],
+         "mimeTypes": ["text/html"], "available": True},
+        {"format": "text", "kind": "document", "extensions": [".txt"],
+         "mimeTypes": ["text/plain"], "available": True},
+        {"format": "json", "kind": "document", "extensions": [".json"],
+         "mimeTypes": ["application/json"], "available": True},
+        {"format": "xml", "kind": "document", "extensions": [".xml"],
+         "mimeTypes": ["application/xml", "text/xml"], "available": True},
+    ]
+    parse_format_names = {"markdown", "text", "links", "html", "rawHtml", "pages", "metadata"}
+    max_parse_bytes = 12 * 1024 * 1024
+
+    async def read_part_limited(part, limit):
+        chunks, total = [], 0
+        while True:
+            chunk = await part.read_chunk(size=64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > limit:
+                return None
+            chunks.append(chunk)
+        return b"".join(chunks)
+
+    async def parse_document(request):
+        if request.content_type != "multipart/form-data":
+            return error("Content-Type must be multipart/form-data with a file field", "invalid_request", 415)
+        if request.content_length is not None and request.content_length > max_parse_bytes + 131072:
+            return error("Upload exceeds the 12 MiB file limit", "upload_too_large", 413)
+        reader = await request.multipart()
+        file_body, filename, content_type, option_text = None, None, None, None
+        while True:
+            part = await reader.next()
+            if part is None:
+                break
+            if part.name == "file":
+                if file_body is not None:
+                    return error("Upload exactly one file", "invalid_request")
+                filename = ((part.filename or "upload").replace("\\", "/").rsplit("/", 1)[-1][:255]
+                            or "upload")
+                content_type = (part.headers.get("Content-Type") or "application/octet-stream").split(";", 1)[0].lower()
+                file_body = await read_part_limited(part, max_parse_bytes)
+                if file_body is None:
+                    return error("Upload exceeds the 12 MiB file limit", "upload_too_large", 413)
+            elif part.name == "options":
+                if option_text is not None:
+                    return error("Provide options once", "invalid_request")
+                raw_options = await read_part_limited(part, 65536)
+                if raw_options is None:
+                    return error("options exceeds the 64 KiB limit", "invalid_request", 413)
+                try:
+                    option_text = raw_options.decode("utf-8")
+                except UnicodeDecodeError:
+                    return error("options must be UTF-8 JSON", "invalid_request")
+            else:
+                return error("Only file and options multipart fields are supported", "unsupported_option")
+        if file_body is None or not file_body:
+            return error("A non-empty file field is required", "invalid_request")
+        try:
+            options = json.loads(option_text) if option_text is not None else {}
+        except json.JSONDecodeError:
+            return error("options must contain valid JSON", "invalid_request")
+        if not isinstance(options, dict):
+            return error("options must be a JSON object", "invalid_request")
+        extra = set(options) - {"formats", "onlyMainContent"}
+        if extra:
+            return error("Unsupported parse options: " + ", ".join(sorted(extra)), "unsupported_option")
+        if options.get("onlyMainContent", True) is not True:
+            return error("onlyMainContent:false is not supported by the isolated document parser", "unsupported_option")
+        formats = options.get("formats", ["markdown"])
+        if not isinstance(formats, list) or not formats:
+            return error("formats must be a non-empty list", "invalid_request")
+        requested = []
+        for item in formats:
+            kind = item if isinstance(item, str) else item.get("type") if isinstance(item, dict) else None
+            if isinstance(item, dict) and set(item) != {"type"}:
+                return error("Parse formats accept only a type field", "unsupported_option")
+            if kind not in parse_format_names:
+                return error("Supported parse outputs are " + ", ".join(sorted(parse_format_names)),
+                             "unsupported_option")
+            if kind not in requested:
+                requested.append(kind)
+
+        if file_body.startswith(b"%PDF-"):
+            content_type = "application/pdf"
+        elif file_body.startswith(b"PK\x03\x04") and (filename.lower().endswith(".docx") or "wordprocessingml" in content_type):
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        account = request["account"]
+        try:
+            hosted.billing.charge(account, "page")
+        except Exception as exc:
+            if hasattr(exc, "needed"):
+                raise ScrapeError("insufficient_credits", str(exc)) from exc
+            raise
+        try:
+            from .parser import parse as parse_bytes
+            parsed = await parse_bytes(file_body, "https://upload.invalid/" + filename,
+                                       content_type, include_html="html" in requested,
+                                       include_raw_html="rawHtml" in requested)
+        except BaseException:
+            hosted.billing.refund(account, 1)
+            raise
+
+        metadata = {"filename": filename, "contentType": content_type,
+                    "bytes": len(file_body), "sourceSha256": parsed.get("source_sha256")}
+        if parsed.get("title"):
+            metadata["title"] = parsed["title"]
+        if parsed.get("pages") is not None:
+            metadata["numPages"] = len(parsed["pages"])
+        data = {"metadata": metadata}
+        if "markdown" in requested and parsed.get("markdown") is not None:
+            data["markdown"] = parsed["markdown"]
+        if "text" in requested and parsed.get("text") is not None:
+            data["text"] = parsed["text"]
+        if "links" in requested:
+            data["links"] = [item.get("url") if isinstance(item, dict) else item
+                              for item in parsed.get("links", [])]
+        if "html" in requested and parsed.get("html") is not None:
+            data["html"] = parsed["html"]
+        if "rawHtml" in requested and parsed.get("raw_html") is not None:
+            data["rawHtml"] = parsed["raw_html"]
+        if "pages" in requested and parsed.get("pages") is not None:
+            data["pages"] = [{"pageNumber": page["page"], "markdown": page.get("text", "")}
+                              for page in parsed["pages"]]
+        return web.json_response({"success": True, "data": data, "creditsUsed": 1})
+
+    async def parse_format_list(request):
+        return web.json_response({"success": True, "data": {"formats": parse_formats}})
+
+    async def credit_usage(request):
+        account = request["account"]
+        plan = hosted.billing.limits(account)
+        row = hosted.db.execute("SELECT period_start FROM accounts WHERE id=?", (account,)).fetchone()
+        order = hosted.db.execute("SELECT period_end FROM orders WHERE account=?", (account,)).fetchone()
+        to_iso = lambda stamp: datetime.fromtimestamp(stamp, timezone.utc).isoformat().replace("+00:00", "Z") if stamp else None
+        return web.json_response({"success": True, "data": {
+            "remainingCredits": hosted.billing.remaining(account),
+            "planCredits": plan["credits"],
+            "billingPeriodStart": to_iso(row[0] if row else None),
+            "billingPeriodEnd": to_iso(order[0] if order else None)}})
+
+    async def historical_credit_usage(request):
+        by_api_key = request.query.get("byApiKey", "false")
+        if by_api_key not in {"true", "false"}:
+            return error("byApiKey must be true or false", "invalid_request")
+        if by_api_key == "true":
+            rows = hosted.db.execute(
+                "SELECT strftime('%Y-%m',u.ts,'unixepoch'),u.api_key_hash,k.label,SUM(u.credits) "
+                "FROM usage u LEFT JOIN keys k ON k.hash=u.api_key_hash WHERE u.account=? "
+                "GROUP BY 1,2,3 ORDER BY 1,2", (request["account"],)).fetchall()
+        else:
+            rows = hosted.db.execute(
+                "SELECT strftime('%Y-%m',ts,'unixepoch'),NULL,NULL,SUM(credits) FROM usage "
+                "WHERE account=? GROUP BY 1 ORDER BY 1", (request["account"],)).fetchall()
+        periods = []
+        for month, key_hash, key_label, credits in rows:
+            if not month:
+                continue
+            start = datetime.strptime(month, "%Y-%m").replace(tzinfo=timezone.utc)
+            end = (start.replace(year=start.year + 1, month=1) if start.month == 12
+                   else start.replace(month=start.month + 1)) - timedelta(seconds=1)
+            period = {"startDate": start.isoformat().replace("+00:00", "Z"),
+                      "endDate": end.isoformat().replace("+00:00", "Z"),
+                      "totalCredits": credits or 0}
+            if by_api_key == "true":
+                period["apiKeyId"] = public_usage_key_id(key_hash)
+                period["apiKeyLabel"] = key_label
+            periods.append(period)
+        return web.json_response({"success": True, "periods": periods})
+
     async def map_route(request):
         body = await request.json()
         if not isinstance(body, dict):
@@ -291,7 +473,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if not isinstance(body, dict):
             return error("Request body must be a JSON object")
         allowed = {"url", "limit", "maxDiscoveryDepth", "includePaths", "excludePaths",
-                   "ignoreRobotsTxt", "allowExternalLinks", "allowSubdomains", "sitemap", "scrapeOptions"}
+                   "regexOnFullURL", "ignoreQueryParameters", "ignoreRobotsTxt", "allowExternalLinks",
+                   "allowSubdomains", "sitemap", "scrapeOptions"}
         extra = set(body) - allowed
         if extra:
             return error("Unsupported Apex compatibility options: " + ", ".join(sorted(extra)))
@@ -299,8 +482,6 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             return error("Apex always obeys robots.txt")
         if body.get("allowExternalLinks", False) is not False or body.get("allowSubdomains", False) is not False:
             return error("This adapter is same-site only; external links and subdomains are not enabled")
-        if body.get("includePaths") or body.get("excludePaths"):
-            return error("includePaths/excludePaths patterns are not supported yet; Apex crawl is bounded to same-site depth and limit")
         if body.get("sitemap", "include") != "include":
             return error("Only sitemap='include' is supported")
         scrape_options = body.get("scrapeOptions", {})
@@ -336,6 +517,11 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                           if item in {"markdown", "html", "rawHtml", "links", "screenshot"}})
         start_body = {"url": body.get("url"), "limit": body.get("limit", 25), "render": "auto",
                       "outputs": outputs, "max_depth": body.get("maxDiscoveryDepth", 3)}
+        for source, target in (("includePaths", "include_paths"), ("excludePaths", "exclude_paths"),
+                               ("regexOnFullURL", "regex_on_full_url"),
+                               ("ignoreQueryParameters", "ignore_query_parameters")):
+            if source in body:
+                start_body[target] = body[source]
         if extract_spec:
             admission = extraction_admission(request["account"])
             if admission:
@@ -382,6 +568,23 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             reply["warning"] = payload["note"]
         return web.json_response(reply)
 
+    async def crawl_active(request):
+        rows = hosted.db.execute(
+            "SELECT id,url,page_limit,created,done,failed,credits,options FROM crawl_jobs "
+            "WHERE account=? AND status='running' ORDER BY created DESC LIMIT 100",
+            (request["account"],)).fetchall()
+        crawls = []
+        for ident, url, limit, created, done, failed, credits, raw_options in rows:
+            options = json.loads(raw_options or "{}")
+            formats = options.get("outputs") or ["markdown"]
+            formats = [{"type": "rawHtml" if item == "raw_html" else item} for item in formats]
+            crawls.append({"id": ident, "url": url, "status": "scraping",
+                           "createdAt": datetime.fromtimestamp(created, timezone.utc).isoformat().replace("+00:00", "Z"),
+                           "completed": done, "failed": failed, "total": limit, "creditsUsed": credits,
+                           "options": {"limit": limit,
+                                       "scrapeOptions": {"formats": formats, "onlyMainContent": True}}})
+        return web.json_response({"success": True, "crawls": crawls})
+
     async def crawl_cancel(request):
         response = await crawl_cancel_for(request["account"], {"id": request.match_info["job"]})
         payload = unpack(response)
@@ -389,6 +592,38 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if failure:
             return failure
         return web.json_response({"success": True, "id": payload.get("id"), "status": payload.get("status")})
+
+    async def crawl_errors(request):
+        job = request.match_info["job"]
+        row = hosted.db.execute("SELECT created FROM crawl_jobs WHERE id=? AND account=?",
+                                (job, request["account"])).fetchone()
+        if not row:
+            return error("Crawl job not found.", "not_found", 404)
+        errors, robots_blocked = [], []
+        for seq, url, status, raw, recorded_at in hosted.db.execute(
+                "SELECT seq,url,status,payload,recorded_at FROM crawl_pages WHERE job=? AND status!=200 ORDER BY seq", (job,)):
+            payload = json.loads(raw)
+            code = payload.get("code") or "error"
+            if code == "robots_denied":
+                robots_blocked.append(url)
+            else:
+                errors.append({"id": f"{job}:{seq}",
+                               "timestamp": datetime.fromtimestamp(recorded_at or row[0], timezone.utc).isoformat().replace("+00:00", "Z"),
+                               "url": url, "error": payload.get("error", "Page scrape failed."), "code": code})
+        return web.json_response({"errors": errors, "robotsBlocked": robots_blocked})
+
+    async def interact_create(request):
+        return web.json_response(await interact.create(request["account"], await request.json()))
+
+    async def interact_list(request):
+        return web.json_response(interact.list(request["account"], request.query.get("status")))
+
+    async def interact_execute(request):
+        return web.json_response(await interact.execute(request["account"], request.match_info["session"],
+                                                        await request.json()))
+
+    async def interact_delete(request):
+        return web.json_response(await interact.delete(request["account"], request.match_info["session"]))
 
     def batch_status(job, account):
         row = hosted.db.execute(
@@ -618,17 +853,32 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             try:
                 return await handler(request)
             except (ValueError, KeyError, TypeError, ScrapeError) as exc:
-                return error(str(exc), getattr(exc, "code", None) or "invalid_request")
+                code = getattr(exc, "code", None) or "invalid_request"
+                status = {"paid_plan_required": 402, "insufficient_credits": 402,
+                          "session_capacity": 429, "not_found": 404,
+                          "session_expired": 410, "browser_unavailable": 503,
+                          "blocked_origin": 403}.get(code, 400)
+                return error(str(exc), code, status)
             except web.HTTPException as exc:
                 return error(exc.reason, "request_failed", exc.status)
         return wrapped
 
     app.router.add_post("/v2/scrape", wrap(scrape))
+    app.router.add_post("/v2/parse", wrap(parse_document))
+    app.router.add_get("/v2/parse/formats", wrap(parse_format_list))
+    app.router.add_get("/v2/team/credit-usage", wrap(credit_usage))
+    app.router.add_get("/v2/team/credit-usage/historical", wrap(historical_credit_usage))
     app.router.add_post("/v2/map", wrap(map_route))
     app.router.add_post("/v2/search", wrap(search))
     app.router.add_post("/v2/crawl", wrap(crawl))
+    app.router.add_get("/v2/crawl/active", wrap(crawl_active))
     app.router.add_get("/v2/crawl/{job}", wrap(crawl_status))
     app.router.add_delete("/v2/crawl/{job}", wrap(crawl_cancel))
+    app.router.add_get("/v2/crawl/{job}/errors", wrap(crawl_errors))
+    app.router.add_post("/v2/interact", wrap(interact_create))
+    app.router.add_get("/v2/interact", wrap(interact_list))
+    app.router.add_post("/v2/interact/{session}/execute", wrap(interact_execute))
+    app.router.add_delete("/v2/interact/{session}", wrap(interact_delete))
     app.router.add_post("/v2/batch/scrape", wrap(batch_scrape))
     app.router.add_get("/v2/batch/scrape/{job}/errors", wrap(batch_errors))
     app.router.add_get("/v2/batch/scrape/{job}", wrap(batch_status_route))

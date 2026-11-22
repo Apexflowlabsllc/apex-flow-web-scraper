@@ -6,9 +6,10 @@ scrape, so a crawl can never spend more than the pages it returns.
 import asyncio
 import json
 import logging
+import re
 import secrets
 import time
-from urllib.parse import urldefrag, urlsplit
+from urllib.parse import urldefrag, urlsplit, urlunsplit
 
 from aiohttp import web
 
@@ -25,9 +26,11 @@ def prepare(h):
     h.db.executescript("""
         CREATE TABLE IF NOT EXISTS crawl_jobs(id TEXT PRIMARY KEY,account TEXT,url TEXT,status TEXT,page_limit INTEGER,
             created REAL,finished REAL,options TEXT,done INTEGER DEFAULT 0,failed INTEGER DEFAULT 0,credits INTEGER DEFAULT 0,note TEXT);
-        CREATE TABLE IF NOT EXISTS crawl_pages(job TEXT,seq INTEGER,url TEXT,status INTEGER,payload TEXT,PRIMARY KEY(job,seq));
+        CREATE TABLE IF NOT EXISTS crawl_pages(job TEXT,seq INTEGER,url TEXT,status INTEGER,payload TEXT,recorded_at REAL,PRIMARY KEY(job,seq));
         CREATE INDEX IF NOT EXISTS crawl_jobs_account ON crawl_jobs(account,created);
     """)
+    if "recorded_at" not in {row[1] for row in h.db.execute("PRAGMA table_info(crawl_pages)")}:
+        h.db.execute("ALTER TABLE crawl_pages ADD COLUMN recorded_at REAL")
     # A restart ends in-memory jobs; say so instead of leaving them "running" forever.
     h.db.execute("UPDATE crawl_jobs SET status='interrupted',finished=?,note='Service restarted. Pages already collected are kept; start a new crawl for the rest.' WHERE status='running'", (time.time(),))
 
@@ -62,12 +65,48 @@ def _links(result):
             yield value
 
 
+def _crawl_identity(url, ignore_query_parameters=False):
+    url = urldefrag(url)[0]
+    if not ignore_query_parameters:
+        return url
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+
+
+def _compile_path_patterns(value, name):
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > 20:
+        raise ValueError(f"{name} must be an array of at most 20 regular expressions")
+    patterns = []
+    for item in value:
+        if not isinstance(item, str) or not 1 <= len(item) <= 200:
+            raise ValueError(f"Each {name} pattern must be 1–200 characters")
+        # Keep caller patterns away from pathological backtracking expressions.
+        if (re.search(r"\(\?", item) or re.search(r"\\[1-9]", item)
+                or re.search(r"\([^)]*[+*{][^)]*\)[+*{]", item)
+                or len(re.findall(r"(?:[+*]|\{\d+,\})", item)) > 1):
+            raise ValueError(f"{name} pattern uses unsupported or unsafe regex syntax")
+        try:
+            patterns.append(re.compile(item))
+        except re.error as exc:
+            raise ValueError(f"Invalid {name} regular expression: {exc}") from exc
+    return patterns
+
+
+def _matches_crawl_url(url, includes, excludes, regex_on_full_url=False):
+    target = url if regex_on_full_url else urlsplit(url).path
+    return ((not includes or any(pattern.search(target) for pattern in includes))
+            and not any(pattern.search(target) for pattern in excludes))
+
+
 def install(h, app, perform, map_urls=None):
     tasks = {}
 
-    async def run(job, account, start, limit, options, include, max_depth):
+    async def run(job, account, start, limit, options, include, include_patterns, max_depth,
+                  exclude_patterns, regex_on_full_url, ignore_query_parameters):
         host = _site(start)
-        queue, seen, seq, active = [(start, 0)], {start}, 0, 0
+        queue, seen, seq, active = [(start, 0)], {_crawl_identity(start, ignore_query_parameters)}, 0, 0
         scrape_options = {k: options[k] for k in ("render", "fallback", "recipe", "extract") if k in options}
         wanted = options.get("outputs") or ["markdown"]
         note = None
@@ -75,9 +114,13 @@ def install(h, app, perform, map_urls=None):
         def offer(url, depth):
             url = urldefrag(url)[0]
             parts = urlsplit(url)
-            if (parts.scheme in ("http", "https") and _site(url) == host and url not in seen and depth <= max_depth
-                    and not parts.path.lower().endswith(SKIP) and (not include or include in url) and len(seen) < limit * 4):
-                seen.add(url)
+            identity = _crawl_identity(url, ignore_query_parameters)
+            if (parts.scheme in ("http", "https") and _site(url) == host and identity not in seen and depth <= max_depth
+                    and not parts.path.lower().endswith(SKIP)
+                    and (not include or include in url)
+                    and _matches_crawl_url(url, include_patterns, exclude_patterns, regex_on_full_url)
+                    and len(seen) < limit * 4):
+                seen.add(identity)
                 queue.append((url, depth))
 
         if map_urls:
@@ -130,7 +173,8 @@ def install(h, app, perform, map_urls=None):
                         if "links" not in wanted:
                             result.pop("links", None)
                     seq += 1
-                    h.db.execute("INSERT INTO crawl_pages VALUES(?,?,?,?,?)", (job, seq, url, item["status"], json.dumps({"url": url, **item})))
+                    h.db.execute("INSERT INTO crawl_pages(job,seq,url,status,payload,recorded_at) VALUES(?,?,?,?,?,?)",
+                                 (job, seq, url, item["status"], json.dumps({"url": url, **item}), time.time()))
                     ok = item["status"] == 200
                     h.db.execute("UPDATE crawl_jobs SET done=done+?,failed=failed+?,credits=credits+? WHERE id=?",
                                  (int(ok), int(not ok), item.get("credits_used", 0) if ok else 0, job))
@@ -156,7 +200,8 @@ def install(h, app, perform, map_urls=None):
                          (status, time.time(), note, job))
 
     async def start_for(account, body):
-        allowed = {"url", "limit", "render", "outputs", "include", "max_depth", "fallback", "recipe", "extract"}
+        allowed = {"url", "limit", "render", "outputs", "include", "include_paths", "exclude_paths", "regex_on_full_url",
+                   "ignore_query_parameters", "max_depth", "fallback", "recipe", "extract"}
         if not isinstance(body, dict) or set(body) - allowed:
             raise ValueError("Use url with optional " + ", ".join(sorted(allowed - {"url"})))
         try:
@@ -174,6 +219,12 @@ def install(h, app, perform, map_urls=None):
         include = body.get("include")
         if include is not None and (not isinstance(include, str) or not 1 <= len(include) <= 200):
             raise ValueError("include must be 1–200 characters that every crawled URL contains")
+        include_patterns = _compile_path_patterns(body.get("include_paths"), "include_paths")
+        exclude_patterns = _compile_path_patterns(body.get("exclude_paths"), "exclude_paths")
+        regex_on_full_url = body.get("regex_on_full_url", False)
+        ignore_query_parameters = body.get("ignore_query_parameters", False)
+        if not isinstance(regex_on_full_url, bool) or not isinstance(ignore_query_parameters, bool):
+            raise ValueError("regex_on_full_url and ignore_query_parameters must be booleans")
         if body.get("render", "never") not in ("never", "auto", "always"):
             raise ValueError("render must be never, auto or always")
         running = h.db.execute("SELECT COUNT(*) FROM crawl_jobs WHERE account=? AND status='running'", (account,)).fetchone()[0]
@@ -183,13 +234,19 @@ def install(h, app, perform, map_urls=None):
         if h.billing.remaining(account) < 1:
             return web.json_response({"error": "Not enough credits", "code": "insufficient_credits", "retryable": False,
                                       "credits_left": 0, "buy_url": h.site + "/#pricing"}, status=402)
-        options = {"render": body.get("render", "never"), **{k: body[k] for k in ("outputs", "fallback", "recipe", "extract") if k in body}}
+        options = {"render": body.get("render", "never"),
+                   **{k: body[k] for k in ("outputs", "fallback", "recipe", "extract") if k in body},
+                   "include_paths": body.get("include_paths", []),
+                   "exclude_paths": body.get("exclude_paths", []),
+                   "regex_on_full_url": regex_on_full_url,
+                   "ignore_query_parameters": ignore_query_parameters}
         job = "crawl_" + secrets.token_hex(12)
         h.db.execute("DELETE FROM crawl_pages WHERE job IN (SELECT id FROM crawl_jobs WHERE created<?)", (time.time() - KEEP_SECONDS,))
         h.db.execute("DELETE FROM crawl_jobs WHERE created<?", (time.time() - KEEP_SECONDS,))
         h.db.execute("INSERT INTO crawl_jobs(id,account,url,status,page_limit,created,options) VALUES(?,?,?,'running',?,?,?)",
                      (job, account, start, limit, time.time(), json.dumps(options)))
-        tasks[job] = asyncio.create_task(run(job, account, start, limit, options, include, depth))
+        tasks[job] = asyncio.create_task(run(job, account, start, limit, options, include, include_patterns,
+                                             depth, exclude_patterns, regex_on_full_url, ignore_query_parameters))
         return web.json_response({"id": job, "status": "running", "url": start, "limit": limit,
                                   "status_url": h.site + "/v1/crawl/" + job,
                                   "note": "Poll status_url. Each page costs the usual 1 or 3 credits; pages that fail are free. Results are kept for 7 days."})

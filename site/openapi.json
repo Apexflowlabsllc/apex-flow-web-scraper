@@ -941,6 +941,40 @@
         }
       }
     },
+    "/keys": {
+      "get": {
+        "operationId": "listApiKeys",
+        "summary": "List account API keys",
+        "description": "Returns key IDs and labels only. Bearer key values are never returned by this endpoint.",
+        "responses": {"200": {"description": "Account keys", "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "keys": {"type": "array", "items": {"type": "object", "properties": {
+            "id": {"type": "string"}, "label": {"type": "string"}, "created_at": {"type": "number"}, "revoked": {"type": "boolean"}
+          }}}
+        }}}}}
+      },
+      "post": {
+        "operationId": "createApiKey",
+        "summary": "Create a labeled API key",
+        "description": "Returns the new bearer secret once. Store it in a secret manager; list responses never include the secret.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "label": {"type": "string", "maxLength": 80}
+        }, "additionalProperties": false}}}},
+        "responses": {"201": {"description": "Created key, including one-time bearer secret", "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "id": {"type": "string"}, "key": {"type": "string", "writeOnly": true}, "label": {"type": "string"}, "created_at": {"type": "number"}
+        }}}}}, "409": {"description": "Account reached its active key limit"}}
+      }
+    },
+    "/keys/{key_id}": {
+      "delete": {
+        "operationId": "revokeApiKey",
+        "summary": "Revoke an account API key",
+        "parameters": [{"name": "key_id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Revoked", "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "id": {"type": "string"}, "revoked": {"type": "boolean"}
+        }}}}}, "404": {"description": "Key not found, belongs to another account, or already revoked"},
+        "409": {"description": "Create a replacement before revoking the account's last active key"}}
+      }
+    },
     "/usage": {
       "get": {
         "operationId": "creditBalance",
@@ -2238,6 +2272,44 @@
         }
       }
     },
+    "/v2/parse": {
+      "post": {
+        "operationId": "firecrawlCompatParseUpload",
+        "summary": "Parse an uploaded document",
+        "description": "Parses one uploaded PDF, DOCX, HTML, text, JSON, or XML document. Maximum file size is 12 MiB; the operation costs one credit. Supported options are formats and onlyMainContent=true.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {"type": "string", "format": "binary"},
+                  "options": {"type": "string", "description": "Optional JSON object encoded as a multipart field. Supports formats and onlyMainContent=true."}
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Parsed document; costs one credit", "content": {"application/json": {"schema": {"type": "object"}}}},
+          "400": {"description": "Invalid document or unsupported option"},
+          "402": {"description": "Insufficient credits"},
+          "413": {"description": "Upload exceeds 12 MiB"}
+        }
+      }
+    },
+    "/v2/parse/formats": {
+      "get": {
+        "operationId": "firecrawlCompatParseFormats",
+        "summary": "List supported upload formats",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "responses": {"200": {"description": "Supported upload formats; cached privately for one hour", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
     "/v2/scrape": {
       "post": {
         "operationId": "firecrawlCompatScrape",
@@ -2390,6 +2462,50 @@
         }
       }
     },
+    "/v2/team/credit-usage": {
+      "get": {
+        "operationId": "firecrawlCompatCreditUsage",
+        "summary": "Current credit usage",
+        "description": "Returns account allowance and billing period dates. Values are Apex account-scoped.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "responses": {
+          "200": {
+            "description": "Current allowance and period metadata",
+            "content": {"application/json": {"schema": {"type": "object", "properties": {
+              "success": {"type": "boolean"},
+              "data": {"type": "object", "properties": {
+                "remainingCredits": {"type": "integer"},
+                "planCredits": {"type": "integer"},
+                "billingPeriodStart": {"type": ["string", "null"], "format": "date-time"},
+                "billingPeriodEnd": {"type": ["string", "null"], "format": "date-time"}
+              }}
+            }}}}
+          }
+        }
+      }
+    },
+    "/v2/team/credit-usage/historical": {
+      "get": {
+        "operationId": "firecrawlCompatHistoricalCreditUsage",
+        "summary": "Historical credit usage",
+        "description": "Returns monthly account-wide totals by default. Set byApiKey=true for per-key totals. Legacy usage recorded before key-level attribution was added is returned with a null apiKeyId.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "parameters": [{"name": "byApiKey", "in": "query", "schema": {"type": "boolean", "default": false}}],
+        "responses": {
+          "200": {"description": "Monthly account-wide totals", "content": {"application/json": {"schema": {"type": "object", "properties": {
+            "success": {"type": "boolean"},
+            "periods": {"type": "array", "items": {"type": "object", "properties": {
+              "startDate": {"type": "string", "format": "date-time"},
+              "endDate": {"type": "string", "format": "date-time"},
+              "totalCredits": {"type": "integer"},
+              "apiKeyId": {"type": ["string", "null"], "description": "Stable opaque key identifier; null for unattributed legacy usage."},
+              "apiKeyLabel": {"type": ["string", "null"], "description": "User-provided key label, when available."}
+            }}}
+          }}}}},
+          "400": {"description": "Invalid or unsupported option"}
+        }
+      }
+    },
     "/v2/map": {
       "post": {
         "operationId": "firecrawlCompatMap",
@@ -2524,11 +2640,87 @@
         }
       }
     },
+    "/v2/interact": {
+      "post": {
+        "operationId": "createApexInteractSession",
+        "summary": "Create a bounded browser session",
+        "description": "Creates a short-lived, account-owned browser session. Every request is restricted to the explicitly allowed public origins and read-only GET/HEAD traffic. Arbitrary code, CDP, and live video are not exposed.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["allowedOrigins"],
+                "properties": {
+                  "allowedOrigins": {"type": "array", "minItems": 1, "maxItems": 10, "items": {"type": "string", "format": "uri"}},
+                  "url": {"type": "string", "format": "uri", "description": "Optional initial page; must match an allowed origin."},
+                  "ttl": {"type": "integer", "minimum": 30, "maximum": 900, "default": 300},
+                  "activityTtl": {"type": "integer", "minimum": 10, "maximum": 300, "default": 120},
+                  "streamWebView": {"type": "boolean", "const": false},
+                  "blockAds": {"type": "boolean", "const": false}
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Session created; costs three credits.", "content": {"application/json": {"schema": {"type": "object", "properties": {"success": {"type": "boolean"}, "id": {"type": "string"}, "expiresAt": {"type": "string", "format": "date-time"}, "actionsUrl": {"type": "string"}, "allowedOrigins": {"type": "array", "items": {"type": "string"}}, "creditCost": {"type": "integer"}}}}}},
+          "402": {"description": "Paid plan or credits required"},
+          "429": {"description": "Interactive session capacity reached"},
+          "503": {"description": "Browser runtime unavailable"}
+        }
+      },
+      "get": {
+        "operationId": "listApexInteractSessions",
+        "summary": "List account browser sessions",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "parameters": [{"name": "status", "in": "query", "required": false, "schema": {"type": "string", "enum": ["active", "destroyed"]}}],
+        "responses": {"200": {"description": "Account-owned active or recently destroyed sessions", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
+    "/v2/interact/{session}/execute": {
+      "post": {
+        "operationId": "executeApexInteractActions",
+        "summary": "Navigate and run bounded browser actions",
+        "description": "Navigates only within the session origin allowlist and runs up to eight declarative click/wait/scroll actions. Does not execute caller-supplied code.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "parameters": [{"name": "session", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {"url": {"type": "string", "format": "uri"}, "actions": {"type": "array", "maxItems": 8, "items": {"$ref": "#/components/schemas/BrowserAction"}}}, "additionalProperties": false}}}},
+        "responses": {
+          "200": {"description": "Current page state; costs three credits.", "content": {"application/json": {"schema": {"type": "object"}}}},
+          "403": {"description": "Destination outside allowed origins"},
+          "404": {"description": "Session is not owned by this account"},
+          "410": {"description": "Session expired"},
+          "402": {"description": "Insufficient credits"}
+        }
+      }
+    },
+    "/v2/interact/{session}": {
+      "delete": {
+        "operationId": "deleteApexInteractSession",
+        "summary": "Destroy a browser session",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "parameters": [{"name": "session", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Session destroyed"}, "404": {"description": "Session is not owned by this account"}}
+      }
+    },
+    "/v2/crawl/active": {
+      "get": {
+        "operationId": "firecrawlCompatListActiveCrawls",
+        "summary": "List active account crawls",
+        "description": "Lists up to 100 running crawl jobs owned by the authenticated account. This endpoint is read-only and does not consume credits.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "responses": {"200": {"description": "Active crawls owned by this API account", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
     "/v2/crawl": {
       "post": {
         "operationId": "firecrawlCompatStartCrawl",
         "summary": "Firecrawl-compatible crawl",
-        "description": "Starts a durable same-site crawl. Apex obeys robots.txt, enforces account limits, and rejects external-link, subdomain, path-pattern, and unsupported scrape options.",
+        "description": "Starts a durable same-site crawl. Apex obeys robots.txt, enforces account limits, and rejects external-link and subdomain expansion. includePaths/excludePaths accept bounded, safety-checked regular expressions matched against URL paths; regexOnFullURL switches matching to the full URL. ignoreQueryParameters deduplicates discovered URLs without query strings.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -2591,15 +2783,29 @@
                   },
                   "includePaths": {
                     "type": "array",
+                    "maxItems": 20,
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
                     }
                   },
                   "excludePaths": {
                     "type": "array",
+                    "maxItems": 20,
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
                     }
+                  },
+                  "regexOnFullURL": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "ignoreQueryParameters": {
+                    "type": "boolean",
+                    "default": false
                   },
                   "ignoreRobotsTxt": {
                     "type": "boolean"
@@ -2798,6 +3004,67 @@
             }
           }
         ]
+      }
+    },
+    "/v2/crawl/{job}/errors": {
+      "get": {
+        "operationId": "firecrawlCompatCrawlErrors",
+        "summary": "Get crawl errors",
+        "description": "Returns recorded failed page results and robots-denied URLs for an account-owned crawl.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recorded crawl failures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {"type": "string"},
+                          "timestamp": {"type": "string", "format": "date-time"},
+                          "url": {"type": "string", "format": "uri"},
+                          "error": {"type": "string"},
+                          "code": {"type": "string"}
+                        }
+                      }
+                    },
+                    "robotsBlocked": {
+                      "type": "array",
+                      "items": {"type": "string", "format": "uri"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such crawl for this account",
+            "content": {
+              "application/json": {
+                "schema": {"type": "object"}
+              }
+            }
+          }
+        }
       }
     },
     "/v2/batch/scrape": {
@@ -3098,4 +3365,5 @@
       }
     }
   }
+}
 }
