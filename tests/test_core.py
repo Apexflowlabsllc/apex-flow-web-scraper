@@ -1,5 +1,6 @@
 import asyncio
 import gzip
+import hashlib
 import json
 import socket
 import sqlite3
@@ -166,6 +167,52 @@ async def test_fetch_robots_redirect_cache_retry_and_etag(settings, site):
         settings.cache_ttl = -1
         assert (await f.get(base+"/etag"))["cache"] == "revalidated"
         assert counts["/etag"] == 2
+
+
+async def test_fetch_cache_only_serves_cache_and_never_contacts_origin(settings, site):
+    base, counts = site
+    store = Store(settings)
+    async with Fetcher(settings, store) as fetcher:
+        original = await fetcher.get(base + "/article")
+    before = dict(counts)
+
+    async with Fetcher(settings, store) as fetcher:
+        cached = await fetcher.get(base + "/article", cache_only=True, min_age_ms=0)
+        assert cached["body"] == original["body"]
+        assert cached["cache"] == "cache_only"
+        with pytest.raises(ScrapeError, match="no network request was made"):
+            await fetcher.get(base + "/article", cache_only=True, min_age_ms=31_536_000_000)
+        with pytest.raises(ScrapeError, match="no network request was made"):
+            await fetcher.get(base + "/uncached", cache_only=True)
+
+    assert counts == before
+
+
+async def test_cache_only_rechecks_cached_robots_even_when_policy_is_in_memory(settings, site):
+    base, counts = site
+    store = Store(settings)
+    async with Fetcher(settings, store) as fetcher:
+        await fetcher.get(base + "/article")
+        robots_key = hashlib.sha256((base + "/robots.txt").encode()).hexdigest()
+        with store.db() as db:
+            db.execute("DELETE FROM cache WHERE key=?", (robots_key,))
+        before = dict(counts)
+        with pytest.raises(ScrapeError, match="no network request was made"):
+            await fetcher.get(base + "/article", cache_only=True)
+    assert counts == before
+
+
+def test_cache_only_age_limits_accept_two_year_lockdown(settings):
+    request = validate_request({
+        "urls": ["https://example.com/"], "max_pages": 1,
+        "cache_only": True, "cache_max_age_ms": 63_072_000_000,
+    }, settings)
+    assert request["cache_max_age_ms"] == 63_072_000_000
+    with pytest.raises(ValueError, match="cache_max_age_ms"):
+        validate_request({
+            "urls": ["https://example.com/"], "max_pages": 1,
+            "cache_only": True, "cache_max_age_ms": 63_072_000_001,
+        }, settings)
 
 
 async def test_fetch_redirect_obeys_explicit_origin_allowlist(settings, site):

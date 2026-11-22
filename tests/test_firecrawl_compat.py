@@ -119,6 +119,69 @@ async def test_v2_scrape_uses_firecrawl_envelope_and_apex_metering(hosted):
     assert (await unsupported.json())["code"] == "unsupported_option"
 
 
+async def test_v2_scrape_min_age_and_lockdown_select_cache_only(hosted):
+    h, client, headers = await _auth(hosted)
+    response = await client.post("/v2/scrape", headers=headers, json={
+        "url": "https://example.com/cached", "formats": ["markdown"], "minAge": 1, "maxAge": 5000,
+    })
+    assert response.status == 200
+    assert h.scrape_calls[-1][1]["cache_only"] is True
+    assert h.scrape_calls[-1][1]["min_age_ms"] == 1
+    assert h.scrape_calls[-1][1]["cache_max_age_ms"] == 5000
+    assert h.scrape_calls[-1][1]["render"] == "never"
+
+    response = await client.post("/v2/scrape", headers=headers, json={
+        "url": "https://example.com/locked", "formats": ["html"], "lockdown": True,
+    })
+    assert response.status == 200
+    assert h.scrape_calls[-1][1]["cache_only"] is True
+    assert h.scrape_calls[-1][1]["cache_max_age_ms"] == 63_072_000_000
+
+
+async def test_v2_scrape_rejects_unsupported_cache_only_options(hosted):
+    _, client, headers = await _auth(hosted)
+    for body in (
+        {"url": "https://example.com", "minAge": True},
+        {"url": "https://example.com", "lockdown": "true"},
+        {"url": "https://example.com", "minAge": 1, "formats": ["screenshot"]},
+        {"url": "https://example.com", "lockdown": True, "waitFor": 10},
+    ):
+        response = await client.post("/v2/scrape", headers=headers, json=body)
+        assert response.status == 400
+
+
+async def test_v2_scrape_translates_cache_miss_to_firecrawl_404(hosted):
+    from rainbo_scrape.policy import ScrapeError
+
+    h, _, _, _, nonce, _ = hosted
+    await h.fulfill("cs_test_Example123")
+    key = h.key_for("cs_test_Example123", _hash(nonce))
+
+    async def cache_miss(url, **kwargs):
+        assert kwargs["cache_only"] is True
+        raise ScrapeError("cache_miss", "No eligible cached response is available; no network request was made")
+
+    client = TestClient(TestServer(make_app(h.billing, cache_miss, hosted=h)))
+    await client.start_server()
+    try:
+        response = await client.post("/v2/scrape", headers={"Authorization": f"Bearer {key}"}, json={
+            "url": "https://example.com/missing", "minAge": 1,
+        })
+        payload = await response.json()
+        assert response.status == 404
+        assert payload["code"] == "SCRAPE_NO_CACHED_DATA"
+        assert "no network request was made" in payload["error"]
+
+        response = await client.post("/v2/scrape", headers={"Authorization": f"Bearer {key}"}, json={
+            "url": "https://example.com/missing", "lockdown": True,
+        })
+        payload = await response.json()
+        assert response.status == 404
+        assert payload["code"] == "SCRAPE_LOCKDOWN_CACHE_MISS"
+    finally:
+        await client.close()
+
+
 async def test_v2_requires_auth_and_rejects_unsupported_formats(hosted):
     _, client, *_ = hosted
     assert (await client.post("/v2/scrape", json={"url": "https://example.com"})).status == 401
@@ -349,6 +412,11 @@ async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hoste
     assert h.scrape_calls[-1][1]["actions"] == [{"type": "wait", "ms": 1200}]
     assert "ad blocking is not implemented by Apex" in scraped.warning
     assert "origin attribution is not recorded by Apex" in scraped.warning
+
+    locked = await asyncio.to_thread(app.v2.scrape, "https://example.com/locked", formats=["markdown"], lockdown=True)
+    assert locked.markdown == "# Fixture"
+    assert h.scrape_calls[-1][1]["cache_only"] is True
+    assert h.scrape_calls[-1][1]["cache_max_age_ms"] > 0
 
     started = await asyncio.to_thread(app.v2.start_batch_scrape, ["https://example.com"], wait_for=800)
     status = None

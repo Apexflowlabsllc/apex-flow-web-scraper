@@ -72,14 +72,16 @@ class Fetcher:
             if mark:
                 self.last[host] = time.monotonic()
 
-    async def allowed(self, url, allowed_origins=None):
+    async def allowed(self, url, allowed_origins=None, cache_only=False):
         p = urlsplit(url)
         origin = f"{p.scheme}://{p.netloc}"
         lock = self.locks.setdefault("robots:"+origin, asyncio.Lock())
         async with lock:
-            if origin not in self.robots:
-                response = await self.get(origin+"/robots.txt", robots=False, cache=True,
-                                          allowed_origins=allowed_origins)
+            if cache_only or origin not in self.robots:
+                response = await self.get(
+                    origin+"/robots.txt", robots=False, cache=True, allowed_origins=allowed_origins,
+                    cache_only=cache_only,
+                    cache_max_age_ms=self.settings.cache_ttl * 1000 if cache_only else None)
                 parser = RobotFileParser(origin+"/robots.txt")
                 if response["status"] in (401, 403):
                     parser.parse(["User-agent: *", "Disallow: /"])
@@ -105,7 +107,8 @@ class Fetcher:
         default = 443 if parsed.scheme == "https" else 80
         return f"{parsed.scheme}://{host}" + (f":{port}" if port and port != default else "")
 
-    async def get(self, url, *, robots=True, cache=True, max_age=None, throttle=True, allowed_origins=None):
+    async def get(self, url, *, robots=True, cache=True, max_age=None, throttle=True, allowed_origins=None,
+                  cache_only=False, min_age_ms=None, cache_max_age_ms=None):
         """max_age is in milliseconds like Firecrawl maxAge: None uses the default TTL, 0 always revalidates/fetches."""
         started = time.monotonic()
         url = check_url(url, self.settings.allow_test_loopback)
@@ -119,13 +122,20 @@ class Fetcher:
                 if redirect and "://".join(urlsplit(original)[:2]) in self.requested_origins:
                     self.requested_origins.add(origin)
                 try:
-                    await self.allowed(url, allowed_origins=allowed_origins)
+                    await self.allowed(url, allowed_origins=allowed_origins, cache_only=cache_only)
                 except ScrapeError as exc:
                     if exc.code != "robots_denied" or origin not in self.requested_origins:
                         raise
                     self.robots_overridden.add(origin)
             key = hashlib.sha256(url.encode()).hexdigest()
             cached = self.store.cache_get(key) if cache and self.store else None
+            if cache_only:
+                age_ms = int(max(0, time.time() - cached["ts"]) * 1000) if cached else None
+                if (cached is None or (min_age_ms is not None and age_ms < min_age_ms)
+                        or (cache_max_age_ms is not None and age_ms > cache_max_age_ms)):
+                    raise ScrapeError("cache_miss", "No eligible cached response is available; no network request was made")
+                self.cache_hits += 1
+                return {**cached, "cache": "cache_only", "elapsed_ms": round((time.monotonic()-started)*1000, 2)}
             ttl = self.settings.cache_ttl if max_age is None else max_age/1000
             if cached and ttl > 0 and time.time()-cached["ts"] < ttl:
                 self.cache_hits += 1
@@ -183,7 +193,8 @@ class Fetcher:
                                     "body": bytes(data), "cache": "miss",
                                     "elapsed_ms": round((time.monotonic()-started)*1000, 2)}
                         private = safe_headers.get("cache-control", "").lower()
-                        if cache and self.store and res.status == 200 and not any(x in private for x in ("no-store", "private")):
+                        cacheable = (res.status == 200 or (urlsplit(url).path == "/robots.txt" and res.status in {404, 410}))
+                        if cache and self.store and cacheable and not any(x in private for x in ("no-store", "private")):
                             self.store.cache_put(key, response)
                         return response
                 except (aiohttp.ClientError, asyncio.TimeoutError) as exc:

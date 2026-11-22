@@ -2350,6 +2350,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "No eligible cache entry is available for a cache-only request; no target request was made",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -2450,6 +2460,16 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 31536000000
+                  },
+                  "minAge": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31536000000,
+                    "description": "Select cache-only lookup and require the cache entry to be at least this old. Cache misses never contact the target."
+                  },
+                  "lockdown": {
+                    "type": "boolean",
+                    "description": "Serve only cached data. Cache misses never contact the target; the default maximum cached-page age is two years."
                   },
                   "screenshot": {
                     "type": "boolean"

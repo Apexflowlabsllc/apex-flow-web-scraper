@@ -16,12 +16,14 @@ class Page(dict):
 
 
 async def ascrape(url, *, render="auto", recipe=None, max_age=None, screenshot=False, extract=None,
-                  wait_selector=None, scrolls=0, actions=None, chunks=None, settings=None, browser_slots=None, robots="obey"):
+                  wait_selector=None, scrolls=0, actions=None, chunks=None, settings=None, browser_slots=None, robots="obey",
+                  cache_only=False, min_age_ms=None, cache_max_age_ms=None):
     settings = settings or Settings()
     request = {"urls": [url], "max_pages": 1, "max_depth": 0, "render": render, "screenshot": screenshot, "robots": robots}
     for key, value in (("recipe", recipe), ("max_age", max_age), ("extract", extract), ("wait_selector", wait_selector),
                          ("scrolls", scrolls), ("actions", actions),
-                         ("chunks", chunks)):
+                         ("chunks", chunks), ("cache_only", cache_only), ("min_age_ms", min_age_ms),
+                         ("cache_max_age_ms", cache_max_age_ms)):
         if value is not None:
             request[key] = value
     options = validate_request(request, settings)

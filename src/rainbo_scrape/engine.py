@@ -63,7 +63,8 @@ def validate_request(request, settings):
         raise ValueError("Job must be a JSON object")
     allowed = {"urls", "max_pages", "max_depth", "max_seconds", "max_bytes", "concurrency",
                "render", "recipe", "wait_selector", "scrolls", "actions", "include_paths", "exclude_paths", "cache",
-               "max_age", "screenshot", "extract", "change_tracking", "follow_external", "chunks", "robots"}
+               "max_age", "screenshot", "extract", "change_tracking", "follow_external", "chunks", "robots",
+               "cache_only", "min_age_ms", "cache_max_age_ms"}
     if set(request)-allowed:
         raise ValueError("Unknown job options: "+", ".join(set(request)-allowed))
     urls = request.get("urls")
@@ -95,6 +96,16 @@ def validate_request(request, settings):
     result.setdefault("cache", True)
     if not isinstance(result["cache"], bool):
         raise ValueError("cache must be boolean")
+    if not isinstance(result.setdefault("cache_only", False), bool):
+        raise ValueError("cache_only must be boolean")
+    for name in ("min_age_ms", "cache_max_age_ms"):
+        value = result.get(name)
+        maximum = 63_072_000_000 if name == "cache_max_age_ms" else 31_536_000_000
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum):
+            raise ValueError(f"{name} must be an integer from 0 to {maximum}")
+    if result["cache_only"] and (result.get("actions") or result["scrolls"] or result.get("screenshot", False)
+                                 or result.get("extract") or result["render"] == "always"):
+        raise ValueError("cache-only mode does not support rendering, browser actions, screenshots or AI extraction")
     if not isinstance(result.setdefault("follow_external", False), bool):
         raise ValueError("follow_external must be boolean")
     max_age = result.get("max_age")
@@ -125,14 +136,17 @@ async def scrape(fetcher, url, options):
     started = time.monotonic()
     if options.get("robots") == "requested":
         fetcher.requested_origins.add("://".join(urlsplit(url)[:2]))
-    response = await fetcher.get(url, cache=options.get("cache", True), max_age=options.get("max_age"))
+    response = await fetcher.get(url, cache=options.get("cache", True), max_age=options.get("max_age"),
+                                 cache_only=options.get("cache_only", False),
+                                 min_age_ms=options.get("min_age_ms"),
+                                 cache_max_age_ms=options.get("cache_max_age_ms"))
     if response["status"] >= 400:
         raise ScrapeError("http_error", f"Site returned HTTP {response['status']}")
     result = await parse(response["body"], response["url"],
                          response["headers"].get("content-type", "text/html"), options.get("recipe"),
                          include_html=options.get("include_html", False),
                          include_raw_html=options.get("include_raw_html", False))
-    mode = options.get("render", "auto")
+    mode = "never" if options.get("cache_only") else options.get("render", "auto")
     rendered = False
     shot = None
     if result["kind"] == "html" and (mode == "always" or options.get("screenshot") or options.get("scrolls") or options.get("actions") or (mode == "auto" and result.get("quality", {}).get("needs_render"))):

@@ -318,7 +318,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         body = await request.json()
         if not isinstance(body, dict):
             return error("Request body must be a JSON object")
-        allowed = {"url", "formats", "onlyMainContent", "maxAge", "screenshot", "actions", "waitFor",
+        allowed = {"url", "formats", "onlyMainContent", "maxAge", "minAge", "lockdown", "screenshot", "actions", "waitFor",
                    "origin", "blockAds", "removeBase64Images", "storeInCache", "fastMode", "mobile"}
         extra = set(body) - allowed
         if extra:
@@ -354,9 +354,28 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if "maxAge" in body and (isinstance(body["maxAge"], bool) or not isinstance(body["maxAge"], int)
                                  or not 0 <= body["maxAge"] <= 31536000000):
             return error("maxAge must be milliseconds from 0 to 31536000000")
+        if "minAge" in body and (isinstance(body["minAge"], bool) or not isinstance(body["minAge"], int)
+                                 or not 0 <= body["minAge"] <= 31536000000):
+            return error("minAge must be milliseconds from 0 to 31536000000")
+        if "lockdown" in body and not isinstance(body["lockdown"], bool):
+            return error("lockdown must be a boolean")
+        cache_only = "minAge" in body or body.get("lockdown", False)
+        if cache_only and (extract_spec or "screenshot" in parsed or body.get("screenshot", False)
+                           or body.get("actions") or body.get("waitFor", 0)):
+            return error("minAge/lockdown cache-only requests do not support JSON extraction, screenshots, or browser actions")
         if "screenshot" in body and not isinstance(body["screenshot"], bool):
             return error("screenshot must be a boolean")
-        apex_body = {"url": url, "render": "auto"}
+        apex_body = {"url": url, "render": "never" if cache_only else "auto"}
+        if cache_only:
+            apex_body["cache_only"] = True
+            if "minAge" in body:
+                apex_body["min_age_ms"] = body["minAge"]
+            if "maxAge" in body:
+                apex_body["cache_max_age_ms"] = body["maxAge"]
+            elif body.get("lockdown"):
+                # Firecrawl's lockdown mode serves cache only, with a two-year
+                # upper age bound when maxAge is not explicitly supplied.
+                apex_body["cache_max_age_ms"] = 63_072_000_000
         apex_outputs = {"raw_html" if field == "raw_html" else field for field in parsed
                         if field in {"markdown", "html", "raw_html", "links", "screenshot"}}
         if apex_outputs:
@@ -375,8 +394,21 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         want_screenshot = "screenshot" in parsed or body.get("screenshot", False)
         if want_screenshot:
             apex_body["screenshot"] = True
-        response = await perform(request["account"], apex_body)
+        try:
+            response = await perform(request["account"], apex_body)
+        except ScrapeError as exc:
+            if cache_only and exc.code == "cache_miss":
+                lockdown_miss = body.get("lockdown", False)
+                return error(
+                    "No cached response is available for this URL; no network request was made.",
+                    "SCRAPE_LOCKDOWN_CACHE_MISS" if lockdown_miss else "SCRAPE_NO_CACHED_DATA", 404)
+            raise
         payload = unpack(response)
+        if response.status == 400 and payload.get("code") == "cache_miss" and cache_only:
+            lockdown_miss = body.get("lockdown", False)
+            return error(
+                "No cached response is available for this URL; no network request was made.",
+                "SCRAPE_LOCKDOWN_CACHE_MISS" if lockdown_miss else "SCRAPE_NO_CACHED_DATA", 404)
         failure = forwarded(response, payload)
         if failure:
             return failure
