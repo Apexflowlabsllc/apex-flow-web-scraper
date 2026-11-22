@@ -4560,6 +4560,422 @@
           }
         }
       }
+    },
+    "/v2/search/research/papers/{paper_id}/related": {
+      "get": {
+        "operationId": "firecrawlResearchPaperRelated",
+        "summary": "Find related scholarly works",
+        "description": "Returns OpenAlex related DOI-bearing records for a DOI or OpenAlex work ID. Requires OPENALEX_API_KEY on the service. Results are cached for one hour and each request costs 130 Apex credits. No abstract text is returned.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paper_id",
+            "in": "path",
+            "required": true,
+            "description": "DOI or OpenAlex work ID; URL-encode reserved DOI path characters.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "k",
+            "in": "query",
+            "required": false,
+            "description": "Maximum records (default 20, range 1–100). Related works are limited by OpenAlex to at most 20 IDs.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Related or citing DOI records and Apex credits used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "paperId",
+                    "relation",
+                    "results",
+                    "creditsUsed"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "paperId": {
+                      "type": "string"
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "related"
+                      ]
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "paperId",
+                          "primaryId",
+                          "ids",
+                          "title",
+                          "authors",
+                          "categories",
+                          "url",
+                          "provider"
+                        ],
+                        "properties": {
+                          "paperId": {
+                            "type": "string",
+                            "description": "Canonical DOI identifier."
+                          },
+                          "primaryId": {
+                            "type": "string"
+                          },
+                          "ids": {
+                            "type": "object"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "authors": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "createdDate": {
+                            "type": "string"
+                          },
+                          "updateDate": {
+                            "type": "string"
+                          },
+                          "categories": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "Crossref",
+                              "OpenAlex"
+                            ],
+                            "description": "Metadata source selected by server configuration."
+                          },
+                          "score": {
+                            "type": "number"
+                          },
+                          "publicationDate": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "OpenAlex publication date, when available."
+                          },
+                          "openAlexId": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "OpenAlex work identifier, present when OpenAlex is the source."
+                          },
+                          "citedByCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "OpenAlex matched citation count."
+                          },
+                          "referenceCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Total OpenAlex references for this work."
+                          },
+                          "referenceIds": {
+                            "type": "array",
+                            "maxItems": 100,
+                            "items": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "description": "At most the first 100 OpenAlex referenced-work IDs."
+                          },
+                          "relatedWorks": {
+                            "type": "array",
+                            "maxItems": 20,
+                            "items": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "description": "At most 20 OpenAlex related-work IDs."
+                          },
+                          "isRetracted": {
+                            "type": "boolean",
+                            "description": "OpenAlex retraction status, when available."
+                          }
+                        }
+                      }
+                    },
+                    "creditsUsed": {
+                      "type": "integer",
+                      "const": 130
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DOI or OpenAlex work not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "OPENALEX_API_KEY is absent or OpenAlex is unavailable; reservation is refunded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/search/research/papers/{paper_id}/citations": {
+      "get": {
+        "operationId": "firecrawlResearchPaperCitations",
+        "summary": "Find works citing a paper",
+        "description": "Returns OpenAlex citations DOI-bearing records for a DOI or OpenAlex work ID. Requires OPENALEX_API_KEY on the service. Results are cached for one hour and each request costs 130 Apex credits. No abstract text is returned.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paper_id",
+            "in": "path",
+            "required": true,
+            "description": "DOI or OpenAlex work ID; URL-encode reserved DOI path characters.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "k",
+            "in": "query",
+            "required": false,
+            "description": "Maximum records (default 20, range 1–100). Related works are limited by OpenAlex to at most 20 IDs.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Related or citing DOI records and Apex credits used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "paperId",
+                    "relation",
+                    "results",
+                    "creditsUsed"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "paperId": {
+                      "type": "string"
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "citations"
+                      ]
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "paperId",
+                          "primaryId",
+                          "ids",
+                          "title",
+                          "authors",
+                          "categories",
+                          "url",
+                          "provider"
+                        ],
+                        "properties": {
+                          "paperId": {
+                            "type": "string",
+                            "description": "Canonical DOI identifier."
+                          },
+                          "primaryId": {
+                            "type": "string"
+                          },
+                          "ids": {
+                            "type": "object"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "authors": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "createdDate": {
+                            "type": "string"
+                          },
+                          "updateDate": {
+                            "type": "string"
+                          },
+                          "categories": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "Crossref",
+                              "OpenAlex"
+                            ],
+                            "description": "Metadata source selected by server configuration."
+                          },
+                          "score": {
+                            "type": "number"
+                          },
+                          "publicationDate": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "OpenAlex publication date, when available."
+                          },
+                          "openAlexId": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "OpenAlex work identifier, present when OpenAlex is the source."
+                          },
+                          "citedByCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "OpenAlex matched citation count."
+                          },
+                          "referenceCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Total OpenAlex references for this work."
+                          },
+                          "referenceIds": {
+                            "type": "array",
+                            "maxItems": 100,
+                            "items": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "description": "At most the first 100 OpenAlex referenced-work IDs."
+                          },
+                          "relatedWorks": {
+                            "type": "array",
+                            "maxItems": 20,
+                            "items": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "description": "At most 20 OpenAlex related-work IDs."
+                          },
+                          "isRetracted": {
+                            "type": "boolean",
+                            "description": "OpenAlex retraction status, when available."
+                          }
+                        }
+                      }
+                    },
+                    "creditsUsed": {
+                      "type": "integer",
+                      "const": 130
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DOI or OpenAlex work not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "OPENALEX_API_KEY is absent or OpenAlex is unavailable; reservation is refunded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

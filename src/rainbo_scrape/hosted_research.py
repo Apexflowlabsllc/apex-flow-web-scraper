@@ -15,6 +15,7 @@ from .billing import QuotaExceeded, cost_of
 
 _CROSSREF_ROOT = "https://api.crossref.org/works"
 _OPENALEX_ROOT = "https://api.openalex.org/works"
+_OPENALEX_SELECT = "id,doi,title,authorships,created_date,updated_date,publication_date,topics,cited_by_count,referenced_works,related_works,relevance_score,is_retracted"
 _CROSSREF_MAILTO = "apexflowlabs@gmail.com"
 _CACHE_TTL = 3600
 _MAX_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -232,7 +233,7 @@ async def _search_openalex(hosted, query, k, start, end, sort):
         "search": query,
         "per_page": 100,
         "cursor": "*",
-        "select": "id,doi,title,authorships,created_date,updated_date,publication_date,topics,cited_by_count,referenced_works,related_works,relevance_score,is_retracted",
+        "select": _OPENALEX_SELECT,
     }
     if sort == "date_desc":
         params["sort"] = "publication_date:desc"
@@ -381,7 +382,7 @@ def install(app, hosted, wrap, error):
                         payload = await _fetch_openalex(hosted, {
                             "filter": "doi:https://doi.org/" + paper_id,
                             "per_page": 1,
-                            "select": "id,doi,title,authorships,created_date,updated_date,publication_date,topics,cited_by_count,referenced_works,related_works,relevance_score,is_retracted",
+                            "select": _OPENALEX_SELECT,
                         })
                         work = payload["results"][0] if payload["results"] else {}
                         paper = _openalex_paper(work if isinstance(work, dict) else {})
@@ -415,5 +416,104 @@ def install(app, hosted, wrap, error):
             raise
         return web.json_response({"success": True, "paper": paper, "creditsUsed": cost_of("search")})
 
+    async def paper_relations(request, relation):
+        if not os.environ.get("OPENALEX_API_KEY", "").strip():
+            return error("Paper relationships require OPENALEX_API_KEY to be configured",
+                         "research_provider_unavailable", 503)
+        paper_id = request.match_info["paper_id"].strip()
+        if paper_id.lower().startswith("doi:"):
+            paper_id = paper_id[4:]
+        work_match = re.fullmatch(r"(?:https://openalex\.org/)?(W\d+)", paper_id, re.I)
+        if work_match:
+            work_id = work_match.group(1).upper()
+            cache_subject = work_id
+        elif _DOI_RE.fullmatch(paper_id):
+            paper_id = paper_id.lower()
+            work_id = None
+            cache_subject = paper_id
+        else:
+            return error("paper_id must be a DOI or OpenAlex work ID")
+        if set(request.query) - {"k"}:
+            return error("Only the k parameter is supported")
+        raw_k = request.query.get("k", "20")
+        if not raw_k.isascii() or not raw_k.isdecimal() or not 1 <= int(raw_k) <= 100:
+            return error("k must be an integer from 1 to 100")
+        k = int(raw_k)
+        try:
+            hosted.billing.reserve(request["account"], cost_of("search"), kind="search")
+        except QuotaExceeded as exc:
+            return error(str(exc), "insufficient_credits", 402)
+        cache_key = hashlib.sha256(f"openalex:{relation}:{cache_subject}:{k}".encode()).hexdigest()
+        row = hosted.db.execute("SELECT payload FROM research_paper_cache WHERE cache_key=? AND expires>?",
+                                (cache_key, time.time())).fetchone()
+        try:
+            papers = json.loads(row[0]) if row else None
+            if papers is None:
+                base_work = None
+                if work_id is None or relation == "related":
+                    filt = "doi:https://doi.org/" + paper_id if work_id is None else "openalex:" + work_id
+                    payload = await _fetch_openalex(hosted, {"filter": filt, "per_page": 1,
+                                                             "select": _OPENALEX_SELECT})
+                    base_work = payload["results"][0] if payload["results"] else None
+                    if not isinstance(base_work, dict):
+                        raise ResearchProviderError(404)
+                    if work_id is None:
+                        match = re.fullmatch(r"https://openalex\.org/(W\d+)", base_work.get("id") or "")
+                        if not match:
+                            raise ResearchProviderError(404)
+                        work_id = match.group(1)
+                if relation == "related":
+                    related = base_work.get("related_works", []) if isinstance(base_work, dict) else []
+                    related_ids = [value.rsplit("/", 1)[-1] for value in related
+                                   if isinstance(value, str) and re.fullmatch(r"https://openalex\.org/W\d+", value)][:20]
+                    if related_ids:
+                        payload = await _fetch_openalex(hosted, {
+                            "filter": "openalex:" + "|".join(related_ids),
+                            "per_page": len(related_ids), "select": _OPENALEX_SELECT,
+                        })
+                        papers = [paper for work in payload["results"] if isinstance(work, dict)
+                                  for paper in [_openalex_paper(work)] if paper]
+                        order = {value: index for index, value in enumerate(related_ids)}
+                        papers.sort(key=lambda paper: order.get(paper.get("ids", {}).get("openalex", [""])[0], 999))
+                    else:
+                        papers = []
+                else:
+                    payload = await _fetch_openalex(hosted, {
+                        "filter": "cites:" + work_id,
+                        "per_page": min(100, k * 2), "sort": "publication_date:desc",
+                        "select": _OPENALEX_SELECT,
+                    })
+                    papers = [paper for work in payload["results"] if isinstance(work, dict)
+                              for paper in [_openalex_paper(work)] if paper][:k]
+                hosted.db.execute("DELETE FROM research_paper_cache WHERE expires<=?", (time.time(),))
+                hosted.db.execute("INSERT OR REPLACE INTO research_paper_cache(cache_key,payload,expires) VALUES(?,?,?)",
+                                  (cache_key, json.dumps(papers, separators=(",", ":")), time.time() + _CACHE_TTL))
+            papers = papers[:k]
+        except ResearchProviderError as exc:
+            hosted.billing.refund(request["account"], cost_of("search"))
+            if exc.status == 404:
+                return error("Paper not found in OpenAlex", "not_found", 404)
+            response = error("OpenAlex is temporarily unavailable", "research_provider_unavailable", 503)
+            response.headers["Retry-After"] = "2"
+            return response
+        except (aiohttp.ClientError, asyncio.TimeoutError, OSError, ValueError, KeyError, TypeError):
+            hosted.billing.refund(request["account"], cost_of("search"))
+            response = error("OpenAlex is temporarily unavailable", "research_provider_unavailable", 503)
+            response.headers["Retry-After"] = "2"
+            return response
+        except BaseException:
+            hosted.billing.refund(request["account"], cost_of("search"))
+            raise
+        return web.json_response({"success": True, "paperId": paper_id, "relation": relation,
+                                  "results": papers, "creditsUsed": cost_of("search")})
+
+    async def related_papers(request):
+        return await paper_relations(request, "related")
+
+    async def citing_papers(request):
+        return await paper_relations(request, "citations")
+
     app.router.add_get("/v2/search/research/papers", wrap(search_papers))
+    app.router.add_get("/v2/search/research/papers/{paper_id:.+}/related", wrap(related_papers))
+    app.router.add_get("/v2/search/research/papers/{paper_id:.+}/citations", wrap(citing_papers))
     app.router.add_get("/v2/search/research/papers/{paper_id:.+}", wrap(get_paper))

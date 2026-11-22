@@ -858,6 +858,68 @@ async def test_openalex_research_falls_back_to_crossref(hosted, monkeypatch):
     assert payload["results"][0]["paperId"] == "10.5555/fallback"
 
 
+async def test_openalex_related_and_citing_paper_routes_are_cached_and_metered(hosted, monkeypatch):
+    import rainbo_scrape.hosted_research as hosted_research
+
+    monkeypatch.setenv("OPENALEX_API_KEY", "fixture-key")
+    h, client, headers = await _auth(hosted)
+    calls = []
+
+    def work(work_id, doi, title):
+        return {
+            "id": f"https://openalex.org/{work_id}", "doi": f"https://doi.org/{doi}",
+            "title": title, "authorships": [{"author": {"display_name": "Research Author"}}],
+            "publication_date": "2025-02-03", "topics": [{"display_name": "Web Science"}],
+            "cited_by_count": 3, "referenced_works": [], "related_works": [],
+            "is_retracted": False,
+        }
+
+    base = work("W100", "10.5555/target", "Target paper")
+    base["related_works"] = ["https://openalex.org/W200", "https://openalex.org/W300"]
+
+    async def fixture_openalex(hosted_service, params):
+        calls.append(dict(params))
+        if params.get("filter") == "doi:https://doi.org/10.5555/target":
+            return {"results": [base], "meta": {}}
+        if params.get("filter") == "openalex:W200|W300":
+            return {"results": [work("W300", "10.5555/third", "Third paper"),
+                                work("W200", "10.5555/second", "Second paper")], "meta": {}}
+        if params.get("filter") == "cites:W100":
+            return {"results": [work("W400", "10.5555/citing", "Citing paper")], "meta": {}}
+        raise AssertionError(params)
+
+    monkeypatch.setattr(hosted_research, "_fetch_openalex", fixture_openalex)
+    related_url = "/v2/search/research/papers/10.5555%2Ftarget/related?k=2"
+    related = await client.get(related_url, headers=headers)
+    related_payload = await related.json()
+    assert related.status == 200 and related_payload["creditsUsed"] == 130
+    assert [paper["paperId"] for paper in related_payload["results"]] == ["10.5555/second", "10.5555/third"]
+    cached = await client.get(related_url, headers=headers)
+    assert (await cached.json())["results"] == related_payload["results"]
+    assert len(calls) == 2
+
+    citations = await client.get("/v2/search/research/papers/W100/citations?k=5", headers=headers)
+    citations_payload = await citations.json()
+    assert citations.status == 200 and citations_payload["relation"] == "citations"
+    assert citations_payload["results"][0]["paperId"] == "10.5555/citing"
+    assert calls[-1]["filter"] == "cites:W100"
+    account = h.billing.account_for(headers["Authorization"][7:])
+    rows = h.billing.db.execute("SELECT credits FROM usage WHERE account=? AND kind='search'", (account,)).fetchall()
+    assert sum(row[0] for row in rows) == 390
+
+
+async def test_openalex_paper_relationships_require_provider_configuration(hosted, monkeypatch):
+    import rainbo_scrape.hosted_research as hosted_research
+
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    before = h.billing.remaining(account)
+    response = await client.get("/v2/search/research/papers/W100/citations", headers=headers)
+    assert response.status == 503
+    assert h.billing.remaining(account) == before
+
+
 async def test_openalex_research_search_and_read_include_citation_graph_metadata(hosted, monkeypatch):
     import rainbo_scrape.hosted_research as hosted_research
 
