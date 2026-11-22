@@ -57,7 +57,7 @@ def page(p):
     ld = {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in p["faq"]]}
     desc = p["lede"][:155]
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(p["title"])} · Apex Flow Web Scraper</title>
-<meta name="description" content="{e(desc)}"><link rel="canonical" href="{BASE}/{p["slug"]}.html"><meta property="og:title" content="{e(p["title"])}"><meta property="og:description" content="{e(desc)}"><meta property="og:image" content="{BASE}/assets/og-crawl.jpg"><meta name="twitter:card" content="summary_large_image">
+<meta name="description" content="{e(desc)}"><link rel="canonical" href="{BASE}/{p["slug"]}.html"><meta property="og:title" content="{e(p["title"])}"><meta property="og:description" content="{e(desc)}"><meta property="og:image" content="{BASE}/assets/og-scraper-2026-11-22.jpg"><meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/integrations/int.css"><script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script></head><body>
 <nav aria-label="Primary"><a href="/">APEX FLOW WEB SCRAPER</a><span class="nav-links"><a href="/integrations/">Integrations</a><a href="/docs.html#packages">Docs</a><a href="/#pricing">Pricing</a><a class="button" href="/trial.html">Get a free key</a></span></nav><main>
 <p class="eyebrow">Data packages</p><h1>{p["h1"]}</h1><p class="lede">{e(p["lede"])}</p>

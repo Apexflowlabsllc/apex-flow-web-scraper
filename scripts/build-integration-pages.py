@@ -215,7 +215,7 @@ def head(title, description, path, extra=""):
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(title)}</title>'
             f'<meta name="description" content="{e(description)}"><link rel="canonical" href="{BASE}{path}"><meta name="theme-color" content="#050d13">'
             f'<meta property="og:title" content="{e(title)}"><meta property="og:description" content="{e(description)}"><meta property="og:type" content="website">'
-            f'<meta property="og:url" content="{BASE}{path}"><meta property="og:image" content="{BASE}/assets/og-crawl.jpg"><meta name="twitter:card" content="summary_large_image">'
+            f'<meta property="og:url" content="{BASE}{path}"><meta property="og:image" content="{BASE}/assets/og-scraper-2026-11-22.jpg"><meta name="twitter:card" content="summary_large_image">'
             f'<link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/integrations/int.css">{extra}</head><body>'
             '<nav aria-label="Primary"><a href="/">APEX FLOW WEB SCRAPER</a><span class="nav-links"><a href="/integrations/">Integrations</a><a href="/docs.html">Docs</a><a href="/#pricing">Pricing</a><a class="button" href="/trial.html">Get a free key</a></span></nav>')
 
