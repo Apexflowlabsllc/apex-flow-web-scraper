@@ -16,6 +16,37 @@ async def _auth(hosted):
     return h, client, {"Authorization": f"Bearer {key}"}
 
 
+async def test_v1_api_key_management_is_account_scoped_and_returns_secret_once(hosted):
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+
+    initial = await client.get("/v1/keys", headers=headers)
+    initial_payload = await initial.json()
+    assert initial.status == 200
+    assert initial_payload["keys"]
+    assert all("key" not in row and "hash" not in row for row in initial_payload["keys"])
+
+    created = await client.post("/v1/keys", headers=headers, json={"label": "Claude Code"})
+    created_payload = await created.json()
+    assert created.status == 201
+    assert created_payload["key"].startswith("rs_live_")
+    assert created_payload["label"] == "Claude Code"
+    new_headers = {"Authorization": f"Bearer {created_payload['key']}"}
+    assert (await client.get("/v1/usage", headers=new_headers)).status == 200
+
+    other_account = h.billing.create_account("other-keys@example.com")
+    other_key = h.billing.new_key(other_account, "other")
+    other_id = h.db.execute("SELECT key_id FROM keys WHERE hash=?", (_hash(other_key),)).fetchone()[0]
+    cross_account = await client.delete(f"/v1/keys/{other_id}", headers=headers)
+    assert cross_account.status == 404
+    assert h.billing.account_for(other_key) == other_account
+
+    revoked = await client.delete(f"/v1/keys/{created_payload['id']}", headers=headers)
+    assert revoked.status == 200
+    assert (await client.get("/v1/usage", headers=new_headers)).status == 401
+    assert (await client.delete(f"/v1/keys/{created_payload['id']}", headers=headers)).status == 404
+
+
 async def test_v2_scrape_uses_firecrawl_envelope_and_apex_metering(hosted):
     h, client, headers = await _auth(hosted)
     response = await client.post("/v2/scrape", headers=headers, json={

@@ -155,7 +155,7 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         if not account:
             extra = {"docs": hosted.site + "/docs.html", "get_key_url": hosted.site + "/trial.html"} if hosted else {}
             return fail(401, "missing or invalid API key", **extra)
-        account_management = request.path == "/v1/usage" or request.path.startswith("/v1/monitors")
+        account_management = request.path == "/v1/usage" or request.path.startswith(("/v1/monitors", "/v1/keys"))
         if hosted and not hosted.entitled(account) and not account_management:
             return fail(402, "Subscription is inactive or its paid period has ended. Open billing from your dashboard.",
                         code="inactive_plan", **buy)
@@ -377,9 +377,38 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
     async def usage(request):
         return await usage_for(request["account"])
 
+    async def list_keys(request):
+        return web.json_response({"keys": billing.list_keys(request["account"])})
+
+    async def create_key(request):
+        if request.content_type != "application/json":
+            return fail(415, "Content-Type must be application/json")
+        body = await request.json()
+        if not isinstance(body, dict) or set(body) - {"label"}:
+            return fail(400, "body must contain only an optional label", code="invalid_request")
+        label = body.get("label", "")
+        if not isinstance(label, str) or len(label.strip()) > 80:
+            return fail(400, "label must be text no longer than 80 characters", code="invalid_request")
+        label = label.strip()
+        account = request["account"]
+        active_keys = billing.db.execute("SELECT COUNT(*) FROM keys WHERE account=? AND revoked=0", (account,)).fetchone()[0]
+        if active_keys >= 25:
+            return fail(409, "This account has reached the 25 active API key limit.", code="key_limit")
+        key = billing.new_key(account, label)
+        row = billing.db.execute("SELECT key_id,created FROM keys WHERE hash=?", (_hash(key),)).fetchone()
+        return web.json_response({"id": row[0], "key": key, "label": label, "created_at": row[1]}, status=201)
+
+    async def revoke_key(request):
+        if not billing.revoke_key_id(request["account"], request.match_info["key_id"]):
+            return fail(404, "API key not found or already revoked", code="not_found")
+        return web.json_response({"id": request.match_info["key_id"], "revoked": True})
+
     app = web.Application(middlewares=[guard], client_max_size=50000)
     app.router.add_post("/v1/scrape", scrape)
     app.router.add_get("/v1/usage", usage)
+    app.router.add_get("/v1/keys", list_keys)
+    app.router.add_post("/v1/keys", create_key)
+    app.router.add_delete("/v1/keys/{key_id}", revoke_key)
     app.router.add_post("/v1/batch", batch)
     if hosted:
         from .mcp_http import install

@@ -60,6 +60,7 @@ def test_key_attribution_migration_preserves_existing_usage(tmp_path):
         CREATE TABLE keys (hash TEXT PRIMARY KEY, account TEXT, label TEXT, revoked INTEGER DEFAULT 0);
         CREATE TABLE usage (ts REAL, account TEXT, kind TEXT, credits INTEGER);
         INSERT INTO accounts VALUES ('acct', 'a@example.com', 'free', 1, 4);
+        INSERT INTO keys VALUES ('oldhash', 'acct', 'legacy', 0);
         INSERT INTO usage VALUES (2, 'acct', 'page', 4);
     """)
     db.close()
@@ -68,4 +69,6 @@ def test_key_attribution_migration_preserves_existing_usage(tmp_path):
     columns = {row[1] for row in billing.db.execute("PRAGMA table_info(usage)")}
     assert "api_key_hash" in columns
     assert billing.db.execute("SELECT credits,api_key_hash FROM usage").fetchone() == (4, None)
+    legacy_key = billing.db.execute("SELECT key_id,created FROM keys WHERE hash='oldhash'").fetchone()
+    assert legacy_key[0].startswith("key_") and legacy_key[1] is not None
     assert billing.remaining("acct") == PLANS["free"]["credits"] - 4

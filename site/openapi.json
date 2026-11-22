@@ -941,6 +941,39 @@
         }
       }
     },
+    "/keys": {
+      "get": {
+        "operationId": "listApiKeys",
+        "summary": "List account API keys",
+        "description": "Returns key IDs and labels only. Bearer key values are never returned by this endpoint.",
+        "responses": {"200": {"description": "Account keys", "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "keys": {"type": "array", "items": {"type": "object", "properties": {
+            "id": {"type": "string"}, "label": {"type": "string"}, "created_at": {"type": "number"}, "revoked": {"type": "boolean"}
+          }}}
+        }}}}}
+      },
+      "post": {
+        "operationId": "createApiKey",
+        "summary": "Create a labeled API key",
+        "description": "Returns the new bearer secret once. Store it in a secret manager; list responses never include the secret.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "label": {"type": "string", "maxLength": 80}
+        }, "additionalProperties": false}}}},
+        "responses": {"201": {"description": "Created key, including one-time bearer secret", "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "id": {"type": "string"}, "key": {"type": "string", "writeOnly": true}, "label": {"type": "string"}, "created_at": {"type": "number"}
+        }}}}}, "409": {"description": "Account reached its active key limit"}}
+      }
+    },
+    "/keys/{key_id}": {
+      "delete": {
+        "operationId": "revokeApiKey",
+        "summary": "Revoke an account API key",
+        "parameters": [{"name": "key_id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Revoked", "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "id": {"type": "string"}, "revoked": {"type": "boolean"}
+        }}}}}, "404": {"description": "Key not found, belongs to another account, or already revoked"}}
+      }
+    },
     "/usage": {
       "get": {
         "operationId": "creditBalance",
@@ -3331,4 +3364,5 @@
       }
     }
   }
+}
 }
