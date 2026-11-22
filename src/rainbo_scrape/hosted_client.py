@@ -50,7 +50,7 @@ class Apex:
                 raise error
 
     def scrape(self, url, **options):
-        """One page. Options: render, outputs, recipe, chunks, max_tokens, page, fallback="archive", max_age, extract."""
+        """One page. Options include render, actions (up to 8 click/wait/scroll steps), outputs, recipe, chunks, max_tokens, page, fallback="archive", max_age and extract."""
         return self._call("POST", "/scrape", {"url": url, **options})
 
     def scrape_all(self, url, **options):

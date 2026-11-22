@@ -11,10 +11,10 @@ from .billing import Billing, QuotaExceeded, cost_of
 from .client import ascrape
 from .policy import ScrapeError
 
-ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "recipe", "outputs", "page", "fallback", "max_tokens"}
+ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "scrolls", "actions", "recipe", "outputs", "page", "fallback", "max_tokens"}
 LIMIT = 262144  # hosted response budget in bytes
 OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff"}
-SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors", "archive", "extracted"}
+SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors", "archive", "extracted", "browser"}
 # Failures where the live site refused or could not serve us; a public archive copy may still exist.
 ARCHIVABLE = {"access_challenge", "http_error", "upstream_error", "rate_limited", "fetch_failed", "dns_failed",
               "robots_denied", "robots_unavailable"}

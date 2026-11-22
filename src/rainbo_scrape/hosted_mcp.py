@@ -48,8 +48,9 @@ async def request(path, payload=None):
 async def scrape_page(url: str, render: Literal["auto", "always", "never"] = "auto",
                       fields: dict[str, str] | None = None, chunks: int | None = None,
                       outputs: list[Output] | None = None, page: int = 1,
-                      max_tokens: int | None = None, archive_fallback: bool = True):
-    """Fetch a page and source receipt for 1 or 3 credits. Use outputs=["markdown"] for reading or ["data","evidence"] with CSS fields for extraction. The reply's change.status says new, unchanged or changed since your last read; add "diff" to outputs to get the changed lines. Long documents come back in parts: when the reply has pagination.next_page, call again with page set to it. Set max_tokens to receive the page in parts that each fit your context budget. If the live site refuses, set archive_fallback=true to read the latest Internet Archive copy; the reply's result.archive gives its capture time."""
+                      max_tokens: int | None = None, archive_fallback: bool = True,
+                      actions: list[dict[str, object]] | None = None):
+    """Fetch a page and source receipt for 1 or 3 credits. Optional actions allow up to 8 bounded click, wait and scroll steps in one rendered request; they do not retain a signed-in session. Use outputs=["markdown"] for reading or ["data","evidence"] with CSS fields for extraction. The reply's change.status says new, unchanged or changed since your last read; add "diff" to outputs to get the changed lines. Long documents come back in parts. If the live site refuses, the labelled Internet Archive copy is returned when available."""
     payload = {"url": url, "render": render}
     if fields:
         payload["recipe"] = {"fields": {name: {"selector": selector, "required": True} for name, selector in fields.items()}}
@@ -61,6 +62,8 @@ async def scrape_page(url: str, render: Literal["auto", "always", "never"] = "au
         payload["page"] = page
     if max_tokens is not None:
         payload["max_tokens"] = max_tokens
+    if actions is not None:
+        payload["actions"] = actions
     if not archive_fallback:
         payload["fallback"] = "none"
     return await request("/scrape", payload)
@@ -68,11 +71,14 @@ async def scrape_page(url: str, render: Literal["auto", "always", "never"] = "au
 
 @mcp.tool()
 async def scrape_batch(urls: list[str], render: Literal["auto", "always", "never"] = "never",
-                       outputs: list[Output] | None = None, archive_fallback: bool = True):
-    """Scrape up to ten public URLs in parallel (six at once on paid plans), returning each status, change status and the remaining balance."""
+                       outputs: list[Output] | None = None, archive_fallback: bool = True,
+                       actions: list[dict[str, object]] | None = None):
+    """Scrape up to ten public URLs in parallel (six at once on paid plans), returning each status, change status and the remaining balance. Optional actions allow up to 8 bounded click/wait/scroll steps per page; they do not retain signed-in sessions."""
     payload = {"urls": urls, "render": render}
     if outputs is not None:
         payload["outputs"] = outputs
+    if actions is not None:
+        payload["actions"] = actions
     if not archive_fallback:
         payload["fallback"] = "none"
     return await request("/batch", payload)

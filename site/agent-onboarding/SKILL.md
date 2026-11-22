@@ -19,6 +19,7 @@ Codex: `codex mcp add apex-scraper --url https://webscraper.apexflowlabs.com/v1/
 
 ## Core calls
 - Scrape one page to Markdown: `POST /v1/scrape {"url":"https://example.com","render":"never"}`. Use `"render":"auto"` only when the page needs JavaScript (3 credits instead of 1). The Markdown is in `result.markdown`.
+- For public pages with dynamic content, pass `actions` with up to 8 declarative `click`, `wait` or `scroll` steps. Example: `{"url":"https://example.com","actions":[{"type":"click","selector":"button.load-more"},{"type":"wait","selector":"article.result"}]}`. Actions use one rendered request, cost up to 3 credits, and do not retain a signed-in browser session. Do not send passwords or use form submissions.
 - Parallel pages: `POST /v1/batch` with up to 10 URLs.
 - Whole site: `POST /v1/crawl {"url":"https://example.com","limit":50}` then `GET /v1/crawl/{id}?offset=N` until `next_offset` is null.
 - Site map: `POST /v1/map`. Named fields without an AI model: add a CSS recipe to a scrape (free). AI schema extraction: add `extract {schema, prompt}` (150 extra credits, paid plans).

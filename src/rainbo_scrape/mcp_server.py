@@ -15,11 +15,12 @@ def apex_scrape_health() -> dict:
 def apex_scrape_submit(urls: list[str], max_pages: int = 20, max_depth: int = 1,
                       render: str = "auto", recipe: dict | None = None, max_seconds: int = 300,
                       cache: bool = True, max_age: int | None = None, extract: dict | None = None,
-                      change_tracking: bool = False, screenshot: bool = False) -> dict:
-    """Start a durable scrape/crawl. Returns immediately with job ID; use status/results. For one page set max_pages=1,max_depth=0. No subscription or third-party scraping calls."""
+                      change_tracking: bool = False, screenshot: bool = False, scrolls: int = 0,
+                      actions: list[dict[str, object]] | None = None) -> dict:
+    """Start a durable scrape/crawl. Returns immediately with job ID; use status/results. For one page set max_pages=1,max_depth=0. Set scrolls=1–10 to load lazy content or actions to run up to 8 bounded click/wait/scroll steps; both require browser rendering and do not retain signed-in sessions."""
     request = {"urls": urls, "max_pages": max_pages, "max_depth": max_depth, "render": render,
                "recipe": recipe, "max_seconds": max_seconds, "cache": cache,
-               "change_tracking": change_tracking, "screenshot": screenshot}
+               "change_tracking": change_tracking, "screenshot": screenshot, "scrolls": scrolls, "actions": actions or []}
     if max_age is not None:
         request["max_age"] = max_age  # milliseconds; 0 = always fresh
     if extract:
@@ -28,10 +29,11 @@ def apex_scrape_submit(urls: list[str], max_pages: int = 20, max_depth: int = 1,
 
 
 @mcp.tool()
-def apex_scrape_fetch(url: str, render: str = "auto", max_age: int | None = None, max_chars: int = 20000) -> dict:
-    """Scrape ONE page right now and return its Markdown (no job, no waiting). Use apex_scrape_submit for crawls."""
+def apex_scrape_fetch(url: str, render: str = "auto", max_age: int | None = None, max_chars: int = 20000,
+                      scrolls: int = 0, actions: list[dict[str, object]] | None = None) -> dict:
+    """Scrape ONE page right now. Set scrolls or up to 8 bounded click/wait/scroll actions to load dynamic content. Actions run in one rendered request and do not retain signed-in sessions."""
     from .client import scrape
-    options = {"render": render}
+    options = {"render": render, "scrolls": scrolls, "actions": actions or []}
     if max_age is not None:
         options["max_age"] = max_age
     page = scrape(url, **options)

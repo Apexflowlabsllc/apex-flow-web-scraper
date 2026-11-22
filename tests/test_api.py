@@ -8,7 +8,7 @@ calls = []
 
 async def fake_scrape(url, **options):
     calls.append((url, options))
-    return {"markdown": "# Hi", "rendered": options.get("render") == "always"}
+    return {"markdown": "# Hi", "rendered": options.get("render") == "always" or bool(options.get("scrolls") or options.get("actions"))}
 
 
 @pytest.fixture
@@ -42,6 +42,15 @@ async def test_scrape_charges_the_credits_it_used(ctx):
     r = await client.post("/v1/scrape", json={"url": "https://e.com", "render": "always"}, headers=auth(key))
     assert (await r.json())["credits_left"] == 996  # a rendered page costs 3
     assert (await (await client.get("/v1/usage", headers=auth(key))).json())["credits_left"] == 996
+
+
+async def test_browser_actions_are_forwarded_and_charged_as_rendered(ctx):
+    billing, account, key, client = ctx
+    actions = [{"type": "click", "selector": "button.next"}, {"type": "wait", "selector": "#results"}]
+    response = await client.post("/v1/scrape", json={"url": "https://e.com", "actions": actions}, headers=auth(key))
+    body = await response.json()
+    assert response.status == 200 and calls[-1][1]["actions"] == actions
+    assert body["credits_used"] == 3 and body["credits_left"] == 997 and billing.remaining(account) == 997
 
 
 async def test_out_of_credits_is_402_and_nothing_runs(ctx):

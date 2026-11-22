@@ -47,7 +47,44 @@ async def close_browser(fetcher):
         await manager.stop()
 
 
-async def render(fetcher, url, wait_selector=None, scrolls=0, screenshot=False):
+async def perform_actions(page, actions):
+    """Run validated, bounded actions without exposing arbitrary Playwright or JavaScript."""
+    safe_click = """el => {
+      const submit = el.closest('button,input[type=submit],input[type=image]');
+      if (submit && submit.type !== 'button') return false;
+      const link = el.closest('a[href]');
+      if (link) {
+        try { if (!['http:', 'https:'].includes(new URL(link.href).protocol)) return false; }
+        catch (_) { return false; }
+      }
+      const form = el.closest('form');
+      return !form || !!link || !!(submit && submit.type === 'button');
+    }"""
+    completed = []
+    for index, action in enumerate(actions, 1):
+        kind = action["type"]
+        try:
+            if kind == "click":
+                locator = page.locator(action["selector"]).first
+                if not await locator.evaluate(safe_click):
+                    raise ValueError("Unsafe form or link action")
+                await locator.click(timeout=4000)
+            elif kind == "wait":
+                if "selector" in action:
+                    await page.locator(action["selector"]).first.wait_for(state="attached", timeout=4000)
+                else:
+                    await page.wait_for_timeout(action["ms"])
+            elif kind == "scroll":
+                distance = action["amount"] if action["direction"] == "down" else -action["amount"]
+                await page.evaluate(f"window.scrollBy(0, window.innerHeight * ({distance}))")
+                await page.wait_for_timeout(300)
+            completed.append({"type": kind, "status": "completed"})
+        except Exception as exc:
+            raise ScrapeError("browser_action_failed", f"Browser action {index} ({kind}) failed") from exc
+    return completed
+
+
+async def render(fetcher, url, wait_selector=None, scrolls=0, screenshot=False, actions=None):
     started = time.monotonic()
     count = transferred = 0
     failures = []
@@ -109,6 +146,7 @@ async def render(fetcher, url, wait_selector=None, scrolls=0, screenshot=False):
             for _ in range(scrolls):
                 await page.evaluate("window.scrollBy(0, window.innerHeight)")
                 await page.wait_for_timeout(300)
+            action_receipt = await perform_actions(page, actions or [])
             hidden_removed = await page.evaluate(HIDDEN_REMOVAL)
             shot = await page.screenshot(full_page=True, type="png") if screenshot else None
             body = (await page.content()).encode()
@@ -118,6 +156,6 @@ async def render(fetcher, url, wait_selector=None, scrolls=0, screenshot=False):
                     "cache": "rendered", "elapsed_ms": round((time.monotonic()-started)*1000, 2),
                     "screenshot": shot,
                     "browser": {"resources": count, "bytes": transferred, "blocked_resources": failures[:20],
-                                "hidden_elements_removed": hidden_removed}}
+                                "hidden_elements_removed": hidden_removed, "actions": action_receipt}}
     finally:
         await context.close()

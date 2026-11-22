@@ -28,6 +28,8 @@ def main(argv=None):
     parser.add_argument("--depth", type=int, default=0)
     parser.add_argument("--port", type=int, default=8840)
     parser.add_argument("--max-age", type=int, default=None, help="cache freshness in milliseconds (0 = always fresh)")
+    parser.add_argument("--scrolls", type=int, default=0, help="scroll 0–10 viewport heights after rendering for lazy content")
+    parser.add_argument("--actions", help="JSON list of up to 8 click, wait and scroll browser actions")
     parser.add_argument("--limit", type=int, default=5000)
     parser.add_argument("--wait", action="store_true", help="scrape: block until the job ends, then print the result")
     parser.add_argument("--track-changes", action="store_true")
@@ -39,6 +41,10 @@ def main(argv=None):
     parser.add_argument("--profile", default="default", help="login / fetch --signed-in: which saved browser profile to use")
     parser.add_argument("--days", type=float, default=7, help="store-rising: how many days of changes to rank")
     args = parser.parse_args(argv)
+    try:
+        action_list = json.loads(args.actions) if args.actions is not None else None
+    except json.JSONDecodeError as exc:
+        parser.error("--actions must be valid JSON: " + str(exc))
     if args.command in {"store-track", "store-rising", "store-list"}:
         # Store watch: snapshot a Shopify store's public catalog, then rank what changed between snapshots.
         from . import storewatch
@@ -89,7 +95,9 @@ def main(argv=None):
         return
     if args.command == "fetch":
         from .client import scrape
-        options = {"render": args.render}
+        options = {"render": args.render, "scrolls": args.scrolls}
+        if action_list is not None:
+            options["actions"] = action_list
         if args.max_age is not None:
             options["max_age"] = args.max_age
         page = scrape(args.value, **options)
@@ -146,7 +154,9 @@ def main(argv=None):
         result = s.health()
     elif args.command == "scrape":
         request = {"urls": [args.value], "max_pages": args.pages, "max_depth": args.depth, "render": args.render,
-                   "change_tracking": args.track_changes}
+                   "change_tracking": args.track_changes, "scrolls": args.scrolls}
+        if action_list is not None:
+            request["actions"] = action_list
         if args.max_age is not None:
             request["max_age"] = args.max_age
         result = s.submit(request)

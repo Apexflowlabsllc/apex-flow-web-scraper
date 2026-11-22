@@ -39,7 +39,7 @@ export class Apex {
     }
   }
 
-  // One page. Options: render, outputs, recipe, chunks, max_tokens, page, fallback: "archive", max_age, extract.
+  // One page. Options: render, outputs, recipe, chunks, max_tokens, page, fallback: "archive", max_age, extract, wait_selector, scrolls (0–10), actions (up to 8 click/wait/scroll steps; single request, no retained login state).
   scrape(url, options = {}) { return this.#call("POST", "/scrape", { url, ...options }); }
 
   // Every part of a long page, joined. Follows pagination for you.

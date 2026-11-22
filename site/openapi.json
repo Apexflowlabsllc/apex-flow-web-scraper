@@ -26,6 +26,48 @@
       }
     },
     "schemas": {
+      "BrowserAction": {
+        "description": "Declarative, one-request browser action. No caller-supplied JavaScript or direct form-fill/submit action; non-GET/HEAD requests are blocked and login state is not retained.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {"const": "click"},
+              "selector": {"type": "string", "minLength": 1, "maxLength": 500}
+            },
+            "required": ["type", "selector"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {"const": "wait"},
+              "selector": {"type": "string", "minLength": 1, "maxLength": 500}
+            },
+            "required": ["type", "selector"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {"const": "wait"},
+              "ms": {"type": "integer", "minimum": 0, "maximum": 5000}
+            },
+            "required": ["type", "ms"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {"const": "scroll"},
+              "direction": {"type": "string", "enum": ["down", "up"], "default": "down"},
+              "amount": {"type": "integer", "minimum": 1, "maximum": 10, "default": 1}
+            },
+            "required": ["type"],
+            "additionalProperties": false
+          }
+        ]
+      },
       "Change": {
         "type": "object",
         "description": "Comparison with the copy this account read last.",
@@ -308,6 +350,19 @@
                   "wait_selector": {
                     "type": "string"
                   },
+                  "scrolls": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 0,
+                    "description": "Scroll down this many viewport heights after browser rendering to load lazy content. Requires render auto or always; rendered requests cost up to 3 credits."
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {"$ref": "#/components/schemas/BrowserAction"},
+                    "description": "Up to 8 click, wait or scroll actions after rendering. At most 10 viewport heights and 10 seconds of explicit waits per request. No caller-supplied JavaScript or direct form-fill/submit action; non-GET/HEAD requests are blocked. No browser session or login state is retained."
+                  },
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
@@ -512,6 +567,19 @@
                   },
                   "wait_selector": {
                     "type": "string"
+                  },
+                  "scrolls": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 0,
+                    "description": "Scroll down this many viewport heights after browser rendering to load lazy content. Requires render auto or always; rendered requests cost up to 3 credits."
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {"$ref": "#/components/schemas/BrowserAction"},
+                    "description": "Up to 8 click, wait or scroll actions after rendering. At most 10 viewport heights and 10 seconds of explicit waits per request. No caller-supplied JavaScript or direct form-fill/submit action; non-GET/HEAD requests are blocked. No browser session or login state is retained."
                   },
                   "outputs": {
                     "type": "array",

@@ -47,6 +47,15 @@ const apex = new Apex();
 const { result } = await apex.scrape("https://example.com", { outputs: ["markdown"] });
 console.log(result.markdown);
 
+// Public dynamic pages: bounded click/wait/scroll actions in one request.
+const dynamic = await apex.scrape("https://example.com/catalog", {
+  actions: [
+    { type: "click", selector: "button.load-more" },
+    { type: "wait", selector: "article.product" },
+  ],
+});
+console.log(dynamic.result.markdown);
+
 for await (const page of apex.crawl("https://www.sqlite.org/docs.html", 25)) {
   console.log(page.url, page.status);
 }

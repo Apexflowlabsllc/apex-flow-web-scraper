@@ -112,6 +112,9 @@ async def test_mcp_crawl_tools_and_web_search_visibility(svc):
     tools = (await (await client.post("/v1/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, headers=auth)).json())["result"]["tools"]
     names = {t["name"] for t in tools}
     assert {"crawl_site", "crawl_status"} <= names and "web_search" not in names        # hidden until a provider key is set
+    schemas = {tool["name"]: tool["inputSchema"] for tool in tools}
+    assert "actions" in schemas["scrape_page"]["properties"]
+    assert "actions" in schemas["scrape_batch"]["properties"]
     started = json.loads((await (await call("crawl_site", {"url": "https://docs.example/p0", "limit": 4})).json())["result"]["content"][0]["text"])
     await finish(client, auth, started["id"])
     status = json.loads((await (await call("crawl_status", {"job_id": started["id"]})).json())["result"]["content"][0]["text"])
