@@ -34,6 +34,15 @@ inherited by the AI client, then restart it. The bridge connects to the hosted
 Streamable HTTP MCP endpoint; scraping is still run by Apex Flow's hosted service.
 `npm install apex-flow-web-scraper` is not available until the package release.
 
+The local bridge also provides `web_search_byok`. Set exactly one of
+`BRAVE_SEARCH_API_KEY`, `TAVILY_API_KEY`, or `EXA_API_KEY` in the environment
+that launches the AI client (or set `APEX_SEARCH_PROVIDER` when setting more
+than one). This tool calls that provider directly from the local bridge; the
+provider bills your account and the key is not sent to Apex. Use its result
+URLs with `scrape_page`; those page reads still use Apex credits. This local
+option is separate from hosted `web_search`, which uses Apex's configured
+provider and credits.
+
 ```bash
 npm install apex-flow-web-scraper
 ```

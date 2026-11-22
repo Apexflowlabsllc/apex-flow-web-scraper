@@ -22,6 +22,24 @@ _PROVIDER_KEYS = {
 }
 
 
+def local_provider_name(env=None):
+    """Select a provider for local BYOK calls without hosted billing settings."""
+    env = os.environ if env is None else env
+    available = [name for name, key in _PROVIDER_KEYS.items() if env.get(key)]
+    selected = env.get("APEX_SEARCH_PROVIDER", "").strip().lower()
+    name = selected if selected else (available[0] if len(available) == 1 else None)
+    return name if name in _PROVIDER_KEYS and name in available else None
+
+
+async def local_search(query, count):
+    """Search directly with a provider key held in this process environment."""
+    name = local_provider_name()
+    fetch = {"brave": brave, "tavily": tavily, "exa": exa}.get(name)
+    if fetch is None:
+        raise ValueError("Configure exactly one local provider key (BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, or EXA_API_KEY); set APEX_SEARCH_PROVIDER when more than one is present.")
+    return await fetch(query, count)
+
+
 def provider_name():
     """Return the one provider selected for this process, or None if unavailable/ambiguous."""
     available = [name for name, key in _PROVIDER_KEYS.items() if os.environ.get(key)]

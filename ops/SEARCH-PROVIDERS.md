@@ -2,6 +2,12 @@
 
 The hosted search endpoint uses one server-side provider for each request. Supported adapters are Brave Search, Tavily Search and Exa Search. Customer requests continue to use the same `/v1/websearch` contract and Apex credits.
 
+## Local bring-your-own-key search
+
+The local Python stdio MCP server and npm stdio bridge expose `web_search_byok`. This tool makes the search request directly from the user's machine to Brave, Tavily, or Exa using the provider key in the local MCP process environment. The key is not sent to Apex, and the provider bills the key owner's account directly. Exactly one key is selected automatically; with multiple keys, set `APEX_SEARCH_PROVIDER=brave|tavily|exa`. Invalid or ambiguous configuration fails closed. The call returns normalized result URLs and snippets. An agent can pass those URLs to `scrape_page`; the page read then uses the user's Apex key and credits. Local BYOK search does not alter or replace the hosted `/v1/websearch` behavior.
+
+This mode was contract-tested with mocked provider responses; it has not been exercised with live provider credentials. Recheck each provider's terms, rate limits, and current pricing before recommending it to customers. Keep provider keys in the environment or secret manager used to launch the local AI client, never in a client config file or chat.
+
 ## Select a provider
 
 Configure the provider key in the hosting dashboard's encrypted environment variable settings. Never put a provider key in source control, a customer-facing page, an MCP client config, a log, or a support ticket.

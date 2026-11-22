@@ -304,6 +304,42 @@ async def test_search_adapters_use_vendor_contract_and_normalize_results(monkeyp
         assert kwargs["json"]["numResults"] == 3
 
 
+def test_local_search_provider_selection_does_not_depend_on_hosted_prices():
+    assert hosted_search.local_provider_name({}) is None
+    assert hosted_search.local_provider_name({"BRAVE_SEARCH_API_KEY": "local"}) == "brave"
+    assert hosted_search.local_provider_name({"BRAVE_SEARCH_API_KEY": "local", "EXA_API_KEY": "local"}) is None
+    assert hosted_search.local_provider_name({"BRAVE_SEARCH_API_KEY": "local", "EXA_API_KEY": "local",
+                                               "APEX_SEARCH_PROVIDER": "exa"}) == "exa"
+    assert hosted_search.local_provider_name({"BRAVE_SEARCH_API_KEY": "local", "APEX_SEARCH_PROVIDER": "tavily"}) is None
+
+
+async def test_python_mcp_byok_search_uses_local_provider_without_hosted_dispatch(monkeypatch):
+    from rainbo_scrape import hosted_mcp
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "local-test-key")
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.delenv("EXA_API_KEY", raising=False)
+    calls = []
+
+    async def local_search(query, limit):
+        calls.append((query, limit))
+        return [{"url": "https://example.com/", "title": "Example", "snippet": "A result"}]
+
+    async def forbidden_dispatch(*args):
+        raise AssertionError("BYOK search must not call the Apex hosted API")
+
+    monkeypatch.setattr(hosted_search, "local_search", local_search)
+    token = hosted_mcp.local_dispatch.set(forbidden_dispatch)
+    try:
+        result = await hosted_mcp.web_search_byok("example", 4)
+    finally:
+        hosted_mcp.local_dispatch.reset(token)
+    assert calls == [("example", 4)] and result["provider"] == "brave"
+    assert "never received" not in result["note"]
+    assert "Apex did not receive your provider key" in result["note"]
+    with pytest.raises(ValueError, match="limit must be"):
+        await hosted_mcp.web_search_byok("example", 0)
+
+
 def test_bigger_plans_get_more_pages_at_once():
     assert [PLANS[p]["concurrency"] for p in ("free", "pass", "starter", "growth", "scale")] == [2, 6, 6, 12, 20]
 

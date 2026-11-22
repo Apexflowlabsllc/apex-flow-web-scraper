@@ -6,6 +6,7 @@ from typing import Literal
 
 import aiohttp
 from mcp.server.fastmcp import FastMCP
+from . import hosted_search
 
 BASE = "https://webscraper.apexflowlabs.com/v1"
 Output = Literal["markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff", "html", "raw_html", "screenshot"]
@@ -166,6 +167,18 @@ async def web_search(query: str, limit: int = 10):
     return await request("/websearch", {"query": query, "limit": limit})
 
 
+async def web_search_byok(query: str, limit: int = 10):
+    """Search directly through the provider configured in this local MCP process. Requires your own provider key in its environment; provider bills you directly, and the key is never sent to Apex. Pass result URLs to scrape_page; scraping still uses Apex credits."""
+    if not isinstance(query, str) or not 1 <= len(query) <= 300:
+        raise ValueError("query must be 1–300 characters")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
+        raise ValueError("limit must be 1–20")
+    provider = hosted_search.local_provider_name()
+    results = await hosted_search.local_search(query, limit)
+    return {"provider": provider, "results": results,
+            "note": "Search was sent directly to your selected provider; Apex did not receive your provider key. Pass a result url to scrape_page to read it."}
+
+
 @mcp.tool()
 async def search_saved(query: str, limit: int = 10):
     """Search the pages this account has already scraped (latest 100 on the trial, 1,000 on paid plans). Uses no credits."""
@@ -209,6 +222,9 @@ async def credit_balance():
 
 
 def main():
+    # BYOK is local-only. Do not register this tool when the same module is
+    # imported by the hosted HTTP MCP server.
+    mcp.tool()(web_search_byok)
     mcp.run()
 
 
