@@ -394,6 +394,25 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             return failure
         return web.json_response({"success": True, "id": payload.get("id"), "status": payload.get("status")})
 
+    async def crawl_errors(request):
+        job = request.match_info["job"]
+        row = hosted.db.execute("SELECT created FROM crawl_jobs WHERE id=? AND account=?",
+                                (job, request["account"])).fetchone()
+        if not row:
+            return error("Crawl job not found.", "not_found", 404)
+        errors, robots_blocked = [], []
+        for seq, url, status, raw, recorded_at in hosted.db.execute(
+                "SELECT seq,url,status,payload,recorded_at FROM crawl_pages WHERE job=? AND status!=200 ORDER BY seq", (job,)):
+            payload = json.loads(raw)
+            code = payload.get("code") or "error"
+            if code == "robots_denied":
+                robots_blocked.append(url)
+            else:
+                errors.append({"id": f"{job}:{seq}",
+                               "timestamp": datetime.fromtimestamp(recorded_at or row[0], timezone.utc).isoformat().replace("+00:00", "Z"),
+                               "url": url, "error": payload.get("error", "Page scrape failed."), "code": code})
+        return web.json_response({"errors": errors, "robotsBlocked": robots_blocked})
+
     def batch_status(job, account):
         row = hosted.db.execute(
             "SELECT id,status,total,completed,credits,created,finished FROM firecrawl_batch_jobs WHERE id=? AND account=?",
@@ -633,6 +652,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
     app.router.add_post("/v2/crawl", wrap(crawl))
     app.router.add_get("/v2/crawl/{job}", wrap(crawl_status))
     app.router.add_delete("/v2/crawl/{job}", wrap(crawl_cancel))
+    app.router.add_get("/v2/crawl/{job}/errors", wrap(crawl_errors))
     app.router.add_post("/v2/batch/scrape", wrap(batch_scrape))
     app.router.add_get("/v2/batch/scrape/{job}/errors", wrap(batch_errors))
     app.router.add_get("/v2/batch/scrape/{job}", wrap(batch_status_route))

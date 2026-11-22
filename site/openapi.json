@@ -2814,6 +2814,67 @@
         ]
       }
     },
+    "/v2/crawl/{job}/errors": {
+      "get": {
+        "operationId": "firecrawlCompatCrawlErrors",
+        "summary": "Get crawl errors",
+        "description": "Returns recorded failed page results and robots-denied URLs for an account-owned crawl.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recorded crawl failures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {"type": "string"},
+                          "timestamp": {"type": "string", "format": "date-time"},
+                          "url": {"type": "string", "format": "uri"},
+                          "error": {"type": "string"},
+                          "code": {"type": "string"}
+                        }
+                      }
+                    },
+                    "robotsBlocked": {
+                      "type": "array",
+                      "items": {"type": "string", "format": "uri"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such crawl for this account",
+            "content": {
+              "application/json": {
+                "schema": {"type": "object"}
+              }
+            }
+          }
+        }
+      }
+    },
     "/v2/batch/scrape": {
       "post": {
         "operationId": "firecrawlCompatBatchScrape",

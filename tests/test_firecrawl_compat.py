@@ -242,6 +242,28 @@ async def test_v2_crawl_does_not_expand_access_scope_or_ignore_robots(hosted):
     assert options["ignore_query_parameters"] is True
 
 
+async def test_v2_crawl_errors_are_account_scoped_and_report_failed_pages(hosted):
+    _, client, headers = await _auth(hosted)
+    response = await client.post("/v2/crawl", headers=headers, json={
+        "url": "https://example.com/failure", "limit": 1, "maxDiscoveryDepth": 0,
+    })
+    job = (await response.json())["id"]
+    for _ in range(20):
+        state = await client.get(f"/v2/crawl/{job}", headers=headers)
+        if (await state.json())["status"] != "scraping":
+            break
+        await asyncio.sleep(0.01)
+    errors = await client.get(f"/v2/crawl/{job}/errors", headers=headers)
+    error_payload = await errors.json()
+    assert errors.status == 200
+    assert error_payload["errors"][0]["url"].endswith("/failure")
+    assert error_payload["errors"][0]["code"] == "invalid_request"
+    assert error_payload["errors"][0]["timestamp"].endswith("Z")
+    assert error_payload["robotsBlocked"] == []
+    missing = await client.get("/v2/crawl/not-a-job/errors", headers=headers)
+    assert missing.status == 404
+
+
 def test_crawl_path_filters_regex_scope_and_query_deduplication():
     from rainbo_scrape.hosted_crawl import _compile_path_patterns, _crawl_identity, _matches_crawl_url
 

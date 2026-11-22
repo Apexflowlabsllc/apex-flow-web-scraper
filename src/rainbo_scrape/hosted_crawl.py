@@ -26,9 +26,11 @@ def prepare(h):
     h.db.executescript("""
         CREATE TABLE IF NOT EXISTS crawl_jobs(id TEXT PRIMARY KEY,account TEXT,url TEXT,status TEXT,page_limit INTEGER,
             created REAL,finished REAL,options TEXT,done INTEGER DEFAULT 0,failed INTEGER DEFAULT 0,credits INTEGER DEFAULT 0,note TEXT);
-        CREATE TABLE IF NOT EXISTS crawl_pages(job TEXT,seq INTEGER,url TEXT,status INTEGER,payload TEXT,PRIMARY KEY(job,seq));
+        CREATE TABLE IF NOT EXISTS crawl_pages(job TEXT,seq INTEGER,url TEXT,status INTEGER,payload TEXT,recorded_at REAL,PRIMARY KEY(job,seq));
         CREATE INDEX IF NOT EXISTS crawl_jobs_account ON crawl_jobs(account,created);
     """)
+    if "recorded_at" not in {row[1] for row in h.db.execute("PRAGMA table_info(crawl_pages)")}:
+        h.db.execute("ALTER TABLE crawl_pages ADD COLUMN recorded_at REAL")
     # A restart ends in-memory jobs; say so instead of leaving them "running" forever.
     h.db.execute("UPDATE crawl_jobs SET status='interrupted',finished=?,note='Service restarted. Pages already collected are kept; start a new crawl for the rest.' WHERE status='running'", (time.time(),))
 
@@ -171,7 +173,8 @@ def install(h, app, perform, map_urls=None):
                         if "links" not in wanted:
                             result.pop("links", None)
                     seq += 1
-                    h.db.execute("INSERT INTO crawl_pages VALUES(?,?,?,?,?)", (job, seq, url, item["status"], json.dumps({"url": url, **item})))
+                    h.db.execute("INSERT INTO crawl_pages(job,seq,url,status,payload,recorded_at) VALUES(?,?,?,?,?,?)",
+                                 (job, seq, url, item["status"], json.dumps({"url": url, **item}), time.time()))
                     ok = item["status"] == 200
                     h.db.execute("UPDATE crawl_jobs SET done=done+?,failed=failed+?,credits=credits+? WHERE id=?",
                                  (int(ok), int(not ok), item.get("credits_used", 0) if ok else 0, job))
