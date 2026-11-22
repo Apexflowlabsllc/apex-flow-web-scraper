@@ -22,7 +22,9 @@ CHROME_CLASSES = {"sidebar", "side-bar", "breadcrumb", "breadcrumbs", "advertise
                   "skip-link", "skip-to-content", "share-buttons", "social-share", "newsletter", "newsletter-signup",
                   "popup", "modal", "cookie-banner", "cookie-notice", "cookie-consent", "cookiebanner", "cookie-bar",
                   "cc-window", "cc-banner", "consent-banner", "toc", "table-of-contents", "site-header", "site-footer",
-                  "page-footer", "masthead", "navbar", "topbar", "top-bar", "pagination", "related-posts"}
+                  "page-footer", "masthead", "navbar", "topbar", "top-bar", "pagination", "related-posts",
+                  # MediaWiki (Wikipedia and every wiki built on it): maintenance banners, navigation boxes, edit links, categories
+                  "ambox", "navbox", "vertical-navbox", "mw-editsection", "catlinks"}
 CHROME_PREFIXES = ("onetrust", "ot-sdk", "didomi", "truste", "osano", "qc-cmp", "sp_message", "usercentrics",
                    "cmplz", "cookieconsent", "cookie-law", "gdpr")
 PERMALINK = re.compile(r"^[#¶§🔗\s]*$")
@@ -53,8 +55,28 @@ def is_chrome(node):
     return False
 
 
+def drop_language_menus(root):
+    """Remove language switchers: lists of five or more links that name another language (hreflang), and the
+    small wrapper around each one (such as a "22 languages" dropdown), so they do not open the page as content."""
+    for menu in list(root.find_all(("ul", "ol"))):
+        if menu.decomposed:
+            continue
+        links = menu.find_all("a")
+        tagged = [a for a in links if a.get("hreflang")]
+        if len(tagged) < 5 or len(tagged) < 0.8 * len(links):
+            continue
+        target, own = menu, _text_len(menu)
+        for parent in menu.parents:
+            if (parent.name in ("body", "html", "main", "article", None) or _text_len(parent) - own > 80
+                    or parent.find(("h1", "h2", "h3"))):   # never take the page title with it
+                break
+            target = parent
+        target.decompose()
+
+
 def strip_chrome(root):
     """Remove scripts, hidden nodes and site chrome. Page headers stay when they hold the page title."""
+    drop_language_menus(root)
     for node in root.find_all(SKIP):
         node.decompose()
     for node in root.find_all(string=lambda s: isinstance(s, Comment)):

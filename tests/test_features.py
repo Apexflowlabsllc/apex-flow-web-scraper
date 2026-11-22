@@ -51,6 +51,26 @@ def test_chrome_is_removed_but_page_title_header_kept():
     assert "cookies" not in out and "Home About" not in out and "Copyright" not in out
 
 
+def test_language_switcher_is_dropped_but_ordinary_link_lists_stay():
+    langs = "".join(f'<li><a href="https://{c}.example.org/x" hreflang="{c}" lang="{c}">{c.upper()} name</a></li>' for c in "de es fr it ja nl pt".split())
+    html = (f'<html><body><div class="titlebar"><h1>Web scraping</h1><div id="p-lang-btn"><label>22 languages</label><ul>{langs}</ul></div></div>'
+            '<p>Web scraping is data scraping used for extracting data from websites.</p>'
+            '<ul><li><a href="/a">First</a></li><li><a href="/b">Second</a></li><li><a href="/c">Third</a></li>'
+            '<li><a href="/d">Fourth</a></li><li><a href="/e">Fifth</a></li></ul></body></html>')
+    out = md(html)
+    assert "22 languages" not in out and "DE name" not in out
+    assert "# Web scraping" in out and "Web scraping is data scraping" in out and "[Fifth]" in out
+
+
+def test_wiki_maintenance_banners_and_navboxes_are_dropped():
+    html = ('<body><main><h1>Markdown</h1><table class="box-Primary_sources plainlinks metadata ambox"><tr><td>This article relies on primary sources.</td></tr></table>'
+            '<p>Markdown is a lightweight markup language.</p><h2>History<span class="mw-editsection">[edit]</span></h2><p>Created in 2004.</p>'
+            '<div class="navbox"><a href="/a">Lightweight markup languages</a></div><div id="catlinks" class="catlinks">Categories: Markup languages</div></main></body>')
+    out = md(html)
+    assert "Markdown is a lightweight markup language." in out and "Created in 2004." in out and "## History" in out
+    assert "primary sources" not in out and "[edit]" not in out and "Lightweight markup languages" not in out and "Categories" not in out
+
+
 def test_many_articles_listing_uses_whole_page_not_one_card():
     cards = "".join(f"<article><h3>Item {i}</h3><p>${i}</p></article>" for i in range(5))
     out = md(f"<body><div>{cards}</div></body>")
