@@ -218,3 +218,31 @@ test("source installer points clients at the checkout without saving API keys", 
   assert.ok(existsSync(server.args[0]));
   assert.doesNotMatch(JSON.stringify(server), /API_KEY|Bearer |rs_live_|your-api-key/i);
 });
+
+test("source installer generates a checked-out bridge config for every supported client", () => {
+  const home = isolatedHome();
+  const targets = getClientTargets({ home, cwd: join(home, "project"), appData: join(home, "appdata"), xdgConfigHome: join(home, "xdg"), os: "win32" });
+  assert.equal(targets.length, 16);
+  const bridgePath = getMcpCommand("win32", { source: true }).args[0];
+  for (const target of targets) {
+    const configPath = join(home, "generated", `${target.id}.${target.format === "toml" ? "toml" : "json"}`);
+    const installed = installClient({ ...target, path: configPath }, { source: true, os: "win32" });
+    assert.equal(installed.changed, true, `${target.id} should receive a source bridge config`);
+    const content = readFileSync(configPath, "utf8");
+    assert.match(content, /mcp-bridge\.mjs/, `${target.id} should point to the local bridge`);
+    assert.doesNotMatch(content, /\bnpx\b|rs_live_|Bearer [A-Za-z0-9_-]{12,}|your-api-key/i, `${target.id} must not use npm or embed credentials`);
+    if (target.format === "toml") {
+      assert.ok(content.includes(`command = ${JSON.stringify(process.execPath)}`), `${target.id} should use the current Node executable`);
+      continue;
+    }
+    const data = JSON.parse(content);
+    const keys = Array.isArray(target.rootKey) ? target.rootKey : [target.rootKey || "mcpServers"];
+    const root = keys.reduce((value, key) => value?.[key], data);
+    const server = root?.[SERVER_NAME];
+    assert.ok(server, `${target.id} should contain the Apex MCP server entry`);
+    const command = Array.isArray(server.command) ? server.command[0] : server.command;
+    const args = Array.isArray(server.command) ? server.command.slice(1) : server.args;
+    assert.equal(command, process.execPath, `${target.id} should use the current Node executable`);
+    assert.deepEqual(args, [bridgePath], `${target.id} should launch the checked-out bridge directly`);
+  }
+});
