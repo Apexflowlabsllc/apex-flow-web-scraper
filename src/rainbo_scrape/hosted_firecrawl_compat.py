@@ -7,6 +7,7 @@ the exact supported subset; this is not a claim of complete SDK compatibility.
 import asyncio
 import json
 import logging
+import os
 import secrets
 import time
 from datetime import datetime, timezone
@@ -62,6 +63,12 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             data["html"] = result["html"]
         if isinstance(result.get("raw_html"), str):
             data["rawHtml"] = result["raw_html"]
+        extracted = result.get("extracted")
+        if isinstance(extracted, dict):
+            data["json"] = extracted.get("data")
+            if not extracted.get("valid", True):
+                data["jsonValidation"] = {"valid": False, "errors": extracted.get("errors", [])}
+                data["warning"] = "Apex extraction did not satisfy the requested JSON Schema; inspect jsonValidation."
         if isinstance(result.get("links"), list):
             data["links"] = [link.get("url") if isinstance(link, dict) else link
                               for link in result["links"] if isinstance(link, (str, dict))]
@@ -103,6 +110,47 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 raise ValueError(f"Firecrawl action {kind!r} is not supported by Apex's bounded read-only browser actions")
         return translated
 
+    def json_extract_spec(item):
+        """Translate Firecrawl's JSON format to Apex's provider-backed schema extractor."""
+        if not isinstance(item, dict) or item.get("type") != "json":
+            return None
+        extra = set(item) - {"type", "schema", "prompt"}
+        if extra:
+            raise ValueError("JSON format supports only type, schema and prompt in this adapter")
+        schema, prompt = item.get("schema"), item.get("prompt")
+        if schema is None:
+            if not isinstance(prompt, str) or not prompt.strip():
+                raise ValueError("JSON format needs a schema or a non-empty prompt")
+            schema = {"type": "object"}
+        if not isinstance(schema, dict):
+            raise ValueError("JSON format schema must be an object")
+        if prompt is not None and (not isinstance(prompt, str) or len(prompt) > 2000):
+            raise ValueError("JSON format prompt must be text up to 2000 characters")
+        spec = {"schema": schema, **({"prompt": prompt} if prompt is not None else {})}
+        from .llm import validate_extract_spec
+        from jsonschema.exceptions import SchemaError
+        try:
+            return validate_extract_spec(spec)
+        except (TypeError, ValueError, RecursionError, SchemaError) as exc:
+            raise ValueError("Invalid JSON extraction schema or prompt: " + str(exc)[:300]) from exc
+
+    def extraction_admission(account):
+        """Reject JSON jobs before enqueueing when hosted extraction cannot run."""
+        from .llm import providers
+        if not providers():
+            return error("Model extraction is not configured on this hosted service.", "not_available_hosted", 400)
+        if hosted.billing.limits(account)["price"] == 0:
+            return error("JSON extraction requires a paid plan.", "paid_plan_required", 402)
+        if hosted.billing.remaining(account) < 153:
+            return error("JSON extraction needs up to 153 credits for one auto-rendered page.",
+                         "insufficient_credits", 402)
+        day = time.strftime("%Y-%m-%d", time.gmtime())
+        used = hosted.db.execute("SELECT COALESCE(SUM(count),0) FROM funnel WHERE day=? AND event='extract'", (day,)).fetchone()[0]
+        if used >= int(os.environ.get("APEX_EXTRACT_DAILY_CAP", "3000")):
+            return error("AI extraction has reached today's service limit. Retry tomorrow or use a CSS recipe.",
+                         "extract_daily_limit", 429)
+        return None
+
     async def scrape(request):
         if request.content_type != "application/json":
             return error("Content-Type must be application/json", "invalid_request", 415)
@@ -121,9 +169,18 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         formats = body.get("formats", ["markdown"])
         if not isinstance(formats, list) or not formats:
             return error("formats must be a non-empty list")
-        parsed = []
+        parsed, extract_spec = [], None
         for item in formats:
             kind = item if isinstance(item, str) else item.get("type") if isinstance(item, dict) else None
+            if kind == "json":
+                if extract_spec is not None or isinstance(item, str):
+                    return error("JSON output needs one object format with a schema or prompt")
+                try:
+                    extract_spec = json_extract_spec(item)
+                except ValueError as exc:
+                    return error(str(exc))
+                parsed.append("json")
+                continue
             if isinstance(item, dict) and set(item) - {"type"}:
                 return error("Format-specific options are not supported by this compatibility subset")
             if kind not in {"markdown", "html", "rawHtml", "links", "screenshot"}:
@@ -135,7 +192,12 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if "screenshot" in body and not isinstance(body["screenshot"], bool):
             return error("screenshot must be a boolean")
         apex_body = {"url": url, "render": "auto"}
-        apex_body["outputs"] = sorted(set(parsed) | ({"screenshot"} if "screenshot" in parsed else set()))
+        apex_outputs = {"raw_html" if field == "raw_html" else field for field in parsed
+                        if field in {"markdown", "html", "raw_html", "links", "screenshot"}}
+        if apex_outputs:
+            apex_body["outputs"] = sorted(apex_outputs)
+        if extract_spec:
+            apex_body["extract"] = extract_spec
         if "maxAge" in body:
             apex_body["max_age"] = body["maxAge"]
         if body.get("actions") is not None:
@@ -160,6 +222,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             selected["html"] = data["html"]
         if "raw_html" in parsed and "rawHtml" in data:
             selected["rawHtml"] = data["rawHtml"]
+        if "json" in parsed and "json" in data:
+            selected["json"] = data["json"]
         if "links" in parsed and "links" in data:
             selected["links"] = data["links"]
         selected["metadata"] = data["metadata"]
@@ -251,17 +315,32 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         formats = scrape_options.get("formats", [{"type": "markdown"}])
         if not isinstance(formats, list) or not formats:
             return error("Crawl formats must be a non-empty list")
-        crawl_formats = []
+        crawl_formats, extract_spec = [], None
         for item in formats:
             kind = item if isinstance(item, str) else item.get("type") if isinstance(item, dict) else None
+            if kind == "json":
+                if extract_spec is not None or isinstance(item, str):
+                    return error("JSON output needs one object format with a schema or prompt")
+                try:
+                    extract_spec = json_extract_spec(item)
+                except ValueError as exc:
+                    return error(str(exc))
+                crawl_formats.append("json")
+                continue
             if isinstance(item, dict) and set(item) - {"type"}:
                 return error("Format-specific options are not supported by this compatibility subset")
             if kind not in {"markdown", "html", "rawHtml", "links", "screenshot"}:
                 return error(f"Crawl format {kind!r} is not supported; supported formats are markdown, html, rawHtml, links, screenshot")
             crawl_formats.append(kind)
-        outputs = sorted({"raw_html" if item == "rawHtml" else item for item in crawl_formats})
+        outputs = sorted({"raw_html" if item == "rawHtml" else item for item in crawl_formats
+                          if item in {"markdown", "html", "rawHtml", "links", "screenshot"}})
         start_body = {"url": body.get("url"), "limit": body.get("limit", 25), "render": "auto",
                       "outputs": outputs, "max_depth": body.get("maxDiscoveryDepth", 3)}
+        if extract_spec:
+            admission = extraction_admission(request["account"])
+            if admission:
+                return admission
+            start_body["extract"] = extract_spec
         response = await crawl_start_for(request["account"], start_body)
         payload = unpack(response)
         failure = forwarded(response, payload)
@@ -328,7 +407,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 result = page_data(result, credits,
                                    screenshot=options.get("screenshot", False)
                                    or "screenshot" in options.get("_compat_formats", []))
-                for field in ("markdown", "html", "rawHtml", "links", "screenshot"):
+                for field in ("markdown", "html", "rawHtml", "links", "screenshot", "json"):
                     if field not in options.get("_compat_formats", []) and not (
                             field == "screenshot" and options.get("screenshot", False)):
                         result.pop(field, None)
@@ -437,9 +516,18 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         formats = body.get("formats", ["markdown"])
         if not isinstance(formats, list) or not formats:
             return error("formats must be a non-empty list")
-        selected = []
+        selected, extract_spec = [], None
         for item in formats:
             kind = item if isinstance(item, str) else item.get("type") if isinstance(item, dict) else None
+            if kind == "json":
+                if extract_spec is not None or isinstance(item, str):
+                    return error("JSON output needs one object format with a schema or prompt")
+                try:
+                    extract_spec = json_extract_spec(item)
+                except ValueError as exc:
+                    return error(str(exc))
+                selected.append("json")
+                continue
             if isinstance(item, dict) and set(item) - {"type"}:
                 return error("Format-specific options are not supported by this compatibility subset")
             if kind not in {"markdown", "html", "rawHtml", "links", "screenshot"}:
@@ -450,10 +538,18 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             return error("maxAge must be milliseconds from 0 to 31536000000")
         if "screenshot" in body and not isinstance(body["screenshot"], bool):
             return error("screenshot must be a boolean")
-        outputs = {"raw_html" if item == "rawHtml" else item for item in selected}
+        outputs = {"raw_html" if item == "rawHtml" else item for item in selected
+                   if item in {"markdown", "html", "rawHtml", "links", "screenshot"}}
         if "screenshot" in selected or body.get("screenshot", False):
             outputs.add("screenshot")
-        apex_options = {"outputs": sorted(outputs), "render": "auto"}
+        apex_options = {"render": "auto"}
+        if outputs:
+            apex_options["outputs"] = sorted(outputs)
+        if extract_spec:
+            admission = extraction_admission(request["account"])
+            if admission:
+                return admission
+            apex_options["extract"] = extract_spec
         if "maxAge" in body:
             apex_options["max_age"] = body["maxAge"]
         if body.get("actions") is not None:

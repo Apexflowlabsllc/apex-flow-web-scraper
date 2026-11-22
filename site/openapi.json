@@ -2311,13 +2311,6 @@
                         },
                         {
                           "type": "object",
-                          "enum": [
-                            "markdown",
-                            "html",
-                            "rawHtml",
-                            "links",
-                            "screenshot"
-                          ],
                           "properties": {
                             "type": {
                               "type": "string",
@@ -2332,6 +2325,40 @@
                           },
                           "required": [
                             "type"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "json"
+                            },
+                            "schema": {
+                              "type": "object",
+                              "description": "JSON Schema Draft 2020-12. Required unless prompt is provided."
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "description": "Extraction instruction; required when schema is omitted."
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "anyOf": [
+                            {
+                              "required": [
+                                "schema"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "prompt"
+                              ]
+                            }
                           ],
                           "additionalProperties": false
                         }
@@ -2624,6 +2651,40 @@
                                 "type"
                               ],
                               "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "json"
+                                },
+                                "schema": {
+                                  "type": "object",
+                                  "description": "JSON Schema Draft 2020-12. Required unless prompt is provided."
+                                },
+                                "prompt": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "description": "Extraction instruction; required when schema is omitted."
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "schema"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "prompt"
+                                  ]
+                                }
+                              ],
+                              "additionalProperties": false
                             }
                           ]
                         }
@@ -2829,6 +2890,40 @@
                           },
                           "required": [
                             "type"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "json"
+                            },
+                            "schema": {
+                              "type": "object",
+                              "description": "JSON Schema Draft 2020-12. Required unless prompt is provided."
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "description": "Extraction instruction; required when schema is omitted."
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "anyOf": [
+                            {
+                              "required": [
+                                "schema"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "prompt"
+                              ]
+                            }
                           ],
                           "additionalProperties": false
                         }

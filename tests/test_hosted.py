@@ -42,6 +42,8 @@ async def hosted(tmp_path, monkeypatch):
             result["raw_html"] = "<html><body><nav>source shell</nav><main><h1>Fixture</h1></main></body></html>"
         if kwargs.get("screenshot"):
             result["screenshot_png_base64"] = "fixture-png"
+        if kwargs.get("extract"):
+            result["extracted"] = {"data": {"heading": "Fixture"}, "valid": True, "errors": []}
         return result
     client=TestClient(TestServer(make_app(billing,scrape,hosted=h)))
     await client.start_server()
