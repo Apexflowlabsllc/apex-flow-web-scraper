@@ -665,7 +665,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         body = await request.json()
         if not isinstance(body, dict):
             return error("Request body must be a JSON object")
-        allowed = {"query", "limit", "sources", "includeDomains", "excludeDomains", "origin", "scrapeOptions"}
+        allowed = {"query", "limit", "sources", "includeDomains", "excludeDomains", "origin", "scrapeOptions", "categories"}
         extra = set(body) - allowed
         if extra:
             return error("Unsupported Apex compatibility options: " + ", ".join(sorted(extra)))
@@ -681,6 +681,18 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                     return error("sources must contain 'web', 'news', or 'images' (string or {type: ...})")
         if len(source_types) != 1 or source_types[0] not in ("web", "news", "images"):
             return error("This adapter supports one Firecrawl source per request: web, news, or images")
+        categories = body.get("categories", [])
+        if not isinstance(categories, list) or len(categories) > 1:
+            return error("This adapter supports at most one search category: pdf")
+        if categories and isinstance(categories[0], dict):
+            if set(categories[0]) != {"type"}:
+                return error("Category objects must contain only type")
+            categories = [categories[0]["type"]]
+        if any(category != "pdf" for category in categories):
+            return error("This adapter currently supports only the pdf search category")
+        pdf_category = categories == ["pdf"]
+        if pdf_category and source_types[0] != "web":
+            return error("The pdf category can only be used with the web source")
         scrape_options = body.get("scrapeOptions")
         scrape_actions = []
         if scrape_options is not None:
@@ -718,6 +730,11 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         except ValueError as exc:
             return error(str(exc), code="invalid_search_filter")
         request_body = {key: body[key] for key in ("query", "limit") if key in body}
+        if pdf_category:
+            query = request_body.get("query")
+            if not isinstance(query, str) or len(query) > 288:
+                return error("query must be at most 288 characters when using categories=['pdf']")
+            request_body["query"] = query + " filetype:pdf"
         if topic in ("news", "images"):
             request_body["topic"] = topic
         if include_domains is not None:
@@ -740,9 +757,17 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                         "url": item.get("url"), "position": index}
                        for index, item in enumerate(payload.get("results", []), start=1)]
         else:
+            provider_results = payload.get("results", [])
+            if pdf_category:
+                provider_results = [item for item in provider_results if isinstance(item, dict)
+                                    and isinstance(item.get("url"), str)
+                                    and urlsplit(item["url"]).path.lower().endswith(".pdf")]
+                if isinstance(body.get("limit", 10), int) and not isinstance(body.get("limit", 10), bool):
+                    provider_results = provider_results[:body.get("limit", 10)]
             results = [{"url": item.get("url"), "title": item.get("title"),
-                        "description": item.get("snippet"), "position": index}
-                       for index, item in enumerate(payload.get("results", []), start=1)]
+                        "description": item.get("snippet"), "position": index,
+                        **({"category": "pdf"} if pdf_category else {})}
+                       for index, item in enumerate(provider_results, start=1)]
         search_credits = payload.get("credits_used", 0)
         total_credits = search_credits if isinstance(search_credits, int) else 0
         if scrape_options is not None:

@@ -595,6 +595,39 @@ async def test_v2_search_scrape_options_scrapes_results_and_counts_page_credits(
     assert rejected.status == 400
 
 
+async def test_v2_search_pdf_category_uses_operator_and_filters_non_pdf_results(hosted, monkeypatch):
+    import rainbo_scrape.hosted_search as hosted_search
+
+    _, client, headers = await _auth(hosted)
+    monkeypatch.setenv("TAVILY_API_KEY", "fixture-search-key")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "tavily")
+    observed = []
+
+    async def fixture_search(query, count, include_domains=None, exclude_domains=None, topic="general"):
+        observed.append(query)
+        return [
+            {"url": "https://docs.example.com/guide.PDF?download=1", "title": "Guide", "snippet": "PDF"},
+            {"url": "https://docs.example.com/page", "title": "Page", "snippet": "HTML"},
+        ]
+
+    monkeypatch.setattr(hosted_search, "tavily", fixture_search)
+    response = await client.post("/v2/search", headers=headers, json={
+        "query": "scraping guide", "sources": ["web"], "categories": ["pdf"], "limit": 1,
+    })
+    payload = await response.json()
+    assert response.status == 200 and payload["success"] is True
+    assert observed == ["scraping guide filetype:pdf"]
+    assert payload["data"]["web"] == [{
+        "url": "https://docs.example.com/guide.PDF?download=1", "title": "Guide",
+        "description": "PDF", "position": 1, "category": "pdf",
+    }]
+
+    unsupported = await client.post("/v2/search", headers=headers, json={
+        "query": "research", "sources": ["web"], "categories": ["research"],
+    })
+    assert unsupported.status == 400
+
+
 async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hosted, monkeypatch):
     import rainbo_scrape.hosted_search as hosted_search
     Firecrawl = pytest.importorskip("firecrawl").Firecrawl
