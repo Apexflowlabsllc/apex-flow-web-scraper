@@ -3,7 +3,7 @@
 **Prepared:** 2026-11-21 (Pacific)  
 **Project:** `E:\apex\work\codex-brief-20261121\scraper`  
 **Branch:** `codex/handoff-2026-11-21-scraper`  
-**Product/code revision reviewed:** `f39ba8babb47451402582c215b239b955b27afc1`
+**Product/code revision reviewed:** `b5d8bdde9dd3e18ba6f9870946976a4eef981b5e`
 **Pull request:** [#34 — Upgrade Web Scraper hero and AI distribution](https://github.com/Apexflowlabsllc/apex-flow-web-scraper/pull/34)
 
 ## Assignment
@@ -16,12 +16,13 @@ The user wants a visually distinctive, highly animated crawler product, broader 
 
 - PR #34 is **open, draft, and mergeable**; handoff documentation commits follow the product/code revision above. GitHub reported **no checks** for the branch on the last check.
 - No production deployment or package publication has occurred. These branch changes are not live in production.
-- Full Python suite: **191 passed, 22 warnings** at code head f39ba8b. Focused billing and compatibility suites: **23 passed**. `node --check site/dashboard.js`, OpenAPI JSON parsing, and `git diff --check` passed. The commits after f39ba8b only update this handoff file.
-- Current committed changes include dashboard API-key controls; create/list/revoke REST endpoints; one-time key display; a 25-active-key limit; and a guard requiring a replacement key before revoking the last active one.
+- Full Python suite: **192 passed, 23 warnings** at code head b5d8bdd. Focused billing and compatibility suite: **17 passed**. `node --check site/dashboard.js`, OpenAPI JSON parsing, and `git diff --check` passed.
+- Current committed changes include dashboard API-key controls; create/list/revoke REST endpoints; one-time key display; a 25-active-key limit; a replacement-key guard before revoking the last active one; and a gateway-protected, aggregate funnel report at `/api/internal/funnel`.
 - Credit usage now supports account and per-key historical views. New usage is attributed using an opaque stable key ID; old ledger entries are preserved and returned as unattributed.
 - Earlier work on this branch includes Firecrawl-style document parsing, crawl active listing, v2 credit usage, schema-based extraction, bounded browser sessions, crawl filters and errors, SDK/CLI/Agent Skill work, and the animated product hero. See the existing parity matrix and PR body for the full list and limits.
 - The dashboard key panel is collapsed by default and keeps the key in the current tab's memory. A new secret is shown once and can be copied by an explicit user action.
 - Production Vercel environment variable **names only** were inspected without decrypting values. The current production list showed `SCRAPER_GATEWAY_SECRET` and `STRIPE_SECRET_KEY`; no search-provider key was present. Filtering the PR branch environment returned no variables. Do not request or reveal secret values.
+- Vercel Web Analytics queries returned `web_analytics_not_enabled`. The branch now includes a private first-party daily funnel report using existing aggregate events; the report describes event-count ratios, not unique people or cohort conversion. See `ops/FUNNEL-REPORT.md`.
 
 ## Highest-value gaps
 
@@ -36,6 +37,7 @@ The user wants a visually distinctive, highly animated crawler product, broader 
 - `src/rainbo_scrape/billing.py`: additive SQLite migration for key IDs and per-key usage; context-local request attribution.
 - `src/rainbo_scrape/api.py`: auth middleware, key create/list/revoke routes, account ownership and last-key protection.
 - `src/rainbo_scrape/hosted_firecrawl_compat.py`: current and historical usage response shapes.
+- `src/rainbo_scrape/hosted_features.py`: owner-only funnel report and existing aggregate event ledger.
 - `site/dashboard.html`, `site/dashboard.js`, `site/app.css`: collapsed key panel, one-time secret display and revoke flow.
 - `site/openapi.json`, `site/docs.html`, `site/firecrawl-compat.html`: public contract and guidance.
 - Tests: `tests/test_billing.py` and `tests/test_firecrawl_compat.py`.
