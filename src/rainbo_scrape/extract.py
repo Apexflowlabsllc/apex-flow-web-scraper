@@ -68,6 +68,37 @@ def _links(soup, url):
     return output
 
 
+def _images(soup, url, limit=2000):
+    base = soup.find("base", href=True)
+    base_url = urljoin(url, base["href"]) if base else url
+    output, seen = [], set()
+    for node in soup.select("img, picture source"):
+        candidates = []
+        for attr in ("src", "data-src", "data-lazy-src", "data-original", "data-original-src"):
+            value = node.get(attr)
+            if isinstance(value, str) and value.strip():
+                candidates.append(value.strip())
+        for attr in ("srcset", "data-srcset"):
+            value = node.get(attr)
+            if isinstance(value, str):
+                candidates.extend(part.strip().split()[0] for part in value.split(",")
+                                  if part.strip() and part.strip().split())
+        for candidate in candidates:
+            if candidate.lower().startswith(("data:", "blob:", "javascript:")):
+                continue
+            try:
+                target = canonical_url(urljoin(base_url, candidate))
+            except ScrapeError:
+                continue
+            if target in seen:
+                continue
+            if len(output) >= limit:
+                return output, True
+            seen.add(target)
+            output.append(target)
+    return output, False
+
+
 def _recipe(soup, recipe, url):
     data, evidence, errors = {}, {}, []
     for name, spec in recipe.get("fields", {}).items():
@@ -145,6 +176,9 @@ def extract(body, url, content_type="text/html", recipe=None, include_html=False
         raise ScrapeError("unsupported_content", "Supported: HTML, JSON, XML/RSS, text and text-based PDF")
     soup = BeautifulSoup(body, "lxml")
     title, links = _text(soup.title), _links(soup, url)
+    images, images_truncated = _images(soup, url)
+    if images_truncated:
+        common["warnings"].append("Image list truncated at 2000 URLs")
     metadata = {m.get("property") or m.get("name"): m.get("content") for m in soup.select("meta[content]")
                 if m.get("property") or m.get("name")}
     data, evidence, errors = _recipe(soup, recipe or {}, url)
@@ -196,7 +230,7 @@ def extract(body, url, content_type="text/html", recipe=None, include_html=False
     return {**common, "kind": "html", "title": title, "text": text, "markdown": markdown,
             **({"html": retained_html} if include_html else {}),
             **({"raw_html": raw_html} if include_raw_html else {}),
-            "metadata": metadata, "links": links, "headings": headings, "tables": tables,
+            "metadata": metadata, "links": links, "images": images, "headings": headings, "tables": tables,
             "structured_data": structured, "data": data, "evidence": evidence, "validation_errors": errors,
             "quality": {"text_chars": len(text), "field_count": len(data), "validation_passed": not errors,
                         "needs_render": needs_render}}

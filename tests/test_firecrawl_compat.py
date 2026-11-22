@@ -119,6 +119,44 @@ async def test_v2_scrape_uses_firecrawl_envelope_and_apex_metering(hosted):
     assert (await unsupported.json())["code"] == "unsupported_option"
 
 
+async def test_v2_images_format_works_for_scrape_batch_and_crawl(hosted):
+    _, client, headers = await _auth(hosted)
+    expected = ["https://cdn.example.com/hero.webp", "https://cdn.example.com/detail.png"]
+
+    response = await client.post("/v2/scrape", headers=headers, json={
+        "url": "https://example.com/images", "formats": ["images"],
+    })
+    payload = await response.json()
+    assert response.status == 200 and payload["data"]["images"] == expected
+
+    response = await client.post("/v2/batch/scrape", headers=headers, json={
+        "urls": ["https://example.com/images-batch"], "formats": ["images"],
+    })
+    job = (await response.json())["id"]
+    for _ in range(30):
+        status = await client.get(f"/v2/batch/scrape/{job}", headers=headers)
+        status_payload = await status.json()
+        if status_payload["status"] != "scraping":
+            break
+        await asyncio.sleep(0.01)
+    assert status_payload["status"] == "completed"
+    assert status_payload["data"][0]["images"] == expected
+
+    response = await client.post("/v2/crawl", headers=headers, json={
+        "url": "https://example.com/images-crawl", "limit": 1, "maxDiscoveryDepth": 0,
+        "scrapeOptions": {"formats": ["images"]},
+    })
+    job = (await response.json())["id"]
+    for _ in range(30):
+        status = await client.get(f"/v2/crawl/{job}", headers=headers)
+        status_payload = await status.json()
+        if status_payload["status"] != "scraping":
+            break
+        await asyncio.sleep(0.01)
+    assert status_payload["status"] == "completed"
+    assert status_payload["data"][0]["images"] == expected
+
+
 async def test_v2_scrape_min_age_and_lockdown_select_cache_only(hosted):
     h, client, headers = await _auth(hosted)
     response = await client.post("/v2/scrape", headers=headers, json={

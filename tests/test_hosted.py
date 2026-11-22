@@ -38,6 +38,8 @@ async def hosted(tmp_path, monkeypatch):
         if url.endswith("failure"): raise ValueError("fixture failed")
         await asyncio.sleep(0.01)
         result = {"markdown":"# Fixture", "rendered":False}
+        if "/images" in url:
+            result["images"] = ["https://cdn.example.com/hero.webp", "https://cdn.example.com/detail.png"]
         if kwargs.get("include_html"):
             result["html"] = "<main><h1>Fixture</h1></main>"
         if kwargs.get("include_raw_html"):

@@ -13,7 +13,7 @@ from .policy import ScrapeError
 
 ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "scrolls", "actions", "recipe", "outputs", "page", "fallback", "max_tokens", "cache_only", "min_age_ms", "cache_max_age_ms"}
 LIMIT = 262144  # hosted response budget in bytes
-OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff", "html", "raw_html", "screenshot"}
+OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "images", "structured_data", "diff", "html", "raw_html", "screenshot"}
 SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors", "archive", "extracted", "browser"}
 # Failures where the live site refused or could not serve us; a public archive copy may still exist.
 ARCHIVABLE = {"access_challenge", "http_error", "upstream_error", "rate_limited", "fetch_failed", "dns_failed",

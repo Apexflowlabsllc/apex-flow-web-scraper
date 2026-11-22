@@ -222,6 +222,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if isinstance(result.get("links"), list):
             data["links"] = [link.get("url") if isinstance(link, dict) else link
                               for link in result["links"] if isinstance(link, (str, dict))]
+        if isinstance(result.get("images"), list):
+            data["images"] = [image for image in result["images"] if isinstance(image, str)]
         if screenshot and result.get("screenshot_png_base64"):
             data["screenshot"] = "data:image/png;base64," + result["screenshot_png_base64"]
         if result.get("warning"):
@@ -348,8 +350,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 continue
             if isinstance(item, dict) and set(item) - {"type"}:
                 return error("Format-specific options are not supported by this compatibility subset")
-            if kind not in {"markdown", "html", "rawHtml", "links", "screenshot"}:
-                return error(f"Format {kind!r} is not supported; supported formats are markdown, html, rawHtml, links, screenshot")
+            if kind not in {"markdown", "html", "rawHtml", "links", "images", "screenshot"}:
+                return error(f"Format {kind!r} is not supported; supported formats are markdown, html, rawHtml, links, images, screenshot")
             parsed.append("raw_html" if kind == "rawHtml" else kind)
         if "maxAge" in body and (isinstance(body["maxAge"], bool) or not isinstance(body["maxAge"], int)
                                  or not 0 <= body["maxAge"] <= 31536000000):
@@ -377,7 +379,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 # upper age bound when maxAge is not explicitly supplied.
                 apex_body["cache_max_age_ms"] = 63_072_000_000
         apex_outputs = {"raw_html" if field == "raw_html" else field for field in parsed
-                        if field in {"markdown", "html", "raw_html", "links", "screenshot"}}
+                        if field in {"markdown", "html", "raw_html", "links", "images", "screenshot"}}
         if apex_outputs:
             apex_body["outputs"] = sorted(apex_outputs)
         if extract_spec:
@@ -427,6 +429,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             selected["json"] = data["json"]
         if "links" in parsed and "links" in data:
             selected["links"] = data["links"]
+        if "images" in parsed and "images" in data:
+            selected["images"] = data["images"]
         selected["metadata"] = data["metadata"]
         if want_screenshot and "screenshot" in data:
             selected["screenshot"] = data["screenshot"]
@@ -708,11 +712,11 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 continue
             if isinstance(item, dict) and set(item) - {"type"}:
                 return error("Format-specific options are not supported by this compatibility subset")
-            if kind not in {"markdown", "html", "rawHtml", "links", "screenshot"}:
-                return error(f"Crawl format {kind!r} is not supported; supported formats are markdown, html, rawHtml, links, screenshot")
+            if kind not in {"markdown", "html", "rawHtml", "links", "images", "screenshot"}:
+                return error(f"Crawl format {kind!r} is not supported; supported formats are markdown, html, rawHtml, links, images, screenshot")
             crawl_formats.append(kind)
         outputs = sorted({"raw_html" if item == "rawHtml" else item for item in crawl_formats
-                          if item in {"markdown", "html", "rawHtml", "links", "screenshot"}})
+                          if item in {"markdown", "html", "rawHtml", "links", "images", "screenshot"}})
         start_body = {"url": body.get("url"), "limit": body.get("limit", 25), "render": "auto",
                       "outputs": outputs, "max_depth": body.get("maxDiscoveryDepth", 3)}
         if crawl_actions:
@@ -873,7 +877,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                                    or "screenshot" in options.get("_compat_formats", []))
                 if options.get("_compat_warning"):
                     result["warning"] = "; ".join(filter(None, [result.get("warning"), options["_compat_warning"]]))
-                for field in ("markdown", "html", "rawHtml", "links", "screenshot", "json"):
+                for field in ("markdown", "html", "rawHtml", "links", "images", "screenshot", "json"):
                     if field not in options.get("_compat_formats", []) and not (
                             field == "screenshot" and options.get("screenshot", False)):
                         result.pop(field, None)
@@ -1162,8 +1166,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 continue
             if isinstance(item, dict) and set(item) - {"type"}:
                 return error("Format-specific options are not supported by this compatibility subset")
-            if kind not in {"markdown", "html", "rawHtml", "links", "screenshot"}:
-                return error(f"Format {kind!r} is not supported; supported formats are markdown, html, rawHtml, links, screenshot")
+            if kind not in {"markdown", "html", "rawHtml", "links", "images", "screenshot"}:
+                return error(f"Format {kind!r} is not supported; supported formats are markdown, html, rawHtml, links, images, screenshot")
             selected.append(kind)
         if "maxAge" in body and (isinstance(body["maxAge"], bool) or not isinstance(body["maxAge"], int)
                                  or not 0 <= body["maxAge"] <= 31536000000):
@@ -1171,7 +1175,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if "screenshot" in body and not isinstance(body["screenshot"], bool):
             return error("screenshot must be a boolean")
         outputs = {"raw_html" if item == "rawHtml" else item for item in selected
-                   if item in {"markdown", "html", "rawHtml", "links", "screenshot"}}
+                   if item in {"markdown", "html", "rawHtml", "links", "images", "screenshot"}}
         if "screenshot" in selected or body.get("screenshot", False):
             outputs.add("screenshot")
         apex_options = {"render": "auto"}

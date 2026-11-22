@@ -147,6 +147,21 @@ def test_xml_entity_expansion_denied():
         extract(b'<!DOCTYPE x [<!ENTITY a SYSTEM "file:///etc/passwd">]><rss>&a;</rss>', "https://example.com/", "application/xml")
 
 
+def test_html_image_urls_resolve_base_and_lazy_sources_without_inline_data():
+    page = b'''<html><head><base href="/assets/"></head><body>
+      <img src="hero.webp"><img src="hero.webp">
+      <img data-src="/lazy.png"><img src="data:image/png;base64,AAAA">
+      <picture><source srcset="small.avif 1x, large.avif 2x"></picture>
+    </body></html>'''
+    result = extract(page, "https://example.com/product", "text/html")
+    assert result["images"] == [
+        "https://example.com/assets/hero.webp",
+        "https://example.com/lazy.png",
+        "https://example.com/assets/small.avif",
+        "https://example.com/assets/large.avif",
+    ]
+
+
 def test_access_challenge_not_success():
     with pytest.raises(ScrapeError, match="access challenge"):
         extract(b'<html><title>Just a moment...</title><p>Verify you are human</p></html>', "https://example.com/")

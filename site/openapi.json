@@ -411,7 +411,7 @@
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 11,
+                    "maxItems": 12,
                     "items": {
                       "type": "string",
                       "enum": [
@@ -421,6 +421,7 @@
                         "evidence",
                         "chunks",
                         "links",
+                        "images",
                         "structured_data",
                         "diff",
                         "html",
@@ -634,7 +635,7 @@
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 11,
+                    "maxItems": 12,
                     "items": {
                       "type": "string",
                       "enum": [
@@ -644,6 +645,7 @@
                         "evidence",
                         "chunks",
                         "links",
+                        "images",
                         "structured_data",
                         "diff",
                         "html",
@@ -2314,7 +2316,7 @@
       "post": {
         "operationId": "firecrawlCompatScrape",
         "summary": "Firecrawl-compatible scrape",
-        "description": "Supported formats: markdown, links, screenshot. Unsupported formats/options return an explicit error. Apex credit costs and receipts apply.",
+        "description": "Supported formats: markdown, links, images, screenshot. Images returns up to 2,000 resolved image URLs; image bytes and OCR are not included. Unsupported formats/options return an explicit error. Apex credit costs and receipts apply.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -2388,6 +2390,7 @@
                             "html",
                             "rawHtml",
                             "links",
+                            "images",
                             "screenshot"
                           ]
                         },
@@ -2401,6 +2404,7 @@
                                 "html",
                                 "rawHtml",
                                 "links",
+                                "images",
                                 "screenshot"
                               ]
                             }
@@ -2746,7 +2750,7 @@
       "post": {
         "operationId": "firecrawlCompatStartCrawl",
         "summary": "Firecrawl-compatible crawl",
-        "description": "Starts a durable same-site crawl. Apex obeys robots.txt, enforces account limits, and rejects external-link and subdomain expansion. includePaths/excludePaths accept bounded, safety-checked regular expressions matched against URL paths; regexOnFullURL switches matching to the full URL. ignoreQueryParameters deduplicates discovered URLs without query strings.",
+        "description": "Starts a durable same-site crawl. Supports markdown, links, images and screenshot formats; images returns up to 2,000 resolved image URLs per page without downloading image bytes or OCR. Apex obeys robots.txt, enforces account limits, and rejects external-link and subdomain expansion. includePaths/excludePaths accept bounded, safety-checked regular expressions matched against URL paths; regexOnFullURL switches matching to the full URL. ignoreQueryParameters deduplicates discovered URLs without query strings.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -2862,6 +2866,7 @@
                                 "html",
                                 "rawHtml",
                                 "links",
+                                "images",
                                 "screenshot"
                               ]
                             },
@@ -2875,6 +2880,7 @@
                                     "html",
                                     "rawHtml",
                                     "links",
+                                    "images",
                                     "screenshot"
                                   ]
                                 }
@@ -3111,7 +3117,7 @@
       "post": {
         "operationId": "firecrawlCompatBatchScrape",
         "summary": "Start an asynchronous batch scrape",
-        "description": "Creates an account-scoped asynchronous batch job. Supports markdown, links and screenshot formats, maxAge, bounded read-only browser actions, and optional signed lifecycle webhooks for started, page, and completed events. Webhooks use public HTTPS on port 443, retry with bounded backoff, and return a one-time signingSecret. URL count follows the account plan; custom concurrency remains unsupported.",
+        "description": "Creates an account-scoped asynchronous batch job. Supports markdown, links, images and screenshot formats, maxAge, bounded read-only browser actions, and optional signed lifecycle webhooks for started, page, and completed events. Webhooks use public HTTPS on port 443, retry with bounded backoff, and return a one-time signingSecret. URL count follows the account plan; custom concurrency remains unsupported.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -3198,6 +3204,7 @@
                             "html",
                             "rawHtml",
                             "links",
+                            "images",
                             "screenshot"
                           ]
                         },
@@ -3211,6 +3218,7 @@
                                 "html",
                                 "rawHtml",
                                 "links",
+                                "images",
                                 "screenshot"
                               ]
                             }
