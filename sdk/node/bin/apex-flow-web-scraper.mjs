@@ -189,8 +189,9 @@ export async function runDoctor({
   }
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = { command: argv[0] || "help", all: false, client: null, yes: false, force: false, dryRun: false, source: false };
+  if (options.command === "--help" || options.command === "-h") options.command = "help";
   for (let i = 1; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--all") options.all = true;

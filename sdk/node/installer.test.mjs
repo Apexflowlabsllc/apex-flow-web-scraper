@@ -2,7 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import { getClientTargets, getMcpCommand, installClient, jsoncWithMcpServer, MCP_COMMAND, SERVER_NAME, tomlWithMcpServer } from "./bin/apex-flow-web-scraper.mjs";
+import { getClientTargets, getMcpCommand, installClient, jsoncWithMcpServer, MCP_COMMAND, parseArgs, SERVER_NAME, tomlWithMcpServer } from "./bin/apex-flow-web-scraper.mjs";
+
+test("CLI help works with no command or a leading help flag", () => {
+  assert.equal(parseArgs([]).command, "help");
+  assert.equal(parseArgs(["--help"]).command, "help");
+  assert.equal(parseArgs(["-h"]).command, "help");
+});
 
 const scratchBase = resolve(process.cwd(), "work", "installer-tests");
 mkdirSync(scratchBase, { recursive: true });
