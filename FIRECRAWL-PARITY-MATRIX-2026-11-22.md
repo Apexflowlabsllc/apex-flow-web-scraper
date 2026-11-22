@@ -16,7 +16,7 @@ not a sales claim.
 | Batch | Async batch scrape with status and error retrieval | Draft v2 create/status/cancel/error routes, persisted per-URL results, per-URL errors and plan-bounded URL counts; workers reuse metered native batch slices and account concurrency | **Partial.** Custom concurrency, webhook callbacks, multi-process queue claiming, restart resume and same-client SDK validation remain. A process restart safely marks in-flight jobs failed while retaining completed page rows. |
 | Search | General web search; separate research, developer, government and paper indexes | Hosted `/v1/websearch` depends on an optional configured provider; `/v1/search` searches only the customer's own recently saved pages; draft `/v2/search` maps only configured web search | **Major gap.** Deliver a dependable first-party or licensed general-web search path, with rank/source evidence and measured freshness. Do not imply saved-page search searches the web. |
 | Structured extraction | JSON/schema modes, parse endpoints and specialized data indexes | CSS recipes, provider-backed JSON Schema extraction, PDF/DOCX parsing and several vertical package tools | **Partial.** Improve schema coverage, document parsing, typed validation, evidence, retries and gold-set accuracy. |
-| Persistent browser and Interact | Browser sandbox sessions, code/actions in session, session list/delete, interact endpoints | Isolated one-request rendering with bounded click/wait/scroll actions; no retained session | **Gap.** Add owner-controlled local sessions with per-domain allowlists, expiry, revocation, secret isolation, budgets and audit receipts. No cookie import, CAPTCHA solving or access-control evasion. |
+| Persistent browser and Interact | Browser sandbox sessions, code/actions in session, session list/delete, interact endpoints | Draft `/v2/interact` has short-lived in-memory browser sessions, session list/delete, public-origin allowlists and bounded read-only click/wait/scroll actions; 3-credit create/action charges, two browser slots and one session per account per API process | **Partial.** No CDP/live view, arbitrary code, cookie profiles, signed-in use, or multi-process session affinity; session state is lost on process restart. Needs durable isolated browser workers, authenticated test domain, quotas/load tests and richer safe interactions. |
 | Scheduled monitoring | Create/list/update/delete/run monitors and check history | Paid, opt-in monitors with baseline, signed HTTPS events, pause/resume/delete, bounded retries and plan quotas | **Partial parity.** Apex implementation is narrower and new; needs multi-process/load fault testing, observable delivery history and real customer validation. |
 | Autonomous Agent | Long-running research tasks with run lists/status, trace, snapshot, cancellation and source data | No general autonomous web research job | **Gap.** Add only after task budgets, source citations, stop/cancel, safe tools, run trace and honest limitations are designed. |
 | Alexandria / domain providers | Firecrawl Cloud documents access to 550+ data providers plus paper/developer/government indexes | No equivalent hosted provider catalog or broad indexed datasets | **Major gap.** Scope licensed, customer-valued data connectors one at a time; prove provenance, rights, coverage and cost before expanding. |
@@ -37,9 +37,11 @@ not a sales claim.
    `crawl`, and asynchronous `batch/scrape` create/status/cancel/errors. Expand
    the adapter against the official schema and test real Firecrawl SDK clients
    locally before using a drop-in compatibility claim.
-3. **Make JavaScript access useful across steps.** Build isolated, local,
-   customer-owned persistent browser sessions with domain binding, expiry,
-   revocation, resource ceilings and human-controlled challenge handling.
+3. **Make JavaScript access useful across steps.** Draft `/v2/interact` now
+   keeps a guarded public-site browser context alive across calls, with origin
+   binding, expiry, revocation, resource ceilings and bounded declarative
+   actions. Next prove it in a browser-enabled environment, then design
+   durable isolated workers and customer-owned authenticated profiles.
 4. **Close discovery and data breadth.** Select a lawful search/index provider
    path and vertical datasets based on customer demand, freshness, provenance,
    access rights and measured cost per correct answer.

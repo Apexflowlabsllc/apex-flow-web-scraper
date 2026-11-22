@@ -278,7 +278,11 @@ Read the [documentation](https://webscraper.apexflowlabs.com/docs.html),
 See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged capability plan, [FIRECRAWL-PARITY-MATRIX-2026-11-22.md](FIRECRAWL-PARITY-MATRIX-2026-11-22.md) for the sourced feature/access comparison, and [ACCESS-PLATFORM-PLAN.md](ACCESS-PLATFORM-PLAN.md) for the proxy infrastructure and owner-controlled challenge-handling design.
 
 
-### Firecrawl v2 API compatibility\n\nThe draft branch includes a limited compatibility adapter for scrape, map, configured web search, crawl lifecycle, and asynchronous batch job routes. It supports markdown/html/rawHtml/links/screenshots and provider-backed JSON schema extraction; hosted JSON extraction requires a configured model provider and a paid plan and costs 150 credits per page. Batch webhooks, custom concurrency, and full Firecrawl SDK parity are not implemented. See the [migration guide](site/firecrawl-compat.html). These routes are branch-only until a reviewed production release.\n\n## Latest Apex-only benchmark (0.11.0 branch code, 22 Nov 2026)
+### Firecrawl v2 API compatibility
+
+The draft branch includes a limited compatibility adapter for scrape, map, configured web search, crawl lifecycle, async batch, and bounded interactive sessions. It supports markdown/html/rawHtml/links/screenshots and provider-backed JSON schema extraction; hosted JSON extraction requires a configured model provider and a paid plan and costs 150 credits per page. Interactive sessions cost 3 credits to create and per action request, are limited to explicit public-origin allowlists, and accept declarative click/wait/scroll actions only. They do not expose CDP, live video, login profiles, or arbitrary code execution. Session affinity is process-local and is not ready for multi-process deployment. Batch webhooks, custom concurrency, and full Firecrawl SDK parity are not implemented. See the [migration guide](site/firecrawl-compat.html). These routes are branch-only until a reviewed production release.
+
+## Latest Apex-only benchmark (0.11.0 branch code, 22 Nov 2026)
 
 27/30 URLs fetched, 83/94 reference checks passed, median 1.16 s per successful
 URL with rendering disabled. Two sources denied robots-compliant access, one

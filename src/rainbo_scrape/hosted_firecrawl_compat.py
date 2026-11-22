@@ -15,9 +15,15 @@ from datetime import datetime, timezone
 from aiohttp import web
 from .policy import ScrapeError
 
+INTERACT_SERVICE_KEY = web.AppKey("interact_service", object)
+
 
 def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_for, crawl_cancel_for,
             batch_for, hosted):
+    from .interact import InteractService
+    interact = InteractService(hosted)
+    app[INTERACT_SERVICE_KEY] = interact
+    app.on_cleanup.append(interact.close_all)
     batch_tasks = {}
     hosted.db.executescript("""
         CREATE TABLE IF NOT EXISTS firecrawl_batch_jobs(
@@ -413,6 +419,19 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                                "url": url, "error": payload.get("error", "Page scrape failed."), "code": code})
         return web.json_response({"errors": errors, "robotsBlocked": robots_blocked})
 
+    async def interact_create(request):
+        return web.json_response(await interact.create(request["account"], await request.json()))
+
+    async def interact_list(request):
+        return web.json_response(interact.list(request["account"], request.query.get("status")))
+
+    async def interact_execute(request):
+        return web.json_response(await interact.execute(request["account"], request.match_info["session"],
+                                                        await request.json()))
+
+    async def interact_delete(request):
+        return web.json_response(await interact.delete(request["account"], request.match_info["session"]))
+
     def batch_status(job, account):
         row = hosted.db.execute(
             "SELECT id,status,total,completed,credits,created,finished FROM firecrawl_batch_jobs WHERE id=? AND account=?",
@@ -641,7 +660,12 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             try:
                 return await handler(request)
             except (ValueError, KeyError, TypeError, ScrapeError) as exc:
-                return error(str(exc), getattr(exc, "code", None) or "invalid_request")
+                code = getattr(exc, "code", None) or "invalid_request"
+                status = {"paid_plan_required": 402, "insufficient_credits": 402,
+                          "session_capacity": 429, "not_found": 404,
+                          "session_expired": 410, "browser_unavailable": 503,
+                          "blocked_origin": 403}.get(code, 400)
+                return error(str(exc), code, status)
             except web.HTTPException as exc:
                 return error(exc.reason, "request_failed", exc.status)
         return wrapped
@@ -653,6 +677,10 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
     app.router.add_get("/v2/crawl/{job}", wrap(crawl_status))
     app.router.add_delete("/v2/crawl/{job}", wrap(crawl_cancel))
     app.router.add_get("/v2/crawl/{job}/errors", wrap(crawl_errors))
+    app.router.add_post("/v2/interact", wrap(interact_create))
+    app.router.add_get("/v2/interact", wrap(interact_list))
+    app.router.add_post("/v2/interact/{session}/execute", wrap(interact_execute))
+    app.router.add_delete("/v2/interact/{session}", wrap(interact_delete))
     app.router.add_post("/v2/batch/scrape", wrap(batch_scrape))
     app.router.add_get("/v2/batch/scrape/{job}/errors", wrap(batch_errors))
     app.router.add_get("/v2/batch/scrape/{job}", wrap(batch_status_route))
