@@ -1,8 +1,14 @@
-import type { ICredentialType, INodeProperties } from 'n8n-workflow';
+import type {
+	IAuthenticateGeneric,
+	ICredentialTestRequest,
+	ICredentialType,
+	INodeProperties,
+} from 'n8n-workflow';
 
 export class ApexFlowApi implements ICredentialType {
 	name = 'apexFlowApi';
 	displayName = 'Apex Flow Web Scraper API';
+	icon = 'file:apex-flow.svg' as const;
 	documentationUrl = 'https://webscraper.apexflowlabs.com/docs.html#api';
 	properties: INodeProperties[] = [
 		{
@@ -14,15 +20,15 @@ export class ApexFlowApi implements ICredentialType {
 			required: true,
 		},
 	];
-	authenticate = {
-		type: 'generic' as const,
+	authenticate: IAuthenticateGeneric = {
+		type: 'generic',
 		properties: {
 			headers: {
 				Authorization: '=Bearer {{$credentials.apiKey}}',
 			},
 		},
 	};
-	test = {
+	test: ICredentialTestRequest = {
 		request: {
 			baseURL: 'https://webscraper.apexflowlabs.com/v1',
 			url: '/usage',

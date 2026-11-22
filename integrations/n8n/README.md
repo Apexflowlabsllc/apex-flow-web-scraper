@@ -14,9 +14,11 @@ the repository owner's release approval.
 ```bash
 cd integrations/n8n
 npm install
+npm run lint
+npm run typecheck
 npm run build
 npm test
-npm pack
+npm pack --dry-run
 ```
 
 The resulting tarball can be installed as a private/custom node in a
@@ -36,15 +38,18 @@ use Apex plan credits; check your plan before running large workflows.
 
 - Page and site: Scrape Page, Map Site, Search the Web.
 - Crawl: Start Crawl, Get Crawl Status, Cancel Crawl.
-- Batch: Start Batch Scrape with a JSON array of URLs.
+- Batch: Start Batch Scrape with one URL per line.
 
 Search requires an operator-configured hosted search provider. If it is not
 configured, the API returns its normal actionable error. This package does not
 silently switch to a different provider or expose local bring-your-own-key
 search, which belongs in a local client process.
 
-This initial community-node implementation has contract tests and TypeScript
-checks, but the n8n UI and multi-version runtime behavior still need a local
-n8n integration run before release or a verified-node submission. n8n's
-verified-node path also requires its current CLI scaffold, lint and review;
-those release checks have not been completed.
+The package passes `@n8n/node-cli` 0.57.4 lint/build, TypeScript checks, 8
+contract tests and a tarball dry run. `npm audit --omit=dev` reports zero
+runtime vulnerabilities. The CLI's development dependency tree currently
+reports 35 advisories (19 high, 16 moderate); these are not shipped in the
+package tarball, and should be reviewed before adopting the CLI as a release
+dependency. The package remains private and unpublished. The n8n UI and
+multi-version runtime behavior still need a local n8n integration run before
+release or a verified-node submission.

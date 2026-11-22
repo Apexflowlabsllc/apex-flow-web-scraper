@@ -4,6 +4,7 @@
   "private": true,
   "description": "Use Apex Flow Web Scraper from n8n workflows.",
   "license": "MIT",
+  "author": { "name": "Apex Flow Labs", "email": "apexflowlabs@gmail.com" },
   "homepage": "https://webscraper.apexflowlabs.com/docs.html",
   "repository": {
     "type": "git",
@@ -26,7 +27,10 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-node-assets.mjs",
+    "build": "n8n-node build && node scripts/copy-node-assets.mjs",
+    "build:watch": "tsc --watch",
+    "lint": "n8n-node lint",
+    "lint:fix": "n8n-node lint --fix",
     "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test test/*.test.mjs",
@@ -34,6 +38,7 @@
   },
   "n8n": {
     "n8nNodesApiVersion": 1,
+    "strict": true,
     "nodes": [
       "dist/nodes/ApexFlow/ApexFlow.node.js"
     ],
@@ -43,10 +48,13 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@n8n/node-cli": "0.57.4",
+    "eslint": "9.32.0",
     "n8n-workflow": "^2.16.0",
+    "prettier": "3.6.2",
     "typescript": "^5.9.0"
   },
-  "overrides": {
-    "zod": "^4.6.6"
+  "peerDependencies": {
+    "n8n-workflow": "*"
   }
 }

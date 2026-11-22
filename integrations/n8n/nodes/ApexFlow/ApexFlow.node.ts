@@ -1,6 +1,9 @@
+import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 import type {
 	IExecuteFunctions,
 	IDataObject,
+	JsonObject,
+	INode,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
@@ -15,30 +18,35 @@ interface RequestPlan {
 	query?: Record<string, string | number>;
 }
 
-export function buildRequestPlan(operation: Operation, params: Record<string, unknown>): RequestPlan {
-	const jsonObject = (value: unknown, label: string): Record<string, unknown> | undefined => {
+export function buildRequestPlan(operation: Operation, params: Record<string, unknown>, node: INode): RequestPlan {
+	const fail = (message: string): never => {
+		throw new NodeOperationError(node, message);
+	};
+	const stringList = (value: unknown, label: string): string[] | undefined => {
 		if (value === undefined || value === null || value === '') return undefined;
-		let parsed = value;
-		if (typeof parsed === 'string') {
-			try {
-				parsed = JSON.parse(parsed);
-			} catch {
-				throw new Error(`${label} must be valid JSON.`);
-			}
+		if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+			fail(`${label} must be a list of text values.`);
 		}
-		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error(`${label} must be a JSON object.`);
-		return parsed as Record<string, unknown>;
+		return (value as string[]).map((item) => item.trim()).filter(Boolean);
+	};
+	const scrapeOptions = (): Record<string, unknown> => {
+		const body: Record<string, unknown> = {};
+		const render = String(params.render ?? '').trim();
+		if (render) body.render = render;
+		const outputs = stringList(params.outputs, 'Outputs');
+		if (outputs?.length) body.outputs = outputs;
+		return body;
 	};
 	switch (operation) {
 		case 'scrape': {
 			const url = String(params.url ?? '').trim();
-			if (!url) throw new Error('URL is required.');
-			const body: Record<string, unknown> = { url, ...jsonObject(params.options, 'Options') };
+			if (!url) fail('URL is required.');
+			const body: Record<string, unknown> = { url, ...scrapeOptions() };
 			return { method: 'POST', path: '/scrape', body };
 		}
 		case 'map': {
 			const url = String(params.url ?? '').trim();
-			if (!url) throw new Error('URL is required.');
+			if (!url) fail('URL is required.');
 			const body: Record<string, unknown> = { url, limit: Number(params.mapLimit ?? params.limit ?? 1000) };
 			const search = String(params.search ?? '').trim();
 			if (search) body.search = search;
@@ -46,22 +54,22 @@ export function buildRequestPlan(operation: Operation, params: Record<string, un
 		}
 		case 'webSearch': {
 			const query = String(params.query ?? '').trim();
-			if (!query) throw new Error('Search query is required.');
+			if (!query) fail('Search query is required.');
 			return { method: 'POST', path: '/websearch', body: { query, limit: Number(params.resultLimit ?? params.limit ?? 10) } };
 		}
 		case 'startCrawl': {
 			const url = String(params.url ?? '').trim();
-			if (!url) throw new Error('URL is required.');
+			if (!url) fail('URL is required.');
 			return {
 				method: 'POST',
 				path: '/crawl',
-				body: { url, limit: Number(params.pageLimit ?? params.limit ?? 25), ...jsonObject(params.options, 'Options') },
+				body: { url, limit: Number(params.pageLimit ?? params.limit ?? 25), ...scrapeOptions() },
 			};
 		}
 		case 'getCrawlStatus':
 		case 'cancelCrawl': {
 			const id = String(params.id ?? '').trim();
-			if (!id) throw new Error('Crawl ID is required.');
+			if (!id) fail('Crawl ID is required.');
 			return {
 				method: operation === 'getCrawlStatus' ? 'GET' : 'DELETE',
 				path: `/crawl/${encodeURIComponent(id)}`,
@@ -69,20 +77,19 @@ export function buildRequestPlan(operation: Operation, params: Record<string, un
 			};
 		}
 		case 'batchScrape': {
-			let urls: unknown;
-			try {
-				urls = typeof params.urls === 'string' ? JSON.parse(params.urls) : params.urls;
-			} catch {
-				throw new Error('URLs must be valid JSON: an array of URL strings.');
-			}
+			const urls = typeof params.urls === 'string'
+				? params.urls.split(/[\r\n,]+/).map((url) => url.trim()).filter(Boolean)
+				: params.urls;
 			if (!Array.isArray(urls) || urls.length === 0 || urls.some((url) => typeof url !== 'string' || !url.trim())) {
-				throw new Error('URLs must be a non-empty array of URL strings.');
+				fail('Enter at least one URL, with one URL per line.');
 			}
-			const body: Record<string, unknown> = { urls, ...((jsonObject(params.options, 'Options') ?? {}) as Record<string, unknown>) };
+			const body: Record<string, unknown> = { urls };
+			const formats = stringList(params.formats, 'Formats');
+			if (formats?.length) body.formats = formats;
 			return { method: 'POST', path: '/v2/batch/scrape', body };
 		}
 		default:
-			throw new Error(`Unsupported Apex operation: ${String(operation)}`);
+			return fail(`Unsupported Apex operation: ${String(operation)}`);
 	}
 }
 
@@ -90,25 +97,28 @@ export class ApexFlow implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Apex Flow Web Scraper',
 		name: 'apexFlow',
-		icon: 'fa:globe',
+		icon: { light: 'file:apex-flow.svg', dark: 'file:apex-flow.dark.svg' },
 		group: ['transform'],
 		version: 1,
-		description: 'Scrape pages, map sites, search the web, and run durable crawl or batch jobs.',
+		subtitle: '={{$parameter["operation"]}}',
+		description: 'Scrape pages, map sites, search the web, and run durable crawl or batch jobs. Requests use plan credits',
 		defaults: { name: 'Apex Flow Web Scraper' },
-		inputs: ['main'],
-		outputs: ['main'],
+		usableAsTool: true,
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [{ name: 'apexFlowApi', required: true }],
 		properties: [
 			{
 				displayName: 'Resource',
 				name: 'resource',
 				type: 'options',
+				noDataExpression: true,
 				options: [{ name: 'Page and Site', value: 'pageSite' }, { name: 'Crawl', value: 'crawl' }, { name: 'Batch', value: 'batch' }],
 				default: 'pageSite',
 			},
-			{ displayName: 'Operation', name: 'operation', type: 'options', options: [{ name: 'Scrape Page', value: 'scrape', action: 'Scrape a web page' }, { name: 'Map Site', value: 'map', action: 'Find URLs on a website' }, { name: 'Search the Web', value: 'webSearch', action: 'Search the public web' }], default: 'scrape', displayOptions: { show: { resource: ['pageSite'] } } },
-			{ displayName: 'Operation', name: 'operation', type: 'options', options: [{ name: 'Start Crawl', value: 'startCrawl', action: 'Start an asynchronous site crawl' }, { name: 'Get Crawl Status', value: 'getCrawlStatus', action: 'Get crawl status and results' }, { name: 'Cancel Crawl', value: 'cancelCrawl', action: 'Cancel an active crawl' }], default: 'startCrawl', displayOptions: { show: { resource: ['crawl'] } } },
-			{ displayName: 'Operation', name: 'operation', type: 'options', options: [{ name: 'Start Batch Scrape', value: 'batchScrape', action: 'Start an asynchronous batch scrape' }], default: 'batchScrape', displayOptions: { show: { resource: ['batch'] } } },
+			{ displayName: 'Operation', name: 'operation', type: 'options', noDataExpression: true, options: [{ name: 'Scrape', value: 'scrape', action: 'Scrape a web page' }, { name: 'Map', value: 'map', action: 'Map a site' }, { name: 'Search', value: 'webSearch', action: 'Search the public web' }], default: 'scrape', displayOptions: { show: { resource: ['pageSite'] } } },
+			{ displayName: 'Operation', name: 'operation', type: 'options', noDataExpression: true, options: [{ name: 'Start', value: 'startCrawl', action: 'Start a site crawl' }, { name: 'Get Status', value: 'getCrawlStatus', action: 'Get crawl status and results' }, { name: 'Cancel', value: 'cancelCrawl', action: 'Cancel a crawl' }], default: 'startCrawl', displayOptions: { show: { resource: ['crawl'] } } },
+			{ displayName: 'Operation', name: 'operation', type: 'options', noDataExpression: true, options: [{ name: 'Start', value: 'batchScrape', action: 'Start a batch scrape' }], default: 'batchScrape', displayOptions: { show: { resource: ['batch'] } } },
 			{ displayName: 'URL', name: 'url', type: 'string', required: true, default: '', displayOptions: { show: { operation: ['scrape', 'map', 'startCrawl'] } } },
 			{ displayName: 'Search Query', name: 'query', type: 'string', required: true, default: '', displayOptions: { show: { operation: ['webSearch'] } } },
 			{ displayName: 'Crawl ID', name: 'id', type: 'string', required: true, default: '', displayOptions: { show: { operation: ['getCrawlStatus', 'cancelCrawl'] } } },
@@ -117,8 +127,10 @@ export class ApexFlow implements INodeType {
 			{ displayName: 'Search Filter', name: 'search', type: 'string', default: '', displayOptions: { show: { operation: ['map'] } } },
 			{ displayName: 'Result Limit', name: 'resultLimit', type: 'number', default: 10, displayOptions: { show: { operation: ['webSearch'] } } },
 			{ displayName: 'Page Limit', name: 'pageLimit', type: 'number', default: 25, displayOptions: { show: { operation: ['startCrawl'] } } },
-			{ displayName: 'URLs (JSON)', name: 'urls', type: 'json', required: true, default: '["https://example.com"]', displayOptions: { show: { operation: ['batchScrape'] } }, description: 'An array of URLs. Maximum count follows your Apex plan.' },
-			{ displayName: 'Options (JSON)', name: 'options', type: 'json', default: '{}', displayOptions: { show: { operation: ['scrape', 'startCrawl', 'batchScrape'] } }, description: 'Scrape options supported by the selected endpoint.' },
+			{ displayName: 'Render Mode', name: 'render', type: 'options', options: [{ name: 'Auto', value: 'auto' }, { name: 'Never', value: 'never' }, { name: 'Always', value: 'always' }], default: 'auto', displayOptions: { show: { operation: ['scrape', 'startCrawl'] } }, description: 'Rendered pages can use more credits' },
+			{ displayName: 'Outputs', name: 'outputs', type: 'multiOptions', options: [{ name: 'Chunks', value: 'chunks' }, { name: 'Data', value: 'data' }, { name: 'Diff', value: 'diff' }, { name: 'Evidence', value: 'evidence' }, { name: 'HTML', value: 'html' }, { name: 'Links', value: 'links' }, { name: 'Markdown', value: 'markdown' }, { name: 'Raw HTML', value: 'raw_html' }, { name: 'Screenshot', value: 'screenshot' }, { name: 'Structured Data', value: 'structured_data' }, { name: 'Text', value: 'text' }], default: ['markdown'], displayOptions: { show: { operation: ['scrape', 'startCrawl'] } } },
+			{ displayName: 'URLs', name: 'urls', type: 'string', typeOptions: { rows: 5 }, required: true, default: 'https://example.com', displayOptions: { show: { operation: ['batchScrape'] } }, description: 'Enter one URL per line. The maximum number of URLs follows your Apex plan.' },
+			{ displayName: 'Formats', name: 'formats', type: 'multiOptions', options: [{ name: 'HTML', value: 'html' }, { name: 'Links', value: 'links' }, { name: 'Markdown', value: 'markdown' }, { name: 'Raw HTML', value: 'rawHtml' }, { name: 'Screenshot', value: 'screenshot' }], default: ['markdown'], displayOptions: { show: { operation: ['batchScrape'] } } },
 		],
 	};
 
@@ -128,7 +140,7 @@ export class ApexFlow implements INodeType {
 		for (let i = 0; i < items.length; i++) {
 			const operation = this.getNodeParameter('operation', i) as Operation;
 			const params: Record<string, unknown> = {};
-			for (const name of ['url', 'query', 'id', 'offset', 'limit', 'mapLimit', 'resultLimit', 'pageLimit', 'search', 'urls', 'options']) {
+			for (const name of ['url', 'query', 'id', 'offset', 'limit', 'mapLimit', 'resultLimit', 'pageLimit', 'search', 'urls', 'render', 'outputs', 'formats']) {
 				try {
 					params[name] = this.getNodeParameter(name, i);
 				} catch {
@@ -136,7 +148,7 @@ export class ApexFlow implements INodeType {
 				}
 			}
 			try {
-				const request = buildRequestPlan(operation, params);
+				const request = buildRequestPlan(operation, params, this.getNode());
 				const apiBase = request.path.startsWith('/v2/')
 					? 'https://webscraper.apexflowlabs.com'
 					: 'https://webscraper.apexflowlabs.com/v1';
@@ -154,7 +166,11 @@ export class ApexFlow implements INodeType {
 					returnData.push({ json: { error: error instanceof Error ? error.message : String(error) }, pairedItem: { item: i } });
 					continue;
 				}
-				throw error;
+				if (error instanceof NodeOperationError) {
+					throw new NodeOperationError(this.getNode(), error.message);
+				}
+				const errorResponse = error instanceof Error ? { message: error.message } : error as JsonObject;
+				throw new NodeApiError(this.getNode(), errorResponse as JsonObject);
 			}
 		}
 		return [returnData];
