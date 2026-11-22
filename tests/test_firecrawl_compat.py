@@ -1,7 +1,10 @@
 import asyncio
+import hashlib
+import hmac
 import io
 import json
 import time
+from pathlib import Path
 import pytest
 from aiohttp import FormData
 from aiohttp.test_utils import TestClient, TestServer
@@ -510,6 +513,148 @@ async def test_v2_batch_reports_per_url_errors_and_supports_cancel(hosted, monke
     job = (await response.json())["id"]
     response = await client.delete(f"/v2/batch/scrape/{job}", headers=headers)
     assert response.status == 200 and (await response.json())["status"] == "cancelled"
+
+
+async def test_v2_batch_signed_webhooks_retry_and_filter_events(hosted):
+    h, old_client, _, _, _, _ = hosted
+    _, _, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    await old_client.close()
+    allow_delivery = False
+    attempts = []
+    delivered = []
+
+    async def sender(url, body, request_headers):
+        assert url == "https://hooks.example.com/apex"
+        attempts.append((body, dict(request_headers)))
+        if not allow_delivery:
+            return 503
+        delivered.append((body, dict(request_headers)))
+        return 204
+
+    async def scrape(url, **options):
+        return {"markdown": "# Webhook fixture", "rendered": False, "url": url,
+                "receipt": {"final_url": url, "status": 200}, "kind": "text"}
+
+    client = TestClient(TestServer(make_app(h.billing, scrape, hosted=h, batch_webhook_sender=sender)))
+    await client.start_server()
+    try:
+        invalid = await client.post("/v2/batch/scrape", headers=headers, json={
+            "urls": ["https://example.com"], "webhook": {"url": "http://hooks.example.com/apex"},
+        })
+        assert invalid.status == 400
+        assert (await invalid.json())["code"] == "invalid_webhook"
+        private = await client.post("/v2/batch/scrape", headers=headers, json={
+            "urls": ["https://example.com"], "webhook": {"url": "https://127.0.0.1/apex"},
+        })
+        assert private.status == 400
+
+        response = await client.post("/v2/batch/scrape", headers=headers, json={
+            "urls": ["https://example.com/webhook"], "formats": ["markdown"],
+            "webhook": {"url": "https://hooks.example.com/apex", "events": ["page", "completed"],
+                        "metadata": {"source": "fixture"}},
+        })
+        created = await response.json()
+        assert response.status == 200 and created["signingSecret"].startswith("whsec_")
+        job = created["id"]
+        for _ in range(100):
+            status = await client.get(f"/v2/batch/scrape/{job}", headers=headers)
+            if (await status.json())["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        assert (await status.json())["status"] == "completed"
+        for _ in range(100):
+            pending = h.db.execute("SELECT COUNT(*) FROM firecrawl_batch_webhook_events WHERE job=? AND state='pending'",
+                                   (job,)).fetchone()[0]
+            if pending == 2 and len(attempts) >= 2:
+                break
+            await asyncio.sleep(0.01)
+        rows = h.db.execute("SELECT id,event_type,attempts,state FROM firecrawl_batch_webhook_events WHERE job=? ORDER BY event_type",
+                            (job,)).fetchall()
+        assert [row[1] for row in rows] == ["batch_scrape.completed", "batch_scrape.page"]
+        assert all(row[2:] == (1, "pending") for row in rows)
+
+        allow_delivery = True
+        h.db.execute("UPDATE firecrawl_batch_webhook_events SET next_attempt=0 WHERE job=? AND state='pending'", (job,))
+        for _ in range(100):
+            if len(delivered) >= 2:
+                break
+            await asyncio.sleep(0.02)
+        assert len(delivered) == 2
+        event_types = set()
+        for body, request_headers in delivered:
+            payload = json.loads(body)
+            event_types.add(payload["type"])
+            assert payload["id"] == job
+            assert payload["metadata"] == {"source": "fixture"}
+            assert request_headers["X-Apex-Event-Id"] == payload["webhookId"]
+            timestamp, digest = request_headers["X-Apex-Signature"].split(",v1=")
+            timestamp = timestamp.removeprefix("t=")
+            expected = hmac.new(created["signingSecret"].encode(), timestamp.encode() + b"." + body,
+                                hashlib.sha256).hexdigest()
+            assert hmac.compare_digest(digest, expected)
+        assert event_types == {"batch_scrape.page", "batch_scrape.completed"}
+        assert h.db.execute("SELECT COUNT(*) FROM firecrawl_batch_webhook_events WHERE job=? AND state='delivered'",
+                            (job,)).fetchone()[0] == 2
+        assert h.db.execute("SELECT MIN(attempts) FROM firecrawl_batch_webhook_events WHERE job=?",
+                            (job,)).fetchone()[0] == 2
+        assert h.billing.account_for(headers["Authorization"][7:]) == account
+    finally:
+        await client.close()
+
+
+async def test_v2_batch_webhook_summarizes_oversized_page_payload(hosted):
+    h, old_client, _, _, _, _ = hosted
+    _, _, headers = await _auth(hosted)
+    await old_client.close()
+    delivered = []
+
+    async def sender(url, body, request_headers):
+        delivered.append(json.loads(body))
+        return 204
+
+    async def scrape(url, **options):
+        return {"markdown": "# Large screenshot", "screenshot_png_base64": "A" * 150_000,
+                "rendered": False, "url": url,
+                "receipt": {"final_url": url, "status": 200}, "kind": "text"}
+
+    client = TestClient(TestServer(make_app(h.billing, scrape, hosted=h, batch_webhook_sender=sender)))
+    await client.start_server()
+    try:
+        response = await client.post("/v2/batch/scrape", headers=headers, json={
+            "urls": ["https://example.com/large"], "formats": ["screenshot"],
+            "webhook": {"url": "https://hooks.example.com/apex", "events": ["page"]},
+        })
+        created = await response.json()
+        job = created["id"]
+        for _ in range(200):
+            if h.db.execute("SELECT status FROM firecrawl_batch_jobs WHERE id=?", (job,)).fetchone() == ("completed",):
+                break
+            await asyncio.sleep(0.01)
+        for _ in range(200):
+            if delivered:
+                break
+            await asyncio.sleep(0.01)
+        assert len(delivered) == 1
+        event = delivered[0]
+        assert event["type"] == "batch_scrape.page"
+        assert event["webhookTruncated"] is True
+        assert event["data"][0]["webhookTruncated"] is True
+        assert "retrieve this page from batch status" in event["data"][0]["message"]
+        assert event["data"][0]["metadata"]["url"] == "https://example.com/large"
+        assert h.db.execute("SELECT status FROM firecrawl_batch_jobs WHERE id=?", (job,)).fetchone() == ("completed",)
+    finally:
+        await client.close()
+
+
+def test_openapi_keeps_compatibility_routes_at_top_level_and_documents_batch_webhooks():
+    spec = json.loads((Path(__file__).parents[1] / "site" / "openapi.json").read_text(encoding="utf-8"))
+    paths = spec["paths"]
+    assert "post" in paths["/keys"] and "/v2/batch/scrape" in paths
+    assert not any(any(key.startswith("/") for key in item) for item in paths.values())
+    webhook = paths["/v2/batch/scrape"]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]["webhook"]
+    assert webhook["required"] == ["url"]
+    assert webhook["properties"]["events"]["items"]["enum"] == ["started", "page", "completed"]
 
 
 async def test_v2_crawl_lifecycle_reuses_durable_apex_job(hosted, monkeypatch):

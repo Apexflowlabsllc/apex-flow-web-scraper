@@ -133,7 +133,7 @@ def credits_for(body, rendered):
     return total
 
 
-def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot, search_provider=None, package_loader=None, store_reader=None, monitor_sender=None):
+def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot, search_provider=None, package_loader=None, store_reader=None, monitor_sender=None, batch_webhook_sender=None):
     active = defaultdict(int)
     recent = defaultdict(deque)
     api_recent = defaultdict(deque)
@@ -451,7 +451,8 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         # Lightweight test and embedding hosts may provide only a subset of hosted operations.
         # Register the compatibility surface only when its complete backing API is present.
         if all(path in operations for path in compat_operations):
-            hosted_firecrawl_compat.install(app, *(operations[path] for path in compat_operations), hosted)
+            hosted_firecrawl_compat.install(app, *(operations[path] for path in compat_operations), hosted,
+                                            batch_webhook_sender)
         install(app, billing, operations, hosted.site)
     return app
 

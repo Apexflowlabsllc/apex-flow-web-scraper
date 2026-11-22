@@ -951,7 +951,7 @@
             "id": {"type": "string"}, "label": {"type": "string"}, "created_at": {"type": "number"}, "revoked": {"type": "boolean"}
           }}}
         }}}}}
-      },
+      }},
       "post": {
         "operationId": "createApiKey",
         "summary": "Create a labeled API key",
@@ -3071,7 +3071,7 @@
       "post": {
         "operationId": "firecrawlCompatBatchScrape",
         "summary": "Start an asynchronous batch scrape",
-        "description": "Creates an account-scoped asynchronous batch job. Supports markdown, links and screenshot formats, maxAge, and bounded read-only browser actions. URL count follows the account plan. Custom concurrency and webhooks are not supported.",
+        "description": "Creates an account-scoped asynchronous batch job. Supports markdown, links and screenshot formats, maxAge, bounded read-only browser actions, and optional signed lifecycle webhooks for started, page, and completed events. Webhooks use public HTTPS on port 443, retry with bounded backoff, and return a one-time signingSecret. URL count follows the account plan; custom concurrency remains unsupported.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -3083,7 +3083,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": ["success", "id", "url", "status"],
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "id": {"type": "string"},
+                    "url": {"type": "string"},
+                    "status": {"type": "string", "enum": ["scraping"]},
+                    "signingSecret": {"type": "string", "description": "Returned only when a webhook is configured. Store it securely."},
+                    "signingSecretNotice": {"type": "string"}
+                  }
                 }
               }
             }
@@ -3125,6 +3134,17 @@
                     "items": {
                       "type": "string",
                       "format": "uri"
+                    }
+                  },
+                  "webhook": {
+                    "type": "object",
+                    "required": ["url"],
+                    "additionalProperties": false,
+                    "description": "Optional signed lifecycle callback. Only public HTTPS on port 443 is accepted.",
+                    "properties": {
+                      "url": {"type": "string", "format": "uri", "description": "HTTPS callback URL on port 443."},
+                      "events": {"type": "array", "uniqueItems": true, "items": {"type": "string", "enum": ["started", "page", "completed"]}, "description": "Event names to deliver; defaults to all three."},
+                      "metadata": {"type": "object", "description": "JSON object included in each event; maximum 16 KiB."}
                     }
                   },
                   "formats": {
@@ -3365,5 +3385,4 @@
       }
     }
   }
-}
 }

@@ -38,11 +38,15 @@ test("official Firecrawl SDK can target the Apex v2 compatibility API", async ()
     const searched = await app.search("example query", { limit: 1 });
     assert.equal(searched.web[0].url, "https://example.com/result");
 
-    const started = await app.startBatchScrape(["https://example.com/batch"], { formats: ["markdown"] });
+    const started = await app.startBatchScrape(["https://example.com/batch"], {
+      formats: ["markdown"], webhook: { url: "https://hooks.example.com/apex", events: ["page"] },
+    });
     assert.equal(started.id, "batch_fixture");
     const batch = await app.getBatchScrapeStatus(started.id);
     assert.equal(batch.status, "completed");
     assert.equal(batch.data[0].markdown, "# Batched");
+    assert.deepEqual(requests.find((request) => request.url === "/v2/batch/scrape").body.webhook,
+      { url: "https://hooks.example.com/apex", events: ["page"] });
 
     assert.deepEqual(requests.map(({ method, url }) => `${method} ${url}`), [
       "POST /v2/scrape", "POST /v2/map", "POST /v2/search", "POST /v2/batch/scrape", "GET /v2/batch/scrape/batch_fixture",

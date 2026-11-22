@@ -5,20 +5,32 @@ rejected instead of being accepted and silently ignored. See the site guide for
 the exact supported subset; this is not a claim of complete SDK compatibility.
 """
 import asyncio
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import os
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 
+import aiohttp
 from aiohttp import web
 from .billing import public_usage_key_id
-from .policy import ScrapeError
+from .policy import PublicResolver, ScrapeError, check_url
 
 INTERACT_SERVICE_KEY = web.AppKey("interact_service", object)
 BATCH_LEASE_SECONDS = 30
 BATCH_LEASE_RENEW_SECONDS = 8
+BATCH_WEBHOOK_LEASE_SECONDS = 120
+BATCH_WEBHOOK_MAX_BYTES = 128 * 1024
+BATCH_WEBHOOK_EVENTS = {
+    "started": "batch_scrape.started",
+    "page": "batch_scrape.page",
+    "completed": "batch_scrape.completed",
+}
 
 
 def _claim_firecrawl_batch(db, job, now, lease_seconds=BATCH_LEASE_SECONDS):
@@ -33,8 +45,84 @@ def _claim_firecrawl_batch(db, job, now, lease_seconds=BATCH_LEASE_SECONDS):
     return token if claimed else None
 
 
+def _claim_firecrawl_batch_webhook(db, event_id, now, lease_seconds=BATCH_WEBHOOK_LEASE_SECONDS):
+    token = secrets.token_urlsafe(18)
+    claimed = db.execute(
+        "UPDATE firecrawl_batch_webhook_events SET lease_until=?,lease_token=?,attempts=attempts+1 "
+        "WHERE id=? AND state='pending' AND next_attempt<=? "
+        "AND (lease_until IS NULL OR lease_until<=?)",
+        (now + lease_seconds, token, event_id, now, now),
+    ).rowcount
+    if not claimed:
+        return None
+    row = db.execute("SELECT attempts FROM firecrawl_batch_webhook_events WHERE id=? AND lease_token=?",
+                     (event_id, token)).fetchone()
+    return (token, row[0]) if row else None
+
+
+def _batch_webhook_secret(hosted, account, job):
+    digest = hmac.new(hosted.delivery_secret.encode(),
+                      ("apex-firecrawl-batch-v1:" + account + ":" + job).encode(),
+                      hashlib.sha256).digest()
+    return "whsec_" + base64.urlsafe_b64encode(digest).decode().rstrip("=")
+
+
+def _queue_firecrawl_batch_webhook(db, job, hook, short_name, data, page_seq=None):
+    if not hook or BATCH_WEBHOOK_EVENTS[short_name] not in hook["events"]:
+        return None
+    event_id = "evt_" + secrets.token_urlsafe(18)
+    event_type = BATCH_WEBHOOK_EVENTS[short_name]
+    payload = {"success": True, "type": event_type, "id": job, "webhookId": event_id,
+               "data": [] if short_name == "page" else data, "metadata": hook["metadata"]}
+    db.execute(
+        "INSERT INTO firecrawl_batch_webhook_events(id,job,event_type,payload,page_seq,state,attempts,next_attempt) "
+        "VALUES(?,?,?,?,?, 'pending',0,?)",
+        (event_id, job, event_type, json.dumps(payload, separators=(",", ":")), page_seq, time.time()),
+    )
+    return event_id
+
+
+def _normalize_firecrawl_batch_webhook(value):
+    if not isinstance(value, dict) or set(value) - {"url", "events", "metadata"}:
+        raise ValueError("webhook supports only url, events, and metadata")
+    url = value.get("url")
+    checked = check_url(url)
+    parts = urlsplit(checked)
+    if parts.scheme != "https" or parts.port not in (None, 443):
+        raise ValueError("webhook.url must use HTTPS on port 443")
+    events = value.get("events", list(BATCH_WEBHOOK_EVENTS))
+    if not isinstance(events, list) or not events:
+        raise ValueError("webhook.events must be a non-empty list of started, page, or completed")
+    normalized = []
+    reverse = {full: short for short, full in BATCH_WEBHOOK_EVENTS.items()}
+    for event in events:
+        short = reverse.get(event, event) if isinstance(event, str) else None
+        if short not in BATCH_WEBHOOK_EVENTS:
+            raise ValueError("webhook.events supports only started, page, and completed")
+        full = BATCH_WEBHOOK_EVENTS[short]
+        if full not in normalized:
+            normalized.append(full)
+    metadata = value.get("metadata", {})
+    if not isinstance(metadata, dict):
+        raise ValueError("webhook.metadata must be a JSON object")
+    try:
+        if len(json.dumps(metadata, separators=(",", ":")).encode("utf-8")) > 16_384:
+            raise ValueError("webhook.metadata must be no larger than 16 KiB")
+    except (TypeError, ValueError) as exc:
+        if isinstance(exc, ValueError) and str(exc).startswith("webhook.metadata"):
+            raise
+        raise ValueError("webhook.metadata must be a JSON object") from exc
+    return {"url": checked, "events": normalized, "metadata": metadata}
+
+
+async def _post_firecrawl_batch_webhook(client, url, body, headers):
+    async with client.post(url, data=body, headers=headers, allow_redirects=False) as response:
+        await response.content.read(1024)
+        return response.status
+
+
 def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_for, crawl_cancel_for,
-            batch_for, hosted):
+            batch_for, hosted, webhook_sender=None):
     from .interact import InteractService
     interact = InteractService(hosted)
     app[INTERACT_SERVICE_KEY] = interact
@@ -49,8 +137,18 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         CREATE TABLE IF NOT EXISTS firecrawl_batch_pages(
             job TEXT NOT NULL, seq INTEGER NOT NULL, url TEXT NOT NULL, status INTEGER NOT NULL,
             payload TEXT NOT NULL, credits INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(job,seq));
+        CREATE TABLE IF NOT EXISTS firecrawl_batch_webhook_events(
+            id TEXT PRIMARY KEY, job TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL,
+            page_seq INTEGER,
+            state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
+            next_attempt REAL NOT NULL, http_status INTEGER, last_error TEXT,
+            lease_until REAL, lease_token TEXT);
         CREATE INDEX IF NOT EXISTS firecrawl_batch_account ON firecrawl_batch_jobs(account,created);
+        CREATE INDEX IF NOT EXISTS firecrawl_batch_webhook_due ON firecrawl_batch_webhook_events(state,next_attempt,lease_until);
     """)
+    webhook_columns = {row[1] for row in hosted.db.execute("PRAGMA table_info(firecrawl_batch_webhook_events)")}
+    if "page_seq" not in webhook_columns:
+        hosted.db.execute("ALTER TABLE firecrawl_batch_webhook_events ADD COLUMN page_seq INTEGER")
     batch_columns = {row[1] for row in hosted.db.execute("PRAGMA table_info(firecrawl_batch_jobs)")}
     if "lease_until" not in batch_columns:
         hosted.db.execute("ALTER TABLE firecrawl_batch_jobs ADD COLUMN lease_until REAL")
@@ -691,7 +789,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             return
         lease_token = claimed
         row = hosted.db.execute(
-            "SELECT account,urls,options FROM firecrawl_batch_jobs WHERE id=? AND status='scraping' AND lease_token=?",
+        "SELECT account,urls,options FROM firecrawl_batch_jobs WHERE id=? AND status='scraping' AND lease_token=?",
             (job, lease_token),
         ).fetchone()
         if not row:
@@ -731,20 +829,27 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             else:
                 result = {"metadata": {"url": url, "sourceURL": url, "statusCode": status,
                                        "error": item.get("error", "Scrape failed")}}
-            saved = hosted.db.execute(
-                "INSERT OR IGNORE INTO firecrawl_batch_pages(job,seq,url,status,payload,credits) "
-                "SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM firecrawl_batch_jobs "
-                "WHERE id=? AND status='scraping' AND lease_token=?)",
-                (job, index, url, status, json.dumps(result), credits, job, lease_token),
-            ).rowcount
-            if saved:
-                hosted.db.execute(
-                    "UPDATE firecrawl_batch_jobs SET "
-                    "completed=(SELECT COUNT(*) FROM firecrawl_batch_pages WHERE job=?), "
-                    "credits=(SELECT COALESCE(SUM(credits),0) FROM firecrawl_batch_pages WHERE job=?) "
-                    "WHERE id=? AND status='scraping' AND lease_token=?",
-                    (job, job, job, lease_token),
-                )
+            hosted.db.execute("BEGIN IMMEDIATE")
+            try:
+                saved = hosted.db.execute(
+                    "INSERT OR IGNORE INTO firecrawl_batch_pages(job,seq,url,status,payload,credits) "
+                    "SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM firecrawl_batch_jobs "
+                    "WHERE id=? AND status='scraping' AND lease_token=?)",
+                    (job, index, url, status, json.dumps(result), credits, job, lease_token),
+                ).rowcount
+                if saved:
+                    _queue_firecrawl_batch_webhook(hosted.db, job, options.get("_webhook"), "page", [result], page_seq=index)
+                    hosted.db.execute(
+                        "UPDATE firecrawl_batch_jobs SET "
+                        "completed=(SELECT COUNT(*) FROM firecrawl_batch_pages WHERE job=?), "
+                        "credits=(SELECT COALESCE(SUM(credits),0) FROM firecrawl_batch_pages WHERE job=?) "
+                        "WHERE id=? AND status='scraping' AND lease_token=?",
+                        (job, job, job, lease_token),
+                    )
+                hosted.db.execute("COMMIT")
+            except BaseException:
+                hosted.db.execute("ROLLBACK")
+                raise
 
         try:
             # Reconcile counters from persisted URL rows before resuming a job
@@ -829,8 +934,20 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                     pending = retry
                     await asyncio.sleep(min(15, 2 ** attempt))
                     attempt += 1
-            hosted.db.execute("UPDATE firecrawl_batch_jobs SET status='completed',finished=?,lease_until=NULL,lease_token=NULL WHERE id=? AND status='scraping' AND lease_token=?",
-                              (time.time(), job, lease_token))
+            hosted.db.execute("BEGIN IMMEDIATE")
+            try:
+                finished = time.time()
+                completed = hosted.db.execute(
+                    "UPDATE firecrawl_batch_jobs SET status='completed',finished=?,lease_until=NULL,lease_token=NULL "
+                    "WHERE id=? AND status='scraping' AND lease_token=?",
+                    (finished, job, lease_token),
+                ).rowcount
+                if completed:
+                    _queue_firecrawl_batch_webhook(hosted.db, job, options.get("_webhook"), "completed", [])
+                hosted.db.execute("COMMIT")
+            except BaseException:
+                hosted.db.execute("ROLLBACK")
+                raise
         except asyncio.CancelledError:
             # Service shutdown releases work for another process. Explicit API
             # cancellation changes status first and therefore remains cancelled.
@@ -860,11 +977,90 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                     batch_tasks[job] = asyncio.create_task(run_batch(job), name=f"firecrawl-batch-{job}")
             await asyncio.sleep(1)
 
+    async def deliver_batch_webhook(row, client):
+        event_id, job, event_type, payload, page_seq = row
+        claimed = _claim_firecrawl_batch_webhook(hosted.db, event_id, time.time())
+        if not claimed:
+            return
+        lease_token, attempts = claimed
+        target = hosted.db.execute("SELECT account,options FROM firecrawl_batch_jobs WHERE id=?", (job,)).fetchone()
+        if not target:
+            hosted.db.execute("UPDATE firecrawl_batch_webhook_events SET state='cancelled',lease_until=NULL,lease_token=NULL,last_error='Batch job deleted' WHERE id=? AND lease_token=?",
+                              (event_id, lease_token))
+            return
+        account, raw_options = target
+        hook = json.loads(raw_options).get("_webhook")
+        if not hook or not isinstance(hook.get("url"), str):
+            hosted.db.execute("UPDATE firecrawl_batch_webhook_events SET state='cancelled',lease_until=NULL,lease_token=NULL,last_error='Webhook configuration missing' WHERE id=? AND lease_token=?",
+                              (event_id, lease_token))
+            return
+        event = json.loads(payload)
+        if page_seq is not None:
+            page_row = hosted.db.execute("SELECT payload FROM firecrawl_batch_pages WHERE job=? AND seq=?",
+                                         (job, page_seq)).fetchone()
+            if not page_row:
+                hosted.db.execute("UPDATE firecrawl_batch_webhook_events SET state='failed',lease_until=NULL,lease_token=NULL,last_error='Batch page result missing' WHERE id=? AND lease_token=?",
+                                  (event_id, lease_token))
+                return
+            event["data"] = [json.loads(page_row[0])]
+            body_text = json.dumps(event, separators=(",", ":"))
+            if len(body_text.encode("utf-8")) > BATCH_WEBHOOK_MAX_BYTES:
+                page = event["data"][0]
+                metadata = page.get("metadata", {}) if isinstance(page, dict) else {}
+                keep = {key: metadata[key] for key in ("url", "sourceURL", "statusCode", "contentType", "title", "description", "creditsUsed")
+                        if key in metadata}
+                event["data"] = [{"metadata": keep, "webhookTruncated": True,
+                                  "message": "Page payload exceeded the webhook size limit; retrieve this page from batch status."}]
+                event["webhookTruncated"] = True
+                body_text = json.dumps(event, separators=(",", ":"))
+        else:
+            body_text = payload
+        body = body_text.encode("utf-8")
+        timestamp = str(int(time.time()))
+        secret = _batch_webhook_secret(hosted, account, job).encode("utf-8")
+        signature = hmac.new(secret, timestamp.encode() + b"." + body, hashlib.sha256).hexdigest()
+        headers = {"Content-Type": "application/json", "X-Apex-Event-Id": event_id,
+                   "X-Apex-Signature": f"t={timestamp},v1={signature}"}
+        status = None
+        try:
+            if webhook_sender:
+                status = await webhook_sender(hook["url"], body, headers)
+            else:
+                status = await _post_firecrawl_batch_webhook(client, hook["url"], body, headers)
+            if not isinstance(status, int) or not 200 <= status < 300:
+                raise aiohttp.ClientResponseError(None, (), status=status or 500)
+            hosted.db.execute("UPDATE firecrawl_batch_webhook_events SET state='delivered',lease_until=NULL,lease_token=NULL,http_status=?,last_error=NULL WHERE id=? AND state='pending' AND lease_token=?",
+                              (status, event_id, lease_token))
+        except Exception as exc:
+            if attempts >= 6:
+                hosted.db.execute("UPDATE firecrawl_batch_webhook_events SET state='failed',lease_until=NULL,lease_token=NULL,http_status=?,last_error=? WHERE id=? AND state='pending' AND lease_token=?",
+                                  (status, type(exc).__name__, event_id, lease_token))
+            else:
+                delay = min(30 * (2 ** (attempts - 1)), 1800)
+                hosted.db.execute("UPDATE firecrawl_batch_webhook_events SET lease_until=NULL,lease_token=NULL,next_attempt=?,http_status=?,last_error=? WHERE id=? AND state='pending' AND lease_token=?",
+                                  (time.time() + delay, status, type(exc).__name__, event_id, lease_token))
+
+    async def dispatch_batch_webhooks():
+        timeout = aiohttp.ClientTimeout(total=10, connect=4, sock_read=5)
+        connector = aiohttp.TCPConnector(resolver=PublicResolver(), ttl_dns_cache=0)
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as client:
+            while True:
+                pending = hosted.db.execute(
+                    "SELECT id,job,event_type,payload,page_seq FROM firecrawl_batch_webhook_events WHERE state='pending' "
+                    "AND next_attempt<=? AND (lease_until IS NULL OR lease_until<=?) ORDER BY next_attempt LIMIT 20",
+                    (time.time(), time.time()),
+                ).fetchall()
+                for offset in range(0, len(pending), 4):
+                    await asyncio.gather(*(deliver_batch_webhook(row, client) for row in pending[offset:offset + 4]))
+                await asyncio.sleep(1)
+
     async def batch_worker(app):
         dispatcher = asyncio.create_task(dispatch_batches(), name="firecrawl-batch-dispatcher")
+        webhooks = asyncio.create_task(dispatch_batch_webhooks(), name="firecrawl-batch-webhooks")
         yield
         dispatcher.cancel()
-        await asyncio.gather(dispatcher, return_exceptions=True)
+        webhooks.cancel()
+        await asyncio.gather(dispatcher, webhooks, return_exceptions=True)
         active = list(batch_tasks.values())
         for task in active:
             task.cancel()
@@ -887,7 +1083,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             return error(f"This plan supports at most {max_urls} URLs per batch job", "batch_limit", 413)
         allowed = {"urls", "formats", "onlyMainContent", "maxAge", "screenshot", "actions",
                    "ignoreInvalidURLs", "origin", "blockAds", "removeBase64Images", "storeInCache",
-                   "fastMode", "mobile"}
+                   "fastMode", "mobile", "webhook"}
         extra = set(body) - allowed
         if extra:
             return error("Unsupported Apex compatibility options: " + ", ".join(sorted(extra)))
@@ -944,21 +1140,39 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 return error(str(exc))
         if "screenshot" in selected or body.get("screenshot", False):
             apex_options["screenshot"] = True
+        webhook_config = None
+        if "webhook" in body:
+            try:
+                webhook_config = _normalize_firecrawl_batch_webhook(body["webhook"])
+            except (ValueError, ScrapeError) as exc:
+                return error(str(exc), "invalid_webhook")
+            apex_options["_webhook"] = webhook_config
         apex_options["_compat_formats"] = selected
         if compat_warning:
             apex_options["_compat_warning"] = compat_warning
         hosted.db.execute("DELETE FROM firecrawl_batch_pages WHERE job IN (SELECT id FROM firecrawl_batch_jobs WHERE created<?)",
                           (time.time() - 7 * 86400,))
+        hosted.db.execute("DELETE FROM firecrawl_batch_webhook_events WHERE job IN (SELECT id FROM firecrawl_batch_jobs WHERE created<?)",
+                          (time.time() - 7 * 86400,))
         hosted.db.execute("DELETE FROM firecrawl_batch_jobs WHERE created<?", (time.time() - 7 * 86400,))
         hosted.billing.db.execute("DELETE FROM idempotent_reservations WHERE created<?", (time.time() - 7 * 86400,))
         job = "batch_" + secrets.token_hex(12)
         created = time.time()
-        hosted.db.execute("INSERT INTO firecrawl_batch_jobs(id,account,status,urls,options,total,created) VALUES(?,?, 'scraping', ?,?,?,?)",
-                          (job, request["account"], json.dumps(urls), json.dumps(apex_options), len(urls), created))
+        hosted.db.execute("BEGIN IMMEDIATE")
+        try:
+            hosted.db.execute("INSERT INTO firecrawl_batch_jobs(id,account,status,urls,options,total,created) VALUES(?,?, 'scraping', ?,?,?,?)",
+                              (job, request["account"], json.dumps(urls), json.dumps(apex_options), len(urls), created))
+            _queue_firecrawl_batch_webhook(hosted.db, job, webhook_config, "started", [])
+            hosted.db.execute("COMMIT")
+        except BaseException:
+            hosted.db.execute("ROLLBACK")
+            raise
         batch_tasks[job] = asyncio.create_task(run_batch(job), name=f"firecrawl-batch-{job}")
-        return web.json_response({"success": True, "id": job,
-                                  "url": f"/v2/batch/scrape/{job}",
-                                  "status": "scraping"}, status=200)
+        response = {"success": True, "id": job, "url": f"/v2/batch/scrape/{job}", "status": "scraping"}
+        if webhook_config:
+            response["signingSecret"] = _batch_webhook_secret(hosted, request["account"], job)
+            response["signingSecretNotice"] = "Shown once. Verify X-Apex-Signature over the exact webhook request body."
+        return web.json_response(response, status=200)
 
     async def batch_status_route(request):
         job_id = request.match_info["job"]

@@ -60,7 +60,7 @@ Sources: [Firecrawl Enhanced Mode](https://docs.firecrawl.dev/features/enhanced-
 
 | Capability customers compare | Current Apex position | Build path | Proof required before marketing it as ready |
 |---|---|---|---|
-| Durable crawling and job control | Implemented locally; hosted source includes paid, opt-in scheduled monitors with persisted schedule/event state, signed HTTPS notifications, bounded retries, pause/resume/delete, plan quotas, and expiring token-fenced SQLite leases for monitor checks and webhook attempts | Prove multi-process claiming under real worker contention; expose delivery attempts and recovery state; validate at-least-once duplicate behavior through restart/fault injection; improve queue fairness, retention tools and capacity controls | Fault-injection and load run with stated hardware and job mix; monitor tests cover billing/refunds, restart, concurrent claims, stale-lease fencing, SSRF/DNS rebinding, tenant isolation and exhausted-credit pause |
+| Durable crawling and job control | Implemented locally; hosted source includes paid, opt-in scheduled monitors plus Firecrawl-compatible async batches with persisted results, token-fenced recovery and optional signed lifecycle webhooks; both use bounded retries and public-HTTPS delivery checks | Prove multi-process claiming under real worker contention; expose delivery attempts and recovery state; validate at-least-once duplicate behavior through restart/fault injection; improve queue fairness, retention tools and capacity controls | Fault-injection and load run with stated hardware and job mix; monitor and batch tests cover billing/refunds, restart, concurrent claims, stale-lease fencing, SSRF/DNS rebinding, webhook signatures/retries, tenant isolation and exhausted-credit pause |
 | Extraction breadth | HTML, Markdown, JSON-LD, tables, feeds, sitemaps, JSON, text and text-based PDFs | Add reviewed product/article/job schemas, pagination patterns, iframe policy, image OCR and language-aware parsing | Human-labeled gold set; per-field precision, recall, coverage and source attribution |
 | Recipe authoring | CSS recipes and required fields | Visual selector picker, page preview, multi-page recipe tests, suggested fields with source highlights | Recipe success and maintenance study across unseen layouts; user can inspect and edit every rule |
 | Layout change detection | Compare saved results | Detect selector drift, unexpected empty fields, types and page-template changes; generate repair proposals for review | Versioned-change benchmark; show detection and false-alarm rates, keep human approval before replacing a recipe |
@@ -208,9 +208,13 @@ search-first volume. [Google guidance for generative search](https://developers.
    supports cancellation, and bounds job size to plan limits. The worker reuses
    the metered native batch path. Batch jobs now use expiring token-fenced
    SQLite leases and restart recovery resumes only URL rows without persisted
-   results; two-connection claim and API restart tests cover these paths. Still
-   required: multi-process load/fault testing, webhook callbacks, broader
-   response-schema coverage, and a reviewed production release before customers
+   results; two-connection claim and API restart tests cover these paths. It
+   also supports optional signed lifecycle webhooks (started/page/completed)
+   with event filtering, HTTPS-only delivery, bounded retries and a one-time
+   secret return; page events above 128 KiB are summarized with a
+   status-retrieval hint. Still required: multi-process load/fault testing,
+   broader response-schema coverage,
+   and a reviewed production release before customers
    can use it live. If a worker dies after an upstream scrape succeeds but
    before its result is persisted, recovery may repeat the upstream scrape, but
    a durable per-job/per-URL billing key prevents charging that URL twice.
