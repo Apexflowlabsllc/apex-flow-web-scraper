@@ -89,7 +89,7 @@ async def test_package_endpoints_charge_one_credit_only_for_an_answer(tmp_path, 
     start = billing.remaining(acct)
     async with TestClient(TestServer(make_app(billing, scrape, hosted=h, package_loader=loader))) as client:
         listing = await (await client.get("/v1/packages", headers=auth)).json()
-        assert {p["id"] for p in listing["packages"]} == {"housing", "npr"}
+        assert {p["id"] for p in listing["packages"]} == {"housing", "npr", "home", "rent", "pay", "mortgage-rates"}
         r = await client.post("/v1/packages/housing", json={"region": "Kansas City, MO"}, headers=auth)
         body = await r.json()
         assert r.status == 200 and body["credits_used"] == 1 and body["result"]["latest"]["index"] == 309.0

@@ -29,6 +29,11 @@ PACKAGES = [
 ]
 
 
+def _more_packages():
+    from .hosted_datapacks import PACKAGES as MORE
+    return MORE
+
+
 def _matches(wanted_city, wanted_state, name):
     """FHFA names join cities and states with hyphens: "Sacramento-Roseville-Folsom, CA", "Kansas City, MO-KS"."""
     cities, _, states = name.rpartition(",")
@@ -176,7 +181,7 @@ def install(h, app, loader=None):
         return await answer(account, f"https://feeds.npr.org/{NPR_TOPICS[topic]}/rss.xml", lambda text: npr_news(text, topic, limit))
 
     async def listing_for(account, body=None):
-        return web.json_response({"packages": PACKAGES})
+        return web.json_response({"packages": PACKAGES + _more_packages()})
 
     async def housing(request):
         return await housing_for(request["account"], await request.json())
@@ -190,4 +195,9 @@ def install(h, app, loader=None):
     app.router.add_get("/v1/packages", listing)
     app.router.add_post("/v1/packages/housing", housing)
     app.router.add_post("/v1/packages/npr", npr)
-    return {"/packages": listing_for, "/packages/housing": housing_for, "/packages/npr": npr_for}
+    from . import hosted_datapacks
+
+    async def prices_for(region):
+        return house_prices(await source(FHFA_METRO), region, 8)
+    more = hosted_datapacks.install(h, app, prices_for, source)
+    return {"/packages": listing_for, "/packages/housing": housing_for, "/packages/npr": npr_for, **more}

@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Glassdoor salary data alternative: pay by job and city by API · Apex Flow Web Scraper</title>
+<meta name="description" content="Glassdoor sits behind a bot wall and its terms forbid scraping. Our pay package returns pay for about 800 jobs in every US metro from the government&#x27;s own "><link rel="canonical" href="https://webscraper.apexflowlabs.com/glassdoor-salary-api.html"><meta property="og:title" content="Glassdoor salary data alternative: pay by job and city by API"><meta property="og:description" content="Glassdoor sits behind a bot wall and its terms forbid scraping. Our pay package returns pay for about 800 jobs in every US metro from the government&#x27;s own "><meta property="og:image" content="https://webscraper.apexflowlabs.com/assets/og-crawl.jpg"><meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/integrations/int.css"><script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is this the same as Glassdoor salaries?", "acceptedAnswer": {"@type": "Answer", "text": "No. Glassdoor collects reports from employees; this is a survey of about 1.1 million employers run by the U.S. Bureau of Labor Statistics. It covers every metro and is not limited by how many people posted."}}, {"@type": "Question", "name": "How current is it?", "acceptedAnswer": {"@type": "Answer", "text": "May 2024, the latest release. The government publishes a new year every spring and we update the table when it does."}}, {"@type": "Question", "name": "What does it cost?", "acceptedAnswer": {"@type": "Answer", "text": "One credit an answer. A list of possible metro names, when your question matches more than one, is free."}}]}</script></head><body>
+<nav aria-label="Primary"><a href="/">APEX FLOW WEB SCRAPER</a><span class="nav-links"><a href="/integrations/">Integrations</a><a href="/docs.html#packages">Docs</a><a href="/#pricing">Pricing</a><a class="button" href="/trial.html">Get a free key</a></span></nav><main>
+<p class="eyebrow">Data packages</p><h1>Pay for any job, <em>in any US metro.</em></h1><p class="lede">Glassdoor sits behind a bot wall and its terms forbid scraping. Our pay package returns pay for about 800 jobs in every US metro from the government&#x27;s own employer survey, which you may use and resell: median, mean, the 10th to 90th percentile and how many people do the job.</p>
+<div class="code"><button type="button" class="copy" data-copy>Copy</button><pre><code>curl https://webscraper.apexflowlabs.com/v1/packages/pay \
+  -H &quot;Authorization: Bearer $APEX_SCRAPER_API_KEY&quot; -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{&quot;job&quot;:&quot;software developer&quot;,&quot;region&quot;:&quot;Seattle, WA&quot;}&#x27;</code></pre></div>
+<h2>Part of the reply (real data)</h2><div class="code"><pre><code>{
+  &quot;region&quot;: &quot;Seattle-Tacoma-Bellevue, WA&quot;,
+  &quot;jobs&quot;: [
+    {
+      &quot;title&quot;: &quot;Software Developers&quot;,
+      &quot;employed&quot;: 72730,
+      &quot;annual&quot;: {
+        &quot;median&quot;: 169340,
+        &quot;mean&quot;: 181040,
+        &quot;p10&quot;: 105060,
+        &quot;p25&quot;: 136010,
+        &quot;p75&quot;: 211590,
+        &quot;p90&quot;: &quot;239200+&quot;
+      }
+    }
+  ]
+}</code></pre></div>
+<h2>What comes back</h2><div class="tablewrap"><table><thead><tr><th>Field</th><th>Detail</th><th>Source</th></tr></thead><tbody><tr><td>Annual pay</td><td>Median, mean, 10th, 25th, 75th and 90th percentile</td><td>BLS OEWS, May 2024 (public domain)</td></tr><tr><td>Hourly median</td><td>For every job with a published figure</td><td>BLS OEWS, May 2024</td></tr><tr><td>Jobs in the metro</td><td>How many people hold the job there</td><td>BLS OEWS, May 2024</td></tr></tbody></table></div>
+<p>Endpoint: <code>/v1/packages/pay</code> with <code>job</code>, <code>region</code> and optional <code>limit</code> (up to 20 closest job titles). MCP tool: <code>job_pay</code>. Every answer names its source and attribution.</p>
+<h2>Questions</h2><details><summary>Is this the same as Glassdoor salaries?</summary><p>No. Glassdoor collects reports from employees; this is a survey of about 1.1 million employers run by the U.S. Bureau of Labor Statistics. It covers every metro and is not limited by how many people posted.</p></details><details><summary>How current is it?</summary><p>May 2024, the latest release. The government publishes a new year every spring and we update the table when it does.</p></details><details><summary>What does it cost?</summary><p>One credit an answer. A list of possible metro names, when your question matches more than one, is free.</p></details>
+<p class="cta"><a class="button" href="/trial.html">Get 1,000 free credits →</a> <a class="button secondary" href="/docs.html#packages">Read the package docs</a></p>
+</main><footer><span>Apex Flow Web Scraper, by Apex Flow Labs.</span><a href="/integrations/">Integrations</a><a href="/docs.html">Docs</a><a href="/compare.html">Compare</a><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a></footer>
+<script src="/integrations/int.js" defer></script><script src="/assets/cursor.js" defer></script></body></html>

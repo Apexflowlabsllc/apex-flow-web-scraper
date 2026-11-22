@@ -134,6 +134,30 @@ async def house_prices(region: str, quarters: int = 8):
 
 
 @mcp.tool()
+async def home_report(region: str):
+    """Everything about housing in a US metro such as "Sacramento, CA" in one answer: house price trend with one- and five-year change (FHFA), monthly rent for a studio to a 4-bedroom (HUD FY2026), and this week's 30- and 15-year mortgage rates (Freddie Mac). One credit; a list of candidate names is free."""
+    return await request("/packages/home", {"region": region})
+
+
+@mcp.tool()
+async def rent_prices(region: str):
+    """Monthly rent for a studio, 1, 2, 3 and 4 bedrooms in any US metro, county or town such as "Austin, TX", from HUD Fair Market Rents FY2026 (public domain). One credit."""
+    return await request("/packages/rent", {"region": region})
+
+
+@mcp.tool()
+async def job_pay(job: str, region: str, limit: int = 5):
+    """Pay for a job title in a US metro, for example job="registered nurse", region="Seattle, WA": median, mean and 10th to 90th percentile annual pay and how many people hold the job, from the U.S. Bureau of Labor Statistics (May 2024, public domain). One credit."""
+    return await request("/packages/pay", {"job": job, "region": region, "limit": limit})
+
+
+@mcp.tool()
+async def mortgage_rates():
+    """This week's national average 30- and 15-year fixed mortgage rates, the rate a year ago and the last 8 weeks, from Freddie Mac's Primary Mortgage Market Survey. One credit."""
+    return await request("/packages/mortgage-rates", {})
+
+
+@mcp.tool()
 async def npr_news(topic: Literal["news", "world", "business", "science", "politics", "technology", "health"] = "news", limit: int = 10):
     """Latest NPR headlines for a topic with summaries and links, from NPR's public feed. One credit. Pass a story link to scrape_page to read it."""
     return await request("/packages/npr", {"topic": topic, "limit": limit})
