@@ -40,7 +40,7 @@ jobs:
       - name: Run Python suite
         run: python -m pytest -q
       - name: Compile LangChain integration example
-        run: python -m py_compile examples/langchain_mcp.py
+        run: python -m py_compile examples/langchain_mcp.py examples/llamaindex_mcp.py
       - name: Build Python distributions
         if: matrix.python-version == '3.11'
         run: python -m build --no-isolation
@@ -93,6 +93,29 @@ jobs:
           echo "APEX_LANGCHAIN_CLIENT_PYTHON=$RUNNER_TEMP/langchain-client/bin/python" >> "$GITHUB_ENV"
       - name: Discover and call Apex MCP tool through LangChain
         run: python -m pytest -q tests/test_firecrawl_compat.py::test_current_langchain_mcp_client_discovers_and_calls_hosted_scraper
+
+  llamaindex-mcp:
+    name: LlamaIndex MCP integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11"
+      - name: Install Apex test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check --require-hashes -r requirements-test.lock
+          python -m pip install --disable-pip-version-check --no-deps --no-build-isolation --editable .
+      - name: Install LlamaIndex MCP client in an isolated environment
+        run: |
+          python -m venv "$RUNNER_TEMP/llamaindex-client"
+          "$RUNNER_TEMP/llamaindex-client/bin/python" -m pip install --disable-pip-version-check "llama-index-tools-mcp==0.6.0" llama-index-llms-openai
+          echo "APEX_LLAMA_CLIENT_PYTHON=$RUNNER_TEMP/llamaindex-client/bin/python" >> "$GITHUB_ENV"
+      - name: Discover and call Apex MCP tool through LlamaIndex
+        run: python -m pytest -q tests/test_firecrawl_compat.py::test_current_llamaindex_mcp_client_discovers_and_calls_hosted_scraper
 
   node-sdk:
     name: Node SDK ${{ matrix.node-version }}

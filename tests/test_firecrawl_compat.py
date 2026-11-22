@@ -1010,6 +1010,45 @@ asyncio.run(main())
     assert h.scrape_calls[-1][0] == "https://example.com/langchain"
 
 
+async def test_current_llamaindex_mcp_client_discovers_and_calls_hosted_scraper(hosted):
+    import os
+
+    client_python = os.environ.get("APEX_LLAMA_CLIENT_PYTHON")
+    if not client_python:
+        pytest.skip("set APEX_LLAMA_CLIENT_PYTHON to test the current LlamaIndex MCP client")
+
+    h, client, headers = await _auth(hosted)
+    child_env = {name: os.environ[name] for name in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP")
+                 if name in os.environ}
+    child_env["APEX_SCRAPER_API_KEY"] = headers["Authorization"][7:]
+    child_env["APEX_LLAMA_MCP_URL"] = str(client.make_url("/v1/mcp"))
+    child_env["APEX_LLAMA_TEST_URL"] = "https://example.com/llamaindex"
+    script = """
+import asyncio, os
+from llama_index.tools.mcp import BasicMCPClient, McpToolSpec
+
+async def main():
+    client = BasicMCPClient(
+        os.environ['APEX_LLAMA_MCP_URL'],
+        headers={'Authorization': f\"Bearer {os.environ['APEX_SCRAPER_API_KEY']}\"},
+    )
+    spec = McpToolSpec(client=client, allowed_tools=['scrape_page'])
+    tools = await spec.to_tool_list_async()
+    assert len(tools) == 1 and tools[0].metadata.name == 'scrape_page'
+    result = await tools[0].acall(url=os.environ['APEX_LLAMA_TEST_URL'])
+    assert '# Fixture' in str(result), str(result)
+
+asyncio.run(main())
+"""
+    process = await asyncio.create_subprocess_exec(
+        client_python, "-c", script, env=child_env,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60)
+    assert process.returncode == 0, (stdout + stderr).decode("utf-8", errors="replace")
+    assert h.scrape_calls[-1][0] == "https://example.com/llamaindex"
+
+
 async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hosted, monkeypatch):
     import rainbo_scrape.hosted_search as hosted_search
     Firecrawl = pytest.importorskip("firecrawl").Firecrawl

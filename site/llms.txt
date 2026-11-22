@@ -61,6 +61,7 @@ Grok CLI: add a remote server to ~/.grok/config.toml with url=https://webscraper
 - xAI / Grok native Python SDK with remote MCP: https://github.com/Apexflowlabsllc/apex-flow-web-scraper/blob/main/examples/xai-native-mcp.py
 - xAI / Grok Responses API with remote MCP: https://github.com/Apexflowlabsllc/apex-flow-web-scraper/blob/main/examples/xai-responses-mcp.py. Both examples allow only scrape_page and keep both API keys in the caller's environment. xAI's Responses API currently does not support require_approval; a call can consume xAI tokens and Apex credits. xAI Remote MCP reference: https://docs.x.ai/developers/tools/remote-mcp
 - Vercel AI SDK 7 with the official @ai-sdk/mcp client: server-side Streamable HTTP example at https://github.com/Apexflowlabsllc/apex-flow-web-scraper/blob/main/sdk/node/examples/vercel-ai-sdk-mcp.mjs. It passes Apex's discovered MCP tools to generateText and keeps both Apex and model-provider credentials in the server environment.
+- LlamaIndex MCP client and FunctionAgent: https://github.com/Apexflowlabsllc/apex-flow-web-scraper/blob/main/examples/llamaindex_mcp.py. It uses `llama-index-tools-mcp` 0.6.0, Streamable HTTP, bearer auth and an allowlisted `scrape_page` tool. That client requires MCP SDK 2.x, so keep it in the agent environment, separate from the current Apex server environment.
 
 ## Usage
 Python: `from rainbo_scrape import scrape; scrape("https://example.com").markdown`
