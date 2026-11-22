@@ -76,6 +76,9 @@ test("target registry includes individually selectable Cline, Roo Code, Continue
   assert.equal(byId["jetbrains-air"].path, join(home, ".jetbrains", "mcp", "mcp.json"));
   assert.equal(byId.zed.path, join("E:/fixture-appdata", "Zed", "settings.json"));
   assert.equal(byId.zed.rootKey, "context_servers");
+  assert.equal(byId.grok.path, join(home, ".grok", "config.toml"));
+  assert.equal(byId.grok.remoteUrl, "https://webscraper.apexflowlabs.com/v1/mcp");
+  assert.equal(byId.grok.authEnvVar, "APEX_SCRAPER_API_KEY");
 });
 
 test("OpenCode target builds its native local-server command and secret reference", () => {
@@ -93,6 +96,16 @@ test("Codex TOML integration appends a stdio server and does not duplicate it", 
   assert.match(first.text, /\[mcp_servers\.apex_flow_web_scraper\]/);
   assert.match(first.text, /args = \[\"-y\",\"apex-flow-web-scraper\",\"mcp\"\]/);
   assert.equal(tomlWithMcpServer(first.text, { os: "linux" }).changed, false);
+});
+
+test("Grok CLI config uses remote MCP and an environment reference instead of storing the API key", () => {
+  const target = getClientTargets({ home: "E:/fixture-home", os: "win32" }).find((item) => item.id === "grok");
+  const result = tomlWithMcpServer("", {
+    remoteUrl: target.remoteUrl,
+    authEnvVar: target.authEnvVar,
+  });
+  assert.equal(result.text, '[mcp_servers.apex_flow_web_scraper]\nurl = "https://webscraper.apexflowlabs.com/v1/mcp"\nheaders = { "Authorization" = "Bearer ${APEX_SCRAPER_API_KEY}" }\n');
+  assert.doesNotMatch(result.text, /rs_live_/);
 });
 
 test("Codex TOML integration recognizes quoted and array-table entries", () => {
