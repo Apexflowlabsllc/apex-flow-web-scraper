@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - "codex/**"
   pull_request:
     branches:
       - main
@@ -13,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
