@@ -116,8 +116,8 @@ test("BYOK search selects one local provider and sends no key to Apex", async ()
         { url: "javascript:alert(1)", title: "Invalid", description: "Drop" },
       ] } }) };
     },
-  });
-  assert.equal(request.url, "https://api.search.brave.com/res/v1/web/search?q=example+query&count=2");
+  }, { includeDomains: ["example.com"] });
+  assert.equal(request.url, "https://api.search.brave.com/res/v1/web/search?q=example+query+%28site%3Aexample.com%29&count=2");
   assert.equal(request.options.headers["X-Subscription-Token"], "local-secret");
   assert.equal(request.options.redirect, "error");
   assert.deepEqual(result.results, [{ url: "https://example.com", title: "Example", snippet: "Direct result" }]);
@@ -134,10 +134,12 @@ test("BYOK Tavily and Exa requests use direct vendor contracts", async () => {
     const result = await localByokSearch("search", 3, { env, fetchImpl: async (url, options) => {
       request = { url: String(url), options };
       return { ok: true, json: async () => payload };
-    } });
+    } }, { excludeDomains: ["blocked.example"] });
     assert.equal(request.url, expectedUrl);
     assert.equal(request.options.headers[expectedHeader], expectedValue);
     assert.equal(request.options.redirect, "error");
+    const sent = JSON.parse(request.options.body);
+    assert.deepEqual(sent.exclude_domains || sent.excludeDomains, ["blocked.example"]);
     assert.equal(result.provider, provider);
     assert.equal(result.results[0].snippet, provider === "tavily" ? "Tavily" : "Exa result");
     assert.deepEqual(Object.keys(request.options.headers).sort(), ["Content-Type", expectedHeader].sort());

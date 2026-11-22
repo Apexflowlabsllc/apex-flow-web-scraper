@@ -484,12 +484,76 @@ async def test_v2_map_search_and_batch_expose_exact_supported_subset(hosted, mon
     assert status_payload["data"][0]["markdown"] == "# Fixture"
 
 
-async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hosted):
+async def test_v2_search_domain_filters_match_firecrawl_request_and_response(hosted, monkeypatch):
+    import rainbo_scrape.hosted_search as hosted_search
+
+    _, client, headers = await _auth(hosted)
+    monkeypatch.setenv("TAVILY_API_KEY", "fixture-key")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "tavily")
+    calls = []
+
+    async def fixture_tavily(query, count, include_domains=None, exclude_domains=None):
+        calls.append((query, count, include_domains, exclude_domains))
+        return [
+            {"url": "https://docs.example.com/guide", "title": "Guide", "snippet": "Useful"},
+            {"url": "https://other.example.net/page", "title": "Other", "snippet": "Filtered"},
+        ]
+
+    monkeypatch.setattr(hosted_search, "tavily", fixture_tavily)
+    response = await client.post("/v2/search", headers=headers, json={
+        "query": "scraping API", "limit": 5, "sources": ["web"],
+        "includeDomains": ["EXAMPLE.com"],
+    })
+    payload = await response.json()
+    assert response.status == 200 and payload["success"] is True
+    assert calls == [("scraping API", 5, ["example.com"], None)]
+    assert payload["data"]["web"] == [{
+        "url": "https://docs.example.com/guide", "title": "Guide", "description": "Useful", "position": 1,
+    }]
+
+    object_source = await client.post("/v2/search", headers=headers, json={
+        "query": "scraping API", "sources": [{"type": "web"}],
+    })
+    assert object_source.status == 200
+
+    invalid = await client.post("/v2/search", headers=headers, json={
+        "query": "scraping API", "includeDomains": ["https://example.com/path"],
+    })
+    invalid_payload = await invalid.json()
+    assert invalid.status == 400 and invalid_payload["code"] == "invalid_search_filter"
+
+    conflict = await client.post("/v2/search", headers=headers, json={
+        "query": "scraping API", "includeDomains": ["example.com"], "excludeDomains": ["blocked.example"],
+    })
+    conflict_payload = await conflict.json()
+    assert conflict.status == 400 and conflict_payload["code"] == "invalid_search_filter"
+
+    unsupported_source = await client.post("/v2/search", headers=headers, json={
+        "query": "scraping API", "sources": ["news"],
+    })
+    assert unsupported_source.status == 400
+
+
+async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hosted, monkeypatch):
+    import rainbo_scrape.hosted_search as hosted_search
     Firecrawl = pytest.importorskip("firecrawl").Firecrawl
 
     h, client, headers = await _auth(hosted)
     api_key = headers["Authorization"][7:]
     app = Firecrawl(api_key=api_key, api_url=str(client.make_url("/")).rstrip("/"), max_retries=1)
+    monkeypatch.setenv("TAVILY_API_KEY", "fixture-search-key")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "tavily")
+
+    async def fixture_search(query, count, include_domains=None, exclude_domains=None):
+        assert (query, count, include_domains, exclude_domains) == ("fixture search", 3, ["example.com"], None)
+        return [{"url": "https://docs.example.com/start", "title": "Start", "snippet": "Search result"}]
+
+    monkeypatch.setattr(hosted_search, "tavily", fixture_search)
+    searched = await asyncio.to_thread(app.v2.search, "fixture search", sources=["web"], limit=3,
+                                       include_domains=["example.com"])
+    assert searched.web[0].url == "https://docs.example.com/start"
+    assert searched.web[0].position == 1
+
     scraped = await asyncio.to_thread(app.v2.scrape, "https://example.com", formats=["markdown"], wait_for=1200)
     assert scraped.markdown == "# Fixture"
     assert h.scrape_calls[-1][1]["actions"] == [{"type": "wait", "ms": 1200}]

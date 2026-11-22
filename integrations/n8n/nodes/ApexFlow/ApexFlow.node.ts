@@ -29,6 +29,17 @@ export function buildRequestPlan(operation: Operation, params: Record<string, un
 		}
 		return (value as string[]).map((item) => item.trim()).filter(Boolean);
 	};
+	const domainList = (value: unknown, label: string): string[] | undefined => {
+		if (value === undefined || value === null || value === '') return undefined;
+		const values = typeof value === 'string' ? value.split(/[\r\n,]+/) : value;
+		if (!Array.isArray(values) || values.some((item) => typeof item !== 'string')) {
+			fail(`${label} must be hostnames separated by commas or new lines.`);
+		}
+		const domains = [...new Set((values as string[]).map((item) => item.trim()).filter(Boolean))];
+		if (domains.length < 1 || domains.length > 50) fail(`${label} must contain 1–50 hostnames.`);
+		if (domains.some((domain) => domain.includes('/') || /[:?#@\s]/.test(domain))) fail(`${label} entries must be hostnames without protocol or path.`);
+		return domains;
+	};
 	const scrapeOptions = (): Record<string, unknown> => {
 		const body: Record<string, unknown> = {};
 		const render = String(params.render ?? '').trim();
@@ -55,7 +66,13 @@ export function buildRequestPlan(operation: Operation, params: Record<string, un
 		case 'webSearch': {
 			const query = String(params.query ?? '').trim();
 			if (!query) fail('Search query is required.');
-			return { method: 'POST', path: '/websearch', body: { query, limit: Number(params.resultLimit ?? params.limit ?? 10) } };
+			const body: Record<string, unknown> = { query, limit: Number(params.resultLimit ?? params.limit ?? 10) };
+			const includeDomains = domainList(params.includeDomains, 'Include domains');
+			const excludeDomains = domainList(params.excludeDomains, 'Exclude domains');
+			if (includeDomains && excludeDomains) fail('Use include domains or exclude domains, not both.');
+			if (includeDomains) body.include_domains = includeDomains;
+			if (excludeDomains) body.exclude_domains = excludeDomains;
+			return { method: 'POST', path: '/websearch', body };
 		}
 		case 'startCrawl': {
 			const url = String(params.url ?? '').trim();
@@ -126,6 +143,8 @@ export class ApexFlow implements INodeType {
 			{ displayName: 'Limit', name: 'mapLimit', type: 'number', default: 1000, displayOptions: { show: { operation: ['map'] } } },
 			{ displayName: 'Search Filter', name: 'search', type: 'string', default: '', displayOptions: { show: { operation: ['map'] } } },
 			{ displayName: 'Result Limit', name: 'resultLimit', type: 'number', default: 10, displayOptions: { show: { operation: ['webSearch'] } } },
+			{ displayName: 'Include Domains', name: 'includeDomains', type: 'string', typeOptions: { rows: 2 }, default: '', displayOptions: { show: { operation: ['webSearch'] } }, description: 'Optional hostnames, separated by commas or new lines. Cannot be used with Exclude Domains.' },
+			{ displayName: 'Exclude Domains', name: 'excludeDomains', type: 'string', typeOptions: { rows: 2 }, default: '', displayOptions: { show: { operation: ['webSearch'] } }, description: 'Optional hostnames, separated by commas or new lines. Cannot be used with Include Domains.' },
 			{ displayName: 'Page Limit', name: 'pageLimit', type: 'number', default: 25, displayOptions: { show: { operation: ['startCrawl'] } } },
 			{ displayName: 'Render Mode', name: 'render', type: 'options', options: [{ name: 'Auto', value: 'auto' }, { name: 'Never', value: 'never' }, { name: 'Always', value: 'always' }], default: 'auto', displayOptions: { show: { operation: ['scrape', 'startCrawl'] } }, description: 'Rendered pages can use more credits' },
 			{ displayName: 'Outputs', name: 'outputs', type: 'multiOptions', options: [{ name: 'Chunks', value: 'chunks' }, { name: 'Data', value: 'data' }, { name: 'Diff', value: 'diff' }, { name: 'Evidence', value: 'evidence' }, { name: 'HTML', value: 'html' }, { name: 'Links', value: 'links' }, { name: 'Markdown', value: 'markdown' }, { name: 'Raw HTML', value: 'raw_html' }, { name: 'Screenshot', value: 'screenshot' }, { name: 'Structured Data', value: 'structured_data' }, { name: 'Text', value: 'text' }], default: ['markdown'], displayOptions: { show: { operation: ['scrape', 'startCrawl'] } } },
@@ -140,7 +159,7 @@ export class ApexFlow implements INodeType {
 		for (let i = 0; i < items.length; i++) {
 			const operation = this.getNodeParameter('operation', i) as Operation;
 			const params: Record<string, unknown> = {};
-			for (const name of ['url', 'query', 'id', 'offset', 'limit', 'mapLimit', 'resultLimit', 'pageLimit', 'search', 'urls', 'render', 'outputs', 'formats']) {
+			for (const name of ['url', 'query', 'id', 'offset', 'limit', 'mapLimit', 'resultLimit', 'includeDomains', 'excludeDomains', 'pageLimit', 'search', 'urls', 'render', 'outputs', 'formats']) {
 				try {
 					params[name] = this.getNodeParameter(name, i);
 				} catch {

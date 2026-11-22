@@ -20,6 +20,7 @@ import aiohttp
 from aiohttp import web
 from .billing import public_usage_key_id
 from .extract import validate_attribute_selectors
+from .hosted_search import normalize_domain_filters
 from .policy import PublicResolver, ScrapeError, check_url
 
 INTERACT_SERVICE_KEY = web.AppKey("interact_service", object)
@@ -664,23 +665,47 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         body = await request.json()
         if not isinstance(body, dict):
             return error("Request body must be a JSON object")
-        allowed = {"query", "limit", "sources"}
+        allowed = {"query", "limit", "sources", "includeDomains", "excludeDomains", "origin"}
         extra = set(body) - allowed
         if extra:
             return error("Unsupported Apex compatibility options: " + ", ".join(sorted(extra)))
-        sources = body.get("sources", [{"type": "web"}])
-        if not isinstance(sources, list) or not sources or any(not isinstance(s, dict) or s.get("type") != "web" or set(s) != {"type"} for s in sources):
+        sources = body.get("sources", ["web"])
+        source_types = []
+        if isinstance(sources, list):
+            for source in sources:
+                if isinstance(source, str):
+                    source_types.append(source)
+                elif isinstance(source, dict) and set(source) == {"type"}:
+                    source_types.append(source["type"])
+                else:
+                    return error("sources must contain 'web' or {type: 'web'}")
+        if source_types != ["web"]:
             return error("This adapter supports only the Firecrawl web search source")
+        origin = body.get("origin")
+        if origin is not None and (not isinstance(origin, str) or len(origin) > 200):
+            return error("origin must be a string no longer than 200 characters")
+        try:
+            include_domains, exclude_domains = normalize_domain_filters(
+                body.get("includeDomains"), body.get("excludeDomains"))
+        except ValueError as exc:
+            return error(str(exc), code="invalid_search_filter")
         request_body = {key: body[key] for key in ("query", "limit") if key in body}
+        if include_domains is not None:
+            request_body["include_domains"] = include_domains
+        if exclude_domains is not None:
+            request_body["exclude_domains"] = exclude_domains
         response = await websearch_for(request["account"], request_body)
         payload = unpack(response)
         failure = forwarded(response, payload)
         if failure:
             return failure
-        return web.json_response({"success": True,
-                                 "data": {"web": [{"url": item.get("url"), "title": item.get("title"),
-                                                    "description": item.get("snippet")}
-                                                   for item in payload.get("results", [])]}})
+        reply = {"success": True,
+                 "data": {"web": [{"url": item.get("url"), "title": item.get("title"),
+                                    "description": item.get("snippet"), "position": index}
+                                   for index, item in enumerate(payload.get("results", []), start=1)]}}
+        if origin:
+            reply["warning"] = "Search SDK origin telemetry is accepted but not recorded by Apex."
+        return web.json_response(reply)
 
     async def crawl(request):
         body = await request.json()

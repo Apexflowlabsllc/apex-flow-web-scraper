@@ -32,9 +32,38 @@ function normalize(results, snippetField, limit) {
   return normalized;
 }
 
-export async function localByokSearch(query, limit = 10, { env = process.env, fetchImpl = globalThis.fetch } = {}) {
+function normalizeDomainFilters(includeDomains, excludeDomains) {
+  if (includeDomains !== undefined && excludeDomains !== undefined) throw new Error("includeDomains and excludeDomains cannot be used together");
+  const normalize = (domains, name) => {
+    if (domains === undefined) return undefined;
+    if (!Array.isArray(domains) || domains.length < 1 || domains.length > 50) throw new Error(`${name} must be a list of 1–50 hostnames`);
+    return [...new Set(domains.map((domain) => {
+      if (typeof domain !== "string" || domain !== domain.trim() || !domain || /[\/:?#@]/.test(domain)) {
+        throw new Error(`${name} entries must be hostnames without protocol or path`);
+      }
+      let parsed;
+      try { parsed = new URL(`https://${domain}`); } catch { throw new Error(`${name} contains an invalid hostname`); }
+      if (parsed.port || parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+        throw new Error(`${name} entries must be hostnames without protocol or path`);
+      }
+      return parsed.hostname.toLowerCase().replace(/\.$/, "");
+    }))];
+  };
+  return { includeDomains: normalize(includeDomains, "includeDomains"), excludeDomains: normalize(excludeDomains, "excludeDomains") };
+}
+
+function matchesDomain(item, includeDomains, excludeDomains) {
+  let hostname;
+  try { hostname = new URL(item.url).hostname.toLowerCase().replace(/\.$/, ""); } catch { return false; }
+  if (includeDomains && !includeDomains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`))) return false;
+  if (excludeDomains && excludeDomains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`))) return false;
+  return true;
+}
+
+export async function localByokSearch(query, limit = 10, { env = process.env, fetchImpl = globalThis.fetch } = {}, filters = {}) {
   if (typeof query !== "string" || query.length < 1 || query.length > 300) throw new Error("query must be 1–300 characters");
   if (!Number.isInteger(limit) || limit < 1 || limit > 20) throw new Error("limit must be an integer from 1 to 20");
+  const { includeDomains, excludeDomains } = normalizeDomainFilters(filters.includeDomains, filters.excludeDomains);
   const provider = selectLocalSearchProvider(env);
   if (!provider) throw new Error("Configure exactly one local provider key (BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, or EXA_API_KEY); set APEX_SEARCH_PROVIDER when more than one is present.");
   const timeout = AbortSignal.timeout(15_000);
@@ -42,40 +71,46 @@ export async function localByokSearch(query, limit = 10, { env = process.env, fe
   let body;
   if (provider === "brave") {
     const url = new URL("https://api.search.brave.com/res/v1/web/search");
-    url.searchParams.set("q", query); url.searchParams.set("count", String(limit));
+    const scopedQuery = includeDomains ? `${query} (${includeDomains.map((domain) => `site:${domain}`).join(" OR ")})` : query;
+    url.searchParams.set("q", excludeDomains ? `${scopedQuery} ${excludeDomains.map((domain) => `-site:${domain}`).join(" ")}` : scopedQuery);
+    url.searchParams.set("count", String(limit));
     response = await fetchImpl(url, { headers: { "X-Subscription-Token": env[providerKeys.brave], Accept: "application/json" }, signal: timeout, redirect: "error" });
     if (!response.ok) throw new Error(`Brave Search returned HTTP ${response.status}`);
     body = await response.json();
-    return { provider, results: normalize(body.web?.results, "description", limit),
+    return { provider, results: normalize(body.web?.results, "description", limit).filter((item) => matchesDomain(item, includeDomains, excludeDomains)).slice(0, limit),
       note: "Search was sent directly to your selected provider; Apex did not receive your provider key. Pass a result url to scrape_page to read it." };
   }
   if (provider === "tavily") {
     response = await fetchImpl("https://api.tavily.com/search", { method: "POST", headers: { Authorization: `Bearer ${env[providerKeys.tavily]}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ query, topic: "general", search_depth: "basic", max_results: limit, include_answer: false, include_raw_content: false }), signal: timeout, redirect: "error" });
+      body: JSON.stringify({ query, topic: "general", search_depth: "basic", max_results: limit, include_answer: false, include_raw_content: false,
+        ...(includeDomains ? { include_domains: includeDomains } : {}), ...(excludeDomains ? { exclude_domains: excludeDomains } : {}) }), signal: timeout, redirect: "error" });
     if (!response.ok) throw new Error(`Tavily Search returned HTTP ${response.status}`);
     body = await response.json();
-    return { provider, results: normalize(body.results, "content", limit),
+    return { provider, results: normalize(body.results, "content", limit).filter((item) => matchesDomain(item, includeDomains, excludeDomains)).slice(0, limit),
       note: "Search was sent directly to your selected provider; Apex did not receive your provider key. Pass a result url to scrape_page to read it." };
   }
   response = await fetchImpl("https://api.exa.ai/search", { method: "POST", headers: { "x-api-key": env[providerKeys.exa], "Content-Type": "application/json" },
-    body: JSON.stringify({ query, type: "auto", numResults: limit, contents: { highlights: true } }), signal: timeout, redirect: "error" });
+    body: JSON.stringify({ query, type: "auto", numResults: limit, contents: { highlights: true },
+      ...(includeDomains ? { includeDomains } : {}), ...(excludeDomains ? { excludeDomains } : {}) }), signal: timeout, redirect: "error" });
   if (!response.ok) throw new Error(`Exa Search returned HTTP ${response.status}`);
   body = await response.json();
-  return { provider, results: normalize(body.results, "highlights", limit),
+  return { provider, results: normalize(body.results, "highlights", limit).filter((item) => matchesDomain(item, includeDomains, excludeDomains)).slice(0, limit),
     note: "Search was sent directly to your selected provider; Apex did not receive your provider key. Pass a result url to scrape_page to read it." };
 }
 
 const byokTool = {
   name: "web_search_byok",
-  description: "Search directly through your provider key in this local MCP process. Requires BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, or EXA_API_KEY in the process environment. The provider bills you directly and your key is never sent to Apex. Pass result URLs to scrape_page; scraping still uses Apex credits.",
-  inputSchema: { type: "object", properties: { query: { type: "string", minLength: 1, maxLength: 300 }, limit: { type: "integer", minimum: 1, maximum: 20, default: 10 } }, required: ["query"], additionalProperties: false },
+  description: "Search directly through your provider key in this local MCP process, optionally restricting or excluding hostname sets. Requires BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, or EXA_API_KEY in the process environment. The provider bills you directly and your key is never sent to Apex. Pass result URLs to scrape_page; scraping still uses Apex credits.",
+  inputSchema: { type: "object", properties: { query: { type: "string", minLength: 1, maxLength: 300 }, limit: { type: "integer", minimum: 1, maximum: 20, default: 10 },
+    includeDomains: { type: "array", minItems: 1, maxItems: 50, items: { type: "string", format: "hostname" } },
+    excludeDomains: { type: "array", minItems: 1, maxItems: 50, items: { type: "string", format: "hostname" } } }, required: ["query"], additionalProperties: false },
 };
 
 export async function startMcpBridge({
   apiKey = process.env.APEX_SCRAPER_API_KEY,
   remoteUrl = process.env.APEX_SCRAPER_MCP_URL || "https://webscraper.apexflowlabs.com/v1/mcp",
   stderr = process.stderr,
-  byokSearch = (query, limit) => localByokSearch(query, limit),
+  byokSearch = (query, limit, filters) => localByokSearch(query, limit, undefined, filters),
 } = {}) {
   if (!apiKey) throw new Error("Set APEX_SCRAPER_API_KEY before starting the Apex Flow MCP bridge.");
 
@@ -95,9 +130,9 @@ export async function startMcpBridge({
   });
   local.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (request.params.name === byokTool.name) {
-      const { query, limit = 10 } = request.params.arguments || {};
+      const { query, limit = 10, includeDomains, excludeDomains } = request.params.arguments || {};
       try {
-        const result = await byokSearch(query, limit);
+        const result = await byokSearch(query, limit, { includeDomains, excludeDomains });
         return { content: [{ type: "text", text: JSON.stringify(result) }] };
       } catch (error) {
         return { isError: true, content: [{ type: "text", text: error.message }] };

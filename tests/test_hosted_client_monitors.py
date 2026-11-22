@@ -43,3 +43,13 @@ def test_python_client_has_scheduled_monitor_operations():
         ("POST", "/monitors/events", {"id": "mon_1", "limit": 5}),
         ("POST", "/monitors/delete", {"id": "mon_1"}),
     ]
+
+
+def test_python_hosted_search_forwards_optional_hostname_filters(monkeypatch):
+    client = Apex(api_key="rs_live_fixture", base_url="https://api.example/v1")
+    calls = []
+    monkeypatch.setattr(client, "_call", lambda method, path, body=None: calls.append((method, path, body)))
+    client.web_search("official docs", 7, include_domains=["docs.example.com"])
+    assert calls == [("POST", "/websearch", {
+        "query": "official docs", "limit": 7, "include_domains": ["docs.example.com"],
+    })]

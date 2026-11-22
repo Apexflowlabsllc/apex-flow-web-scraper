@@ -797,7 +797,7 @@
       "post": {
         "operationId": "searchPublicWeb",
         "summary": "Search the public web when the operator enables a provider",
-        "description": "Requires one service-level search provider: Brave Search, Tavily Search, or Exa Search. Returns 503 not_configured when none is configured or provider selection is ambiguous. Successful searches cost 130 credits with Brave, 210 with Tavily basic search, or 180 with Exa for up to 10 requested results plus 25 per requested result above 10. Successful empty results are billed; failed provider calls refund the reservation.",
+        "description": "Requires one service-level search provider: Brave Search, Tavily Search, or Exa Search. Returns 503 not_configured when none is configured or provider selection is ambiguous. Successful searches cost 130 credits with Brave, 210 with Tavily basic search, or 180 with Exa for up to 10 requested results plus 25 per requested result above 10. Successful empty results are billed; failed provider calls refund the reservation. Optional include_domains or exclude_domains filters accept 1–50 hostnames (mutually exclusive).",
         "requestBody": {
           "required": true,
           "content": {
@@ -816,8 +816,21 @@
                     "minimum": 1,
                     "maximum": 20,
                     "default": 10
+                  },
+                  "include_domains": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "items": {"type": "string", "minLength": 3, "maxLength": 253, "format": "hostname"}
+                  },
+                  "exclude_domains": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "items": {"type": "string", "minLength": 3, "maxLength": 253, "format": "hostname"}
                   }
                 },
+                "not": {"required": ["include_domains", "exclude_domains"]},
                 "required": [
                   "query"
                 ]
@@ -2645,7 +2658,7 @@
       "post": {
         "operationId": "firecrawlCompatSearch",
         "summary": "Firecrawl-compatible web search",
-        "description": "Requires an operator-configured web search provider. Supports query, limit, and sources=[{type:web}]. Does not call Apex saved-page search.",
+        "description": "Requires an operator-configured web search provider. Supports query, limit, sources=[\"web\"] (also accepts [{type:\"web\"}]), and mutually exclusive includeDomains/excludeDomains arrays of 1–50 hostnames. Returns Firecrawl-shaped web results with position. Firecrawl SDK origin telemetry is accepted but not recorded. Does not call Apex saved-page search.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -2694,23 +2707,34 @@
                   },
                   "sources": {
                     "type": "array",
+                    "minItems": 1,
+                    "maxItems": 1,
                     "items": {
-                      "type": "object",
-                      "required": [
-                        "type"
-                      ],
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "web"
-                          ]
-                        }
-                      },
-                      "additionalProperties": false
+                      "oneOf": [
+                        {"type": "string", "enum": ["web"]},
+                        {"type": "object", "required": ["type"], "properties": {"type": {"type": "string", "enum": ["web"]}}, "additionalProperties": false}
+                      ]
                     }
+                  },
+                  "includeDomains": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "items": {"type": "string", "minLength": 3, "maxLength": 253, "format": "hostname"}
+                  },
+                  "excludeDomains": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "items": {"type": "string", "minLength": 3, "maxLength": 253, "format": "hostname"}
+                  },
+                  "origin": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "Accepted for Firecrawl SDK compatibility; Apex does not record it."
                   }
-                }
+                },
+                "not": {"required": ["includeDomains", "excludeDomains"]}
               }
             }
           }

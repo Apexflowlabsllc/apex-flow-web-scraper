@@ -105,7 +105,9 @@ The local bridge also provides `web_search_byok`. Set exactly one of
 that launches the AI client (or set `APEX_SEARCH_PROVIDER` when setting more
 than one). This tool calls that provider directly from the local bridge; the
 provider bills your account and the key is not sent to Apex. Use its result
-URLs with `scrape_page`; those page reads still use Apex credits. This local
+URLs with `scrape_page`; those page reads still use Apex credits. Both hosted
+`webSearch()` and local `web_search_byok` accept optional `includeDomains` or
+`excludeDomains` hostname arrays (mutually exclusive, up to 50 values). This local
 option is separate from hosted `web_search`, which uses Apex's configured
 provider and credits.
 

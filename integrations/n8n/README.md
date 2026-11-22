@@ -43,7 +43,10 @@ use Apex plan credits; check your plan before running large workflows.
 Search requires an operator-configured hosted search provider. If it is not
 configured, the API returns its normal actionable error. This package does not
 silently switch to a different provider or expose local bring-your-own-key
-search, which belongs in a local client process.
+search, which belongs in a local client process. Search accepts optional Include
+Domains or Exclude Domains hostnames, entered as comma-separated or newline-
+separated values. The two filters are mutually exclusive and accept up to 50
+hostnames.
 
 The package passes `@n8n/node-cli` 0.57.4 lint/build, TypeScript checks, 8
 contract tests and a tarball dry run. A local `n8n-node dev` session booted n8n

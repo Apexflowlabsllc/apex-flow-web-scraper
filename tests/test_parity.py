@@ -32,8 +32,13 @@ async def svc(tmp_path, monkeypatch):
         return {"url": url, "title": "Page", "markdown": "# " + url, "text": url, "rendered": False, "links": links,
                 "receipt": {"final_url": url}}
 
-    async def provider(query, count):
-        return [] if query == "nothing" else [{"url": f"https://r.example/{i}", "title": query, "snippet": "s"} for i in range(count)]
+    async def provider(query, count, options=None):
+        if query == "nothing":
+            return []
+        if query == "filtered":
+            return [{"url": "https://docs.example.com/guide", "title": "Allowed", "snippet": "s"},
+                    {"url": "https://other.example.net/guide", "title": "Excluded", "snippet": "s"}]
+        return [{"url": f"https://r.example/{i}", "title": query, "snippet": "s"} for i in range(count)]
 
     client = TestClient(TestServer(make_app(billing, scrape, hosted=h, search_provider=provider)))
     await client.start_server()
@@ -131,6 +136,11 @@ async def test_web_search_charges_for_successful_searches_including_empty_result
     assert h.billing.db.execute("SELECT kind,credits FROM usage WHERE account=? ORDER BY ts DESC LIMIT 1", (acct,)).fetchone() == ("search", 130)
     body = await (await client.post("/v1/websearch", json={"query": "nothing"}, headers=auth)).json()
     assert body["results"] == [] and body["credits_used"] == 130 and h.billing.remaining(acct) == 109740
+    response = await client.post("/v1/websearch", json={"query": "filtered", "include_domains": ["EXAMPLE.com"]}, headers=auth)
+    filtered = await response.json()
+    assert response.status == 200 and [item["url"] for item in filtered["results"]] == ["https://docs.example.com/guide"]
+    invalid = await client.post("/v1/websearch", json={"query": "filtered", "include_domains": ["https://example.com/path"]}, headers=auth)
+    assert invalid.status == 400
     assert (await client.post("/v1/websearch", json={"query": ""}, headers=auth)).status == 400
 
 
@@ -161,6 +171,8 @@ async def test_web_search_and_model_extraction_stay_off_without_operator_keys(tm
         monkeypatch.setenv("APEX_SEARCH_PROVIDER", "tavily")
         tool_list = await (await client.post("/v1/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, headers=auth)).json()
         assert "web_search" in {tool["name"] for tool in tool_list["result"]["tools"]}
+        web_search_tool = next(tool for tool in tool_list["result"]["tools"] if tool["name"] == "web_search")
+        assert {"include_domains", "exclude_domains"} <= set(web_search_tool["inputSchema"]["properties"])
         r = await client.post("/v1/scrape", json={"url": "https://example.com", "render": "never", "extract": spec}, headers=auth)
         assert r.status == 400 and (await r.json())["code"] == "not_available_hosted" and calls == []
         monkeypatch.setenv("DEEPSEEK_API_KEY", "fixture")
@@ -215,7 +227,7 @@ async def test_exa_search_reserves_and_charges_requested_result_cap(tmp_path, mo
     billing = Billing(tmp_path / "search-cost.db")
     h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
 
-    async def exa_results(query, count):
+    async def exa_results(query, count, include_domains=None, exclude_domains=None):
         if query == "failure":
             raise hosted_search.aiohttp.ClientError("upstream unavailable")
         return [] if query == "empty" else [{"url": f"https://r.example/{i}", "title": "Result", "snippet": "Text"} for i in range(12)]
@@ -304,6 +316,62 @@ async def test_search_adapters_use_vendor_contract_and_normalize_results(monkeyp
         assert kwargs["json"]["numResults"] == 3
 
 
+@pytest.mark.parametrize("name,key", [
+    ("brave", "BRAVE_SEARCH_API_KEY"),
+    ("tavily", "TAVILY_API_KEY"),
+    ("exa", "EXA_API_KEY"),
+])
+async def test_search_adapters_forward_domain_filters_to_provider(monkeypatch, name, key):
+    for provider_key in ("BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY"):
+        monkeypatch.delenv(provider_key, raising=False)
+    monkeypatch.setenv(key, "fixture-secret")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", name)
+    calls = []
+
+    class Response:
+        status = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def json(self):
+            return {"web": {"results": [{"url": "https://docs.example.com/a", "title": "A", "description": "S"}]},
+                    "results": [{"url": "https://docs.example.com/a", "title": "A", "content": "S",
+                                 "highlights": ["S"]}]}
+
+    class Session:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def get(self, *args, **kwargs):
+            calls.append(("get", args, kwargs))
+            return Response()
+
+        def post(self, *args, **kwargs):
+            calls.append(("post", args, kwargs))
+            return Response()
+
+    monkeypatch.setattr(hosted_search.aiohttp, "ClientSession", Session)
+    result = await hosted_search.search("query", 4, {"include_domains": ["docs.example.com"]})
+    assert result == [{"url": "https://docs.example.com/a", "title": "A", "snippet": "S"}]
+    method, _, kwargs = calls[0]
+    if name == "brave":
+        assert method == "get" and "site:docs.example.com" in kwargs["params"]["q"]
+    elif name == "tavily":
+        assert method == "post" and kwargs["json"]["include_domains"] == ["docs.example.com"]
+    else:
+        assert method == "post" and kwargs["json"]["includeDomains"] == ["docs.example.com"]
+
+
 def test_local_search_provider_selection_does_not_depend_on_hosted_prices():
     assert hosted_search.local_provider_name({}) is None
     assert hosted_search.local_provider_name({"BRAVE_SEARCH_API_KEY": "local"}) == "brave"
@@ -320,8 +388,8 @@ async def test_python_mcp_byok_search_uses_local_provider_without_hosted_dispatc
     monkeypatch.delenv("EXA_API_KEY", raising=False)
     calls = []
 
-    async def local_search(query, limit):
-        calls.append((query, limit))
+    async def local_search(query, limit, include_domains=None, exclude_domains=None):
+        calls.append((query, limit, include_domains, exclude_domains))
         return [{"url": "https://example.com/", "title": "Example", "snippet": "A result"}]
 
     async def forbidden_dispatch(*args):
@@ -330,14 +398,32 @@ async def test_python_mcp_byok_search_uses_local_provider_without_hosted_dispatc
     monkeypatch.setattr(hosted_search, "local_search", local_search)
     token = hosted_mcp.local_dispatch.set(forbidden_dispatch)
     try:
-        result = await hosted_mcp.web_search_byok("example", 4)
+        result = await hosted_mcp.web_search_byok("example", 4, include_domains=["EXAMPLE.com"])
     finally:
         hosted_mcp.local_dispatch.reset(token)
-    assert calls == [("example", 4)] and result["provider"] == "brave"
+    assert calls == [("example", 4, ["example.com"], None)] and result["provider"] == "brave"
     assert "never received" not in result["note"]
     assert "Apex did not receive your provider key" in result["note"]
     with pytest.raises(ValueError, match="limit must be"):
         await hosted_mcp.web_search_byok("example", 0)
+
+
+async def test_python_hosted_mcp_search_forwards_domain_filters(monkeypatch):
+    from rainbo_scrape import hosted_mcp
+    calls = []
+
+    async def dispatch(path, body):
+        calls.append((path, body))
+        return {"results": []}
+
+    token = hosted_mcp.local_dispatch.set(dispatch)
+    try:
+        await hosted_mcp.web_search("official docs", 5, include_domains=["docs.example.com"])
+    finally:
+        hosted_mcp.local_dispatch.reset(token)
+    assert calls == [("/websearch", {
+        "query": "official docs", "limit": 5, "include_domains": ["docs.example.com"],
+    })]
 
 
 def test_bigger_plans_get_more_pages_at_once():

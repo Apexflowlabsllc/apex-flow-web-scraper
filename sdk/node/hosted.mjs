@@ -68,7 +68,11 @@ export class Apex {
   monitorEvents(id, limit = 20) { return this.#call("POST", "/monitors/events", { id, limit }); }
   map(url, limit = 1000, search) { return this.#call("POST", "/map", search ? { url, limit, search } : { url, limit }); }
   search(query, limit = 10) { return this.#call("POST", "/search", { query, limit }); }
-  webSearch(query, limit = 10) { return this.#call("POST", "/websearch", { query, limit }); }
+  webSearch(query, limit = 10, { includeDomains, excludeDomains } = {}) {
+    return this.#call("POST", "/websearch", { query, limit,
+      ...(includeDomains === undefined ? {} : { include_domains: includeDomains }),
+      ...(excludeDomains === undefined ? {} : { exclude_domains: excludeDomains }) });
+  }
   usage() { return this.#call("GET", "/usage"); }
   // Data packages: answers from a publisher's own public data. 1 credit an answer.
   packages() { return this.#call("GET", "/packages"); }

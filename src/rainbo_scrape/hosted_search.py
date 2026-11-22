@@ -1,5 +1,7 @@
 """Whole-web search for hosted accounts using one explicitly configured provider."""
 import os
+import ipaddress
+import re
 from urllib.parse import urlsplit
 
 import aiohttp
@@ -31,13 +33,74 @@ def local_provider_name(env=None):
     return name if name in _PROVIDER_KEYS and name in available else None
 
 
-async def local_search(query, count):
+async def local_search(query, count, include_domains=None, exclude_domains=None):
     """Search directly with a provider key held in this process environment."""
     name = local_provider_name()
     fetch = {"brave": brave, "tavily": tavily, "exa": exa}.get(name)
     if fetch is None:
         raise ValueError("Configure exactly one local provider key (BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, or EXA_API_KEY); set APEX_SEARCH_PROVIDER when more than one is present.")
-    return await fetch(query, count)
+    include_domains, exclude_domains = normalize_domain_filters(include_domains, exclude_domains)
+    results = await fetch(query, count, include_domains, exclude_domains)
+    if include_domains is not None or exclude_domains is not None:
+        results = [item for item in results if _domain_allowed(item["url"], include_domains, exclude_domains)]
+    return results[:count]
+
+
+_DOMAIN_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+
+
+def normalize_domain_filters(include_domains=None, exclude_domains=None):
+    """Validate hostname-only domain filters shared by native and v2 search."""
+    if include_domains is not None and exclude_domains is not None:
+        raise ValueError("includeDomains and excludeDomains cannot be used together")
+
+    def normalize(value, name):
+        if value is None:
+            return None
+        if not isinstance(value, list) or not 1 <= len(value) <= 50:
+            raise ValueError(f"{name} must be a list of 1–50 hostnames")
+        result = []
+        for item in value:
+            if not isinstance(item, str) or not item or item != item.strip():
+                raise ValueError(f"{name} entries must be hostnames without protocol or path")
+            try:
+                domain = item.rstrip(".").encode("idna").decode("ascii").lower()
+            except UnicodeError as exc:
+                raise ValueError(f"{name} contains an invalid hostname") from exc
+            try:
+                ipaddress.ip_address(domain)
+            except ValueError:
+                if not _DOMAIN_RE.fullmatch(domain):
+                    raise ValueError(f"{name} entries must be valid hostnames without protocol or path")
+            if domain not in result:
+                result.append(domain)
+        return result
+
+    return normalize(include_domains, "includeDomains"), normalize(exclude_domains, "excludeDomains")
+
+
+def _brave_query(query, include_domains, exclude_domains):
+    if include_domains:
+        # Brave's documented site: operator is used for server-side filtering;
+        # the same filter is also applied locally after normalization.
+        query += " (" + " OR ".join("site:" + domain for domain in include_domains) + ")"
+    if exclude_domains:
+        query += " " + " ".join("-site:" + domain for domain in exclude_domains)
+    return query
+
+
+def _domain_allowed(url, include_domains, exclude_domains):
+    if not isinstance(url, str):
+        return False
+    try:
+        hostname = (urlsplit(url).hostname or "").lower().rstrip(".")
+    except (TypeError, ValueError):
+        return False
+    if include_domains and not any(hostname == d or hostname.endswith("." + d) for d in include_domains):
+        return False
+    if exclude_domains and any(hostname == d or hostname.endswith("." + d) for d in exclude_domains):
+        return False
+    return True
 
 
 def provider_name():
@@ -85,8 +148,9 @@ def configured():
     return provider_name() is not None
 
 
-async def brave(query, count):
+async def brave(query, count, include_domains=None, exclude_domains=None):
     headers = {"X-Subscription-Token": os.environ["BRAVE_SEARCH_API_KEY"], "Accept": "application/json"}
+    query = _brave_query(query, include_domains, exclude_domains)
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as client:
         async with client.get("https://api.search.brave.com/res/v1/web/search", params={"q": query, "count": str(count)},
                               headers=headers) as response:
@@ -96,10 +160,14 @@ async def brave(query, count):
     return _normalize(data.get("web", {}).get("results", []), "description", count)
 
 
-async def tavily(query, count):
+async def tavily(query, count, include_domains=None, exclude_domains=None):
     headers = {"Authorization": "Bearer " + os.environ["TAVILY_API_KEY"], "Content-Type": "application/json"}
     payload = {"query": query, "topic": "general", "search_depth": "basic", "max_results": count,
                "include_answer": False, "include_raw_content": False}
+    if include_domains is not None:
+        payload["include_domains"] = include_domains
+    if exclude_domains is not None:
+        payload["exclude_domains"] = exclude_domains
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as client:
         async with client.post("https://api.tavily.com/search", json=payload, headers=headers) as response:
             if response.status != 200:
@@ -108,9 +176,13 @@ async def tavily(query, count):
     return _normalize(data.get("results", []), "content", count)
 
 
-async def exa(query, count):
+async def exa(query, count, include_domains=None, exclude_domains=None):
     headers = {"x-api-key": os.environ["EXA_API_KEY"], "Content-Type": "application/json"}
     payload = {"query": query, "type": "auto", "numResults": count, "contents": {"highlights": True}}
+    if include_domains is not None:
+        payload["includeDomains"] = include_domains
+    if exclude_domains is not None:
+        payload["excludeDomains"] = exclude_domains
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as client:
         async with client.post("https://api.exa.ai/search", json=payload, headers=headers) as response:
             if response.status != 200:
@@ -142,12 +214,18 @@ def _normalize(results, snippet_field, count):
     return normalized
 
 
-async def search(query, count):
+async def search(query, count, options=None):
     name = provider_name()
     fetch = {"brave": brave, "tavily": tavily, "exa": exa}.get(name)
     if fetch is None:
         raise aiohttp.ClientError("search provider is not configured unambiguously")
-    return await fetch(query, count)
+    options = options or {}
+    include_domains, exclude_domains = normalize_domain_filters(
+        options.get("include_domains"), options.get("exclude_domains"))
+    results = await fetch(query, count, include_domains, exclude_domains)
+    if include_domains is not None or exclude_domains is not None:
+        results = [item for item in results if _domain_allowed(item["url"], include_domains, exclude_domains)]
+    return results[:count]
 
 
 def install(h, app, provider=None):
@@ -158,11 +236,14 @@ def install(h, app, provider=None):
             return web.json_response({"error": "Web search is not enabled on this service yet. Use /v1/search for pages you have already scraped.",
                                       "code": "not_configured", "retryable": False}, status=503)
         query = body.get("query") if isinstance(body, dict) else None
-        if not isinstance(query, str) or not 1 <= len(query) <= 300 or set(body) - {"query", "limit"}:
-            raise ValueError("Use query (1–300 characters) and optional limit")
+        allowed = {"query", "limit", "include_domains", "exclude_domains"}
+        if not isinstance(query, str) or not 1 <= len(query) <= 300 or set(body) - allowed:
+            raise ValueError("Use query (1–300 characters), optional limit, and optional domain filters")
         limit = body.get("limit", 10)
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
             raise ValueError("limit must be 1–20")
+        include_domains, exclude_domains = normalize_domain_filters(body.get("include_domains"), body.get("exclude_domains"))
+        search_options = {"include_domains": include_domains, "exclude_domains": exclude_domains}
         reserved = credit_reservation(selected_provider, limit)
         try:
             h.billing.reserve(account, reserved, kind="search")
@@ -170,7 +251,11 @@ def install(h, app, provider=None):
             return web.json_response({"error": "Not enough credits", "code": "insufficient_credits", "retryable": False,
                                       "credits_left": h.billing.remaining(account), "buy_url": h.site + "/#pricing"}, status=402)
         try:
-            results = await fetch(query, limit)
+            results = await fetch(query, limit, search_options)
+            if include_domains is not None or exclude_domains is not None:
+                results = [item for item in results if isinstance(item, dict)
+                           and _domain_allowed(item.get("url", ""), include_domains, exclude_domains)]
+                results = results[:limit]
         except BaseException:
             h.billing.refund(account, reserved)
             raise

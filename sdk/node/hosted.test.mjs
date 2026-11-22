@@ -28,6 +28,12 @@ test("errors expose the code, buy link and hint", async () => {
   await assert.rejects(apex.scrape("https://example.com"), (e) => e instanceof ApexError && e.code === "insufficient_credits" && e.buy_url.endsWith("#pricing"));
 });
 
+test("hosted web search forwards optional hostname filters", async () => {
+  const { apex, calls } = fake([{ data: { results: [] } }]);
+  await apex.webSearch("official docs", 7, { includeDomains: ["docs.example.com"] });
+  assert.deepEqual(calls[0].body, { query: "official docs", limit: 7, include_domains: ["docs.example.com"] });
+});
+
 test("crawl yields pages until the job reports no more", async () => {
   const { apex, calls } = fake([
     { data: { id: "crawl_1", status: "running" } },

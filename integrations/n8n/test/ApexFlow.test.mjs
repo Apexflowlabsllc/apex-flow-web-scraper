@@ -22,6 +22,10 @@ test('map and web search build the hosted API payloads', () => {
 	assert.deepEqual(plan('webSearch', { query: 'web scraping API', limit: 5 }), {
 		method: 'POST', path: '/websearch', body: { query: 'web scraping API', limit: 5 },
 	});
+	assert.deepEqual(plan('webSearch', { query: 'web scraping API', limit: 5, includeDomains: 'docs.example.com, api.example.com' }), {
+		method: 'POST', path: '/websearch', body: { query: 'web scraping API', limit: 5, include_domains: ['docs.example.com', 'api.example.com'] },
+	});
+	assert.throws(() => plan('webSearch', { query: 'x', includeDomains: 'example.com', excludeDomains: 'blocked.example' }), /Use include domains or exclude domains/);
 });
 
 test('crawl lifecycle encodes IDs and uses numeric offsets', () => {
