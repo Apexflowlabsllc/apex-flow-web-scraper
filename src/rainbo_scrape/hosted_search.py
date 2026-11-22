@@ -7,7 +7,12 @@ from aiohttp import web
 
 from .billing import QuotaExceeded, cost_of
 
-CREDITS = cost_of("search")  # keep endpoint reservation aligned with the central price table
+_PROVIDER_CREDITS = {
+    "brave": ("APEX_SEARCH_BRAVE_CREDITS", 130),
+    "tavily": ("APEX_SEARCH_TAVILY_CREDITS", 210),
+    "exa": ("APEX_SEARCH_EXA_BASE_CREDITS", 180),
+}
+_EXA_EXTRA_CREDITS = ("APEX_SEARCH_EXA_EXTRA_RESULT_CREDITS", 25)
 
 
 _PROVIDER_KEYS = {
@@ -21,9 +26,41 @@ def provider_name():
     """Return the one provider selected for this process, or None if unavailable/ambiguous."""
     available = [name for name, key in _PROVIDER_KEYS.items() if os.environ.get(key)]
     selected = os.environ.get("APEX_SEARCH_PROVIDER", "").strip().lower()
-    if selected:
-        return selected if selected in available else None
-    return available[0] if len(available) == 1 else None
+    name = selected if selected else (available[0] if len(available) == 1 else None)
+    if name not in available or name not in _PROVIDER_CREDITS:
+        return None
+    cost_env, default_cost = _PROVIDER_CREDITS[name]
+    if _positive_credit_config(cost_env, default_cost) is None:
+        return None
+    if name == "exa" and _positive_credit_config(*_EXA_EXTRA_CREDITS) is None:
+        return None
+    return name
+
+
+def _positive_credit_config(key, default):
+    raw = os.environ.get(key)
+    if raw is None:
+        return default
+    if not raw.isascii() or not raw.isdecimal():
+        return None
+    value = int(raw)
+    return value if 1 <= value <= 100000 else None
+
+
+def credit_reservation(name, limit):
+    """Credits to reserve and charge for this request, including Exa result overage."""
+    if name not in _PROVIDER_CREDITS:
+        return cost_of("search")
+    env, default = _PROVIDER_CREDITS[name]
+    base = _positive_credit_config(env, default)
+    if base is None:
+        raise ValueError("invalid search provider credit configuration")
+    if name != "exa":
+        return base
+    extra = _positive_credit_config(*_EXA_EXTRA_CREDITS)
+    if extra is None:
+        raise ValueError("invalid Exa result credit configuration")
+    return base + extra * max(0, limit - 10)
 
 
 def configured():
@@ -97,7 +134,8 @@ async def search(query, count):
 
 def install(h, app, provider=None):
     async def search_for(account, body):
-        fetch = provider or (search if configured() else None)
+        selected_provider = provider_name() if provider is None else None
+        fetch = provider or (search if selected_provider else None)
         if fetch is None:
             return web.json_response({"error": "Web search is not enabled on this service yet. Use /v1/search for pages you have already scraped.",
                                       "code": "not_configured", "retryable": False}, status=503)
@@ -107,23 +145,23 @@ def install(h, app, provider=None):
         limit = body.get("limit", 10)
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
             raise ValueError("limit must be 1–20")
+        reserved = credit_reservation(selected_provider, limit)
         try:
-            h.billing.reserve(account, CREDITS)
+            h.billing.reserve(account, reserved, kind="search")
         except QuotaExceeded:
             return web.json_response({"error": "Not enough credits", "code": "insufficient_credits", "retryable": False,
                                       "credits_left": h.billing.remaining(account), "buy_url": h.site + "/#pricing"}, status=402)
         try:
             results = await fetch(query, limit)
         except BaseException:
-            h.billing.refund(account, CREDITS)
+            h.billing.refund(account, reserved)
             raise
-        if not results:
-            h.billing.refund(account, CREDITS)
-        return web.json_response({"results": results, "credits_used": CREDITS if results else 0, "credits_left": h.billing.remaining(account),
+        credits_used = reserved
+        return web.json_response({"results": results, "credits_used": credits_used, "credits_left": h.billing.remaining(account),
                                   "note": "Pass a result url to /v1/scrape to read it."})
 
-    async def search(request):
+    async def websearch(request):
         return await search_for(request["account"], await request.json())
 
-    app.router.add_post("/v1/websearch", search)
+    app.router.add_post("/v1/websearch", websearch)
     return {"/websearch": search_for}

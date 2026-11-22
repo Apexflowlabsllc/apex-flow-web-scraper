@@ -29,6 +29,14 @@ def test_charge_reduces_credits_and_enforces_quota(tmp_path):
     assert b.remaining(acct) == 984  # a refused charge changes nothing
 
 
+def test_reserve_records_exact_provider_credits_under_operation_kind(tmp_path):
+    b = Billing(tmp_path / "b.db")
+    acct = b.create_account("a@example.com")
+    b.reserve(acct, 210, kind="search")
+    assert b.remaining(acct) == 790
+    assert b.db.execute("SELECT kind,credits FROM usage WHERE account=?", (acct,)).fetchone() == ("search", 210)
+
+
 def test_plan_change_resets_period(tmp_path):
     b = Billing(tmp_path / "b.db")
     acct = b.create_account("a@example.com")
@@ -45,7 +53,7 @@ def test_prices_undercut_firecrawl_standard():
 
 def test_cost_validation():
     assert cost_of("proxy_page", 2) == 16
-    assert cost_of("search") == 70
+    assert cost_of("search") == 130
     with pytest.raises(ValueError):
         cost_of("bogus")
     with pytest.raises(ValueError):

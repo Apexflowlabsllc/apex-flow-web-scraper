@@ -16,7 +16,8 @@ SITE_PAGES = {f"https://docs.example/p{i}": [f"https://docs.example/p{j}" for j 
 
 @pytest.fixture
 async def svc(tmp_path, monkeypatch):
-    for key in ("SCRAPER_GATEWAY_SECRET", "BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "APEX_SEARCH_PROVIDER"):
+    for key in ("SCRAPER_GATEWAY_SECRET", "BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "APEX_SEARCH_PROVIDER",
+                "APEX_SEARCH_BRAVE_CREDITS", "APEX_SEARCH_TAVILY_CREDITS", "APEX_SEARCH_EXA_BASE_CREDITS", "APEX_SEARCH_EXA_EXTRA_RESULT_CREDITS"):
         monkeypatch.delenv(key, raising=False)
     billing = Billing(tmp_path / "billing.db")
     h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
@@ -122,18 +123,21 @@ async def test_mcp_crawl_tools_and_web_search_visibility(svc):
     assert status["status"] == "completed" and status["pages_done"] == 4 and len(status["results"]) >= 4
 
 
-async def test_web_search_charges_above_cost_and_nothing_for_no_results(svc):
+async def test_web_search_charges_for_successful_searches_including_empty_results(svc):
     h, client, seen = svc
     acct, auth = account(h, "starter", "cs_test_search1")
     body = await (await client.post("/v1/websearch", json={"query": "apex scraper", "limit": 3}, headers=auth)).json()
-    assert len(body["results"]) == 3 and body["credits_used"] == 70 and body["credits_left"] == 109930
+    assert len(body["results"]) == 3 and body["credits_used"] == 130 and body["credits_left"] == 109870
+    assert h.billing.db.execute("SELECT kind,credits FROM usage WHERE account=? ORDER BY ts DESC LIMIT 1", (acct,)).fetchone() == ("search", 130)
     body = await (await client.post("/v1/websearch", json={"query": "nothing"}, headers=auth)).json()
-    assert body["results"] == [] and body["credits_used"] == 0 and h.billing.remaining(acct) == 109930
+    assert body["results"] == [] and body["credits_used"] == 130 and h.billing.remaining(acct) == 109740
     assert (await client.post("/v1/websearch", json={"query": ""}, headers=auth)).status == 400
 
 
 async def test_web_search_and_model_extraction_stay_off_without_operator_keys(tmp_path, monkeypatch):
-    for name in ("SCRAPER_GATEWAY_SECRET", "BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "APEX_SEARCH_PROVIDER", "DEEPSEEK_API_KEY", "OPENROUTER_API_KEY"):
+    for name in ("SCRAPER_GATEWAY_SECRET", "BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "APEX_SEARCH_PROVIDER",
+                 "APEX_SEARCH_BRAVE_CREDITS", "APEX_SEARCH_TAVILY_CREDITS", "APEX_SEARCH_EXA_BASE_CREDITS", "APEX_SEARCH_EXA_EXTRA_RESULT_CREDITS",
+                 "DEEPSEEK_API_KEY", "OPENROUTER_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     billing = Billing(tmp_path / "billing.db")
     h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
@@ -175,7 +179,8 @@ async def test_web_search_and_model_extraction_stay_off_without_operator_keys(tm
 
 
 def test_search_provider_selection_requires_one_unambiguous_configured_provider(monkeypatch):
-    for key in ("BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "APEX_SEARCH_PROVIDER"):
+    for key in ("BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "APEX_SEARCH_PROVIDER",
+                "APEX_SEARCH_BRAVE_CREDITS", "APEX_SEARCH_TAVILY_CREDITS", "APEX_SEARCH_EXA_BASE_CREDITS", "APEX_SEARCH_EXA_EXTRA_RESULT_CREDITS"):
         monkeypatch.delenv(key, raising=False)
     assert hosted_search.provider_name() is None and not hosted_search.configured()
     monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "fixture")
@@ -186,6 +191,49 @@ def test_search_provider_selection_requires_one_unambiguous_configured_provider(
     assert hosted_search.provider_name() == "exa" and hosted_search.configured()
     monkeypatch.setenv("APEX_SEARCH_PROVIDER", "unknown")
     assert hosted_search.provider_name() is None and not hosted_search.configured()
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "brave")
+    monkeypatch.setenv("APEX_SEARCH_BRAVE_CREDITS", "0")
+    assert hosted_search.provider_name() is None and not hosted_search.configured()
+
+
+def test_search_credit_rates_exa_reserves_and_charges_requested_result_count(monkeypatch):
+    for key in ("APEX_SEARCH_BRAVE_CREDITS", "APEX_SEARCH_TAVILY_CREDITS", "APEX_SEARCH_EXA_BASE_CREDITS", "APEX_SEARCH_EXA_EXTRA_RESULT_CREDITS"):
+        monkeypatch.delenv(key, raising=False)
+    assert hosted_search.credit_reservation("brave", 20) == 130
+    assert hosted_search.credit_reservation("tavily", 20) == 210
+    assert hosted_search.credit_reservation("exa", 10) == 180
+    assert hosted_search.credit_reservation("exa", 20) == 430
+    assert hosted_search.credit_reservation("exa", 12) == 230
+    assert hosted_search.credit_reservation("exa", 1) == 180  # the provider bills an empty search request too
+
+
+async def test_exa_search_reserves_and_charges_requested_result_cap(tmp_path, monkeypatch):
+    for key in ("BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "APEX_SEARCH_PROVIDER",
+                "APEX_SEARCH_BRAVE_CREDITS", "APEX_SEARCH_TAVILY_CREDITS", "APEX_SEARCH_EXA_BASE_CREDITS", "APEX_SEARCH_EXA_EXTRA_RESULT_CREDITS"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("EXA_API_KEY", "fixture")
+    billing = Billing(tmp_path / "search-cost.db")
+    h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
+
+    async def exa_results(query, count):
+        if query == "failure":
+            raise hosted_search.aiohttp.ClientError("upstream unavailable")
+        return [] if query == "empty" else [{"url": f"https://r.example/{i}", "title": "Result", "snippet": "Text"} for i in range(12)]
+
+    monkeypatch.setattr(hosted_search, "exa", exa_results)
+    acct, auth = account(h, "scale", "cs_test_exa_cost")
+    async with TestClient(TestServer(make_app(billing, hosted=h))) as client:
+        response = await client.post("/v1/websearch", json={"query": "many", "limit": 20}, headers=auth)
+        body = await response.json()
+        assert response.status == 200, body
+        assert len(body["results"]) == 12 and body["credits_used"] == 430
+        assert body["credits_left"] == PLANS["scale"]["credits"] - 430
+        body = await (await client.post("/v1/websearch", json={"query": "empty", "limit": 20}, headers=auth)).json()
+        assert body["results"] == [] and body["credits_used"] == 430
+        assert h.billing.remaining(acct) == PLANS["scale"]["credits"] - 860
+        response = await client.post("/v1/websearch", json={"query": "failure", "limit": 20}, headers=auth)
+        assert response.status != 200 and h.billing.remaining(acct) == PLANS["scale"]["credits"] - 860
+    billing.db.close()
 
 
 @pytest.mark.parametrize("name,key,payload,expected", [

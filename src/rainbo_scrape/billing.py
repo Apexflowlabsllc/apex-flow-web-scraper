@@ -19,7 +19,8 @@ PLANS = {
     "scale": {"price": 299, "credits": 3750000, "rpm": 240, "concurrency": 20, "saved_pages": 1000, "monitors": 500},
 }
 # Credits per request kind. Rendered pages cost our browser time; proxied pages cost real bandwidth.
-COSTS = {"page": 1, "render": 3, "proxy_page": 8, "proxy_render": 10, "extract": 150, "search": 70}
+# Hosted search uses vendor-specific pricing; this is the baseline for injected/custom providers.
+COSTS = {"page": 1, "render": 3, "proxy_page": 8, "proxy_render": 10, "extract": 150, "search": 130}
 PREFIX = "rs_live_"
 _usage_key_hash = ContextVar("apex_usage_key_hash", default=None)
 
@@ -134,8 +135,13 @@ class Billing:
         plan = self.db.execute("SELECT plan FROM accounts WHERE id=?", (account,)).fetchone()[0]
         return PLANS[plan]
 
-    def charge(self, account, kind, count=1):
-        needed = cost_of(kind, count)
+    def charge(self, account, kind, count=1, *, exact_credits=None):
+        if exact_credits is None:
+            needed = cost_of(kind, count)
+        else:
+            if kind not in COSTS or isinstance(exact_credits, bool) or not isinstance(exact_credits, int) or exact_credits < 0:
+                raise ValueError("invalid exact credit charge")
+            needed = exact_credits
         self.db.execute("BEGIN IMMEDIATE")
         try:
             plan, used = self.db.execute("SELECT plan, used FROM accounts WHERE id=?", (account,)).fetchone()
@@ -151,9 +157,9 @@ class Billing:
             raise
         return left - needed
 
-    def reserve(self, account, credits):
+    def reserve(self, account, credits, kind="page"):
         """Reserve before I/O so concurrent requests cannot overspend."""
-        return self.charge(account, "page", credits)
+        return self.charge(account, kind, exact_credits=credits)
 
     def refund(self, account, credits):
         if credits <= 0:

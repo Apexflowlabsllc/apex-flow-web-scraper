@@ -763,7 +763,7 @@
       "post": {
         "operationId": "searchPublicWeb",
         "summary": "Search the public web when the operator enables a provider",
-        "description": "Requires one service-level search provider: Brave Search, Tavily Search, or Exa Search. Returns 503 not_configured when none is configured or provider selection is ambiguous. A non-empty result costs 70 credits; empty results and provider failures are refunded.",
+        "description": "Requires one service-level search provider: Brave Search, Tavily Search, or Exa Search. Returns 503 not_configured when none is configured or provider selection is ambiguous. Successful searches cost 130 credits with Brave, 210 with Tavily basic search, or 180 with Exa for up to 10 requested results plus 25 per requested result above 10. Successful empty results are billed; failed provider calls refund the reservation.",
         "requestBody": {
           "required": true,
           "content": {

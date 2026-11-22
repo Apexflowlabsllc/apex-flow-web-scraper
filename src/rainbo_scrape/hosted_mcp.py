@@ -162,7 +162,7 @@ async def crawl_status(job_id: str, offset: int = 0):
 
 @mcp.tool()
 async def web_search(query: str, limit: int = 10):
-    """Search the whole web and return result links, titles and snippets for 70 credits. Pass a result url to scrape_page to read it."""
+    """Search the whole web with provider-aware credit pricing. Successful calls are billed even with no results; failed provider calls are refunded. Pass a result url to scrape_page to read it."""
     return await request("/websearch", {"query": query, "limit": limit})
 
 
