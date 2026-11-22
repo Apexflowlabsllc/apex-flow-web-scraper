@@ -638,6 +638,74 @@
         }
       }
     },
+    "/websearch": {
+      "post": {
+        "operationId": "searchPublicWeb",
+        "summary": "Search the public web when the operator enables a provider",
+        "description": "Requires a service-level search provider. Returns 503 not_configured when none is configured. A non-empty result costs 70 credits; empty results and provider failures are refunded.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query": { "type": "string", "minLength": 1, "maxLength": 300 },
+                  "limit": { "type": "integer", "minimum": 1, "maximum": 20, "default": 10 }
+                },
+                "required": ["query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results. Empty result sets use no credits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["results", "credits_used", "credits_left", "note"],
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "url": { "type": "string", "format": "uri" },
+                          "title": { "type": "string" },
+                          "snippet": { "type": "string" }
+                        }
+                      }
+                    },
+                    "credits_used": { "type": "integer", "minimum": 0 },
+                    "credits_left": { "type": "integer", "minimum": 0 },
+                    "note": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Search provider is not configured.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, insufficient credits, rate limit, or provider failure.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/search": {
       "post": {
         "operationId": "searchSavedPages",

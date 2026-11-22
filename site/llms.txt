@@ -39,7 +39,7 @@
 
 ## Not claimed
 - No CAPTCHA solving or bot-wall evasion; sites behind bot walls, such as glassdoor.com, block live reads. The archive copy (on by default for named pages) returns a dated Internet Archive copy where one exists.
-- POST /v1/search and the search_saved MCP tool search only this account's previously scraped pages. Whole-web /v1/websearch and web_search MCP are separate, require the service operator to configure a search provider, and return not_configured when no provider is available.
+- POST /v1/search and the search_saved MCP tool search only this account's previously scraped pages. Whole-web /v1/websearch and web_search MCP are separate and require the service operator to configure a search provider; otherwise they return not_configured. If enabled, a non-empty whole-web search costs 70 credits, empty results are free, and provider failures refund reserved credits.
 - We do not claim universal competitor superiority, the lowest price for every workload, or guaranteed availability on every source.
 
 ## Agent setup
