@@ -18,6 +18,8 @@ from rainbo_scrape.policy import ScrapeError
 from rainbo_scrape.settings import Settings
 from rainbo_scrape.store import Store
 
+REQUEST_STARTS = web.AppKey("test_request_starts", dict)
+
 
 @pytest.fixture
 def settings(tmp_path):
@@ -89,10 +91,13 @@ def test_extract_reports_needs_render_for_js_shell():
 @pytest.fixture
 async def site():
     counts = {}
+    request_starts = {}
 
     async def handler(request):
         path = request.path
         counts[path] = counts.get(path, 0) + 1
+        if path in {"/page", "/page2"}:
+            request_starts[path] = time.monotonic()
         if path == "/robots.txt":
             return web.Response(text="User-agent: *\nCrawl-delay: 2\nSitemap: http://127.0.0.1:%d/sitemap_index.xml\n"
                                 % request.url.port)
@@ -117,6 +122,7 @@ async def site():
                             content_type="text/html")
     application = web.Application()
     application["version"] = "1"
+    application[REQUEST_STARTS] = request_starts
     application.router.add_route("GET", "/{path:.*}", handler)
     runner = web.AppRunner(application)
     await runner.setup()
@@ -135,14 +141,15 @@ async def test_large_response_headers_are_accepted(site, settings):
 
 
 async def test_crawl_delay_does_not_hold_back_the_first_page(site, settings):
-    base, _, _ = site
+    base, _, application = site
     async with Fetcher(settings, None) as fetcher:
         started = time.monotonic()
         await fetcher.get(base + "/page")
         assert time.monotonic() - started < 1.5  # robots says Crawl-delay: 2
-        started = time.monotonic()
+        first_page_started = application[REQUEST_STARTS]["/page"]
         await fetcher.get(base + "/page2")
-        assert time.monotonic() - started >= 1.8  # but the delay still separates page fetches
+        second_page_started = application[REQUEST_STARTS]["/page2"]
+        assert second_page_started - first_page_started >= 1.8  # delay separates request starts
 
 
 async def test_max_age_zero_forces_a_fresh_fetch(site, settings):
@@ -398,12 +405,13 @@ async def test_browser_action_executor_uses_only_bounded_playwright_calls():
         await perform_actions(UnsafePage(), [{"type": "click", "selector": "button.submit"}])
 
 async def test_crawl_delay_shared_by_independent_fetchers(site, settings):
-    base, _, _ = site
+    base, _, application = site
     async with Fetcher(settings, Store(settings)) as first, Fetcher(settings, Store(settings)) as second:
         await first.get(base + "/page")
-        started = time.monotonic()
+        first_page_started = application[REQUEST_STARTS]["/page"]
         await second.get(base + "/page2")
-        assert time.monotonic() - started >= 1.8
+        second_page_started = application[REQUEST_STARTS]["/page2"]
+        assert second_page_started - first_page_started >= 1.8
 
 
 async def test_waiting_browser_and_failed_launch_release_slots(settings, monkeypatch):
