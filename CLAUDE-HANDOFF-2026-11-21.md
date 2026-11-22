@@ -1,9 +1,9 @@
 # Claude Code handoff: Apex Flow Web Scraper
 
-**Prepared:** 2026-11-21 (Pacific)  
+**Prepared:** 2026-11-22 (Pacific)  
 **Project:** `E:\apex\work\codex-brief-20261121\scraper`  
 **Branch:** `codex/handoff-2026-11-21-scraper`  
-**Product/code revision reviewed:** `b5d8bdde9dd3e18ba6f9870946976a4eef981b5e`
+**Product/code revision reviewed:** `f28a7837ad7afc5785a3aa939613e2723d196260`
 **Pull request:** [#34 — Upgrade Web Scraper hero and AI distribution](https://github.com/Apexflowlabsllc/apex-flow-web-scraper/pull/34)
 
 ## Assignment
@@ -14,19 +14,22 @@ The user wants a visually distinctive, highly animated crawler product, broader 
 
 ## Current verified state
 
-- PR #34 is **open, draft, and mergeable**; handoff documentation commits follow the product/code revision above. GitHub reported **no checks** for the branch on the last check.
+- PR #34 is **open and draft** and contains product code revision `f28a7837ad7afc5785a3aa939613e2723d196260`; handoff-only documentation commits may follow. GitHub reports **no checks** for the branch. Keep it draft until independently reviewed.
 - No production deployment or package publication has occurred. These branch changes are not live in production.
-- Full Python suite: **192 passed, 23 warnings** at code head b5d8bdd. Focused billing and compatibility suite: **17 passed**. `node --check site/dashboard.js`, OpenAPI JSON parsing, and `git diff --check` passed.
+- Full Python suite: **196 passed, 23 warnings** at code head f28a783. `node --check site/dashboard.js`, OpenAPI JSON parsing, and `git diff --check` passed before the latest search-provider changes; OpenAPI JSON parsing and `git diff --check` also passed after those changes.
 - Current committed changes include dashboard API-key controls; create/list/revoke REST endpoints; one-time key display; a 25-active-key limit; a replacement-key guard before revoking the last active one; and a gateway-protected, aggregate funnel report at `/api/internal/funnel`.
 - Credit usage now supports account and per-key historical views. New usage is attributed using an opaque stable key ID; old ledger entries are preserved and returned as unattributed.
+- Whole-web search now has Brave Search, Tavily Search, and Exa Search adapters behind the existing normalized API contract. One provider is selected per query; a single configured key auto-selects, while multiple configured keys require `APEX_SEARCH_PROVIDER=brave|tavily|exa`. Ambiguous or invalid setup keeps search disabled and hides the MCP tool. Provider failures still refund the 70-credit reservation. Adapter tests use mocked HTTP responses; no live provider credential was available for end-to-end testing. Operator setup and cost/terms reminders are in `ops/SEARCH-PROVIDERS.md`.
 - Earlier work on this branch includes Firecrawl-style document parsing, crawl active listing, v2 credit usage, schema-based extraction, bounded browser sessions, crawl filters and errors, SDK/CLI/Agent Skill work, and the animated product hero. See the existing parity matrix and PR body for the full list and limits.
 - The dashboard key panel is collapsed by default and keeps the key in the current tab's memory. A new secret is shown once and can be copied by an explicit user action.
-- Production Vercel environment variable **names only** were inspected without decrypting values. The current production list showed `SCRAPER_GATEWAY_SECRET` and `STRIPE_SECRET_KEY`; no search-provider key was present. Filtering the PR branch environment returned no variables. Do not request or reveal secret values.
+- Production Vercel environment variable **names only** were inspected without decrypting values. The current production list showed `SCRAPER_GATEWAY_SECRET` and `STRIPE_SECRET_KEY`; no search-provider key was present. No provider was configured during this review. Do not request or reveal secret values.
+- The newest Vercel deployment found for this branch is still READY at older commit `16a7d76`; there is no preview for current head `f28a783`. That older preview redirects unauthenticated visits to Vercel SSO. Production remains unchanged. GitHub reports no checks.
+- A read-only Claude Opus review was attempted through the available Claude Flow route, but execution stopped because no LLM provider is configured in this environment. No Claude review findings are available yet.
 - Vercel Web Analytics queries returned `web_analytics_not_enabled`. The branch now includes a private first-party daily funnel report using existing aggregate events; the report describes event-count ratios, not unique people or cohort conversion. See `ops/FUNNEL-REPORT.md`.
 
 ## Highest-value gaps
 
-1. **Search:** `/v1/websearch` and v2 search require an operator-configured provider. No search-provider environment variable is currently configured. Propose a reliable, lawful provider path, cost controls and fallback/error behavior; do not silently rely on a public service that may prohibit or rate-limit commercial use.
+1. **Search operations and economics:** branch adapters support Brave, Tavily and Exa, but no provider key is configured in production and there is no live upstream quality/latency test. Before enabling paid traffic, select one provider, confirm current commercial terms/rate limits and cost controls, then verify the deployed endpoint and MCP tool listing. Search provider costs are separate from Apex credits. Do not enable automatic provider failover: a timeout can leave upstream billing ambiguous.
 2. **AI reach:** 15 MCP installer targets and Python/Node clients exist, but setup files do not prove that each integration works. Prioritize clean-install and first-call tests for the highest-value clients, then add distribution listings only with verified packaging.
 3. **Browser capability:** interactive sessions are short-lived and process-local, limited to two browser slots per process, and do not expose CDP/live streaming, persistent profiles or authenticated login. Durable multi-worker session affinity is still missing.
 4. **Research and extraction breadth:** autonomous agent runs/traces, research/developer/government indexes, broad provider catalogs, image OCR, audio/video extraction, and PII redaction are not implemented.
@@ -38,9 +41,10 @@ The user wants a visually distinctive, highly animated crawler product, broader 
 - `src/rainbo_scrape/api.py`: auth middleware, key create/list/revoke routes, account ownership and last-key protection.
 - `src/rainbo_scrape/hosted_firecrawl_compat.py`: current and historical usage response shapes.
 - `src/rainbo_scrape/hosted_features.py`: owner-only funnel report and existing aggregate event ledger.
+- `src/rainbo_scrape/hosted_search.py`: Brave/Tavily/Exa adapters, deterministic provider selection, normalized result URLs/snippets and conditional MCP exposure.
 - `site/dashboard.html`, `site/dashboard.js`, `site/app.css`: collapsed key panel, one-time secret display and revoke flow.
 - `site/openapi.json`, `site/docs.html`, `site/firecrawl-compat.html`: public contract and guidance.
-- Tests: `tests/test_billing.py` and `tests/test_firecrawl_compat.py`.
+- Tests: `tests/test_billing.py`, `tests/test_firecrawl_compat.py`, and `tests/test_parity.py` (including provider selection, mocked vendor requests and normalized result handling).
 
 In particular, check cross-account isolation, legacy database upgrades, context propagation to background jobs, refunds, revoked-key visibility, last-key handling, escaping of labels, and that bearer secrets are never returned by list routes or written to logs.
 
