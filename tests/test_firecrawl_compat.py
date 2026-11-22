@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 from rainbo_scrape.billing import _hash
 from test_hosted import hosted
@@ -219,9 +220,36 @@ async def test_v2_crawl_lifecycle_reuses_durable_apex_job(hosted, monkeypatch):
 
 
 async def test_v2_crawl_does_not_expand_access_scope_or_ignore_robots(hosted):
-    _, client, headers = await _auth(hosted)
-    for options in ({"ignoreRobotsTxt": True}, {"allowExternalLinks": True}, {"includePaths": ["/blog/.*"]}):
+    h, client, headers = await _auth(hosted)
+    for options in ({"ignoreRobotsTxt": True}, {"allowExternalLinks": True}):
         response = await client.post("/v2/crawl", headers=headers,
                                     json={"url": "https://example.com", **options})
         payload = await response.json()
         assert response.status == 400 and payload["success"] is False
+    invalid = await client.post("/v2/crawl", headers=headers,
+                                json={"url": "https://example.com", "includePaths": ["("]})
+    assert invalid.status == 400
+    response = await client.post("/v2/crawl", headers=headers, json={
+        "url": "https://example.com/blog", "limit": 1, "maxDiscoveryDepth": 0,
+        "includePaths": ["^/blog/"], "excludePaths": ["/blog/private"],
+        "regexOnFullURL": False, "ignoreQueryParameters": True,
+    })
+    assert response.status == 200
+    job = (await response.json())["id"]
+    options = json.loads(h.db.execute("SELECT options FROM crawl_jobs WHERE id=?", (job,)).fetchone()[0])
+    assert options["include_paths"] == ["^/blog/"]
+    assert options["exclude_paths"] == ["/blog/private"]
+    assert options["ignore_query_parameters"] is True
+
+
+def test_crawl_path_filters_regex_scope_and_query_deduplication():
+    from rainbo_scrape.hosted_crawl import _compile_path_patterns, _crawl_identity, _matches_crawl_url
+
+    include = _compile_path_patterns(["^/docs/(api|guide)/.*$"], "includePaths")
+    exclude = _compile_path_patterns(["/private(/|$)"], "excludePaths")
+    assert _matches_crawl_url("https://docs.example/docs/api/v1?format=json", include, exclude)
+    assert not _matches_crawl_url("https://docs.example/docs/marketing", include, exclude)
+    assert not _matches_crawl_url("https://docs.example/docs/private/page", include, exclude)
+    assert _matches_crawl_url("https://docs.example/docs/private/page", [], exclude, regex_on_full_url=True) is False
+    assert _crawl_identity("https://docs.example/page?a=1#top", True) == "https://docs.example/page"
+    assert _crawl_identity("https://docs.example/page?a=1#top") == "https://docs.example/page?a=1"

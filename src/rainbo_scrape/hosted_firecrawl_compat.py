@@ -291,7 +291,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if not isinstance(body, dict):
             return error("Request body must be a JSON object")
         allowed = {"url", "limit", "maxDiscoveryDepth", "includePaths", "excludePaths",
-                   "ignoreRobotsTxt", "allowExternalLinks", "allowSubdomains", "sitemap", "scrapeOptions"}
+                   "regexOnFullURL", "ignoreQueryParameters", "ignoreRobotsTxt", "allowExternalLinks",
+                   "allowSubdomains", "sitemap", "scrapeOptions"}
         extra = set(body) - allowed
         if extra:
             return error("Unsupported Apex compatibility options: " + ", ".join(sorted(extra)))
@@ -299,8 +300,6 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             return error("Apex always obeys robots.txt")
         if body.get("allowExternalLinks", False) is not False or body.get("allowSubdomains", False) is not False:
             return error("This adapter is same-site only; external links and subdomains are not enabled")
-        if body.get("includePaths") or body.get("excludePaths"):
-            return error("includePaths/excludePaths patterns are not supported yet; Apex crawl is bounded to same-site depth and limit")
         if body.get("sitemap", "include") != "include":
             return error("Only sitemap='include' is supported")
         scrape_options = body.get("scrapeOptions", {})
@@ -336,6 +335,11 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                           if item in {"markdown", "html", "rawHtml", "links", "screenshot"}})
         start_body = {"url": body.get("url"), "limit": body.get("limit", 25), "render": "auto",
                       "outputs": outputs, "max_depth": body.get("maxDiscoveryDepth", 3)}
+        for source, target in (("includePaths", "include_paths"), ("excludePaths", "exclude_paths"),
+                               ("regexOnFullURL", "regex_on_full_url"),
+                               ("ignoreQueryParameters", "ignore_query_parameters")):
+            if source in body:
+                start_body[target] = body[source]
         if extract_spec:
             admission = extraction_admission(request["account"])
             if admission:

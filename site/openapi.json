@@ -2528,7 +2528,7 @@
       "post": {
         "operationId": "firecrawlCompatStartCrawl",
         "summary": "Firecrawl-compatible crawl",
-        "description": "Starts a durable same-site crawl. Apex obeys robots.txt, enforces account limits, and rejects external-link, subdomain, path-pattern, and unsupported scrape options.",
+        "description": "Starts a durable same-site crawl. Apex obeys robots.txt, enforces account limits, and rejects external-link and subdomain expansion. includePaths/excludePaths accept bounded, safety-checked regular expressions matched against URL paths; regexOnFullURL switches matching to the full URL. ignoreQueryParameters deduplicates discovered URLs without query strings.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -2591,15 +2591,29 @@
                   },
                   "includePaths": {
                     "type": "array",
+                    "maxItems": 20,
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
                     }
                   },
                   "excludePaths": {
                     "type": "array",
+                    "maxItems": 20,
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
                     }
+                  },
+                  "regexOnFullURL": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "ignoreQueryParameters": {
+                    "type": "boolean",
+                    "default": false
                   },
                   "ignoreRobotsTxt": {
                     "type": "boolean"
