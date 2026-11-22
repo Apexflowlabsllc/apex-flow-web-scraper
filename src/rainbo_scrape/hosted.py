@@ -167,10 +167,10 @@ class Hosted:
         async def errors(request, handler):
             try:
                 gateway = os.environ.get("SCRAPER_GATEWAY_SECRET", "")
-                if gateway and not request.path.startswith("/v1/") and request.path not in {"/api/status", "/api/stripe/webhook"} and not hmac.compare_digest(request.headers.get("X-Scraper-Gateway", ""), gateway):
+                if gateway and not request.path.startswith(("/v1/", "/v2/")) and request.path not in {"/api/status", "/api/stripe/webhook"} and not hmac.compare_digest(request.headers.get("X-Scraper-Gateway", ""), gateway):
                     raise web.HTTPForbidden()
                 if request.method == "POST" and request.path != "/api/stripe/webhook" and request.headers.get("Origin") not in ORIGINS | {self.site}:
-                    if not request.path.startswith("/v1/") and request.path != "/api/portal":
+                    if not request.path.startswith(("/v1/", "/v2/")) and request.path != "/api/portal":
                         raise web.HTTPForbidden(text='{"error":"Open this action from the website."}', content_type="application/json")
                 response = await handler(request)
             except (ValueError, KeyError, TypeError):

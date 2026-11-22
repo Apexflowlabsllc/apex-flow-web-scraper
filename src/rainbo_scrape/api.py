@@ -147,7 +147,7 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
 
     @web.middleware
     async def guard(request, handler):
-        if hosted and not request.path.startswith("/v1/"):
+        if hosted and not request.path.startswith(("/v1/", "/v2/")):
             return await handler(request)
         header = request.headers.get("Authorization", "")
         key = header[7:] if header.startswith("Bearer ") else ""
@@ -382,6 +382,12 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         operations.update(hosted_stores.install(hosted, app, store_reader))
         from . import hosted_monitors
         operations.update(hosted_monitors.install(hosted, app, perform, monitor_sender))
+        from . import hosted_firecrawl_compat
+        compat_operations = ("/scrape", "/map", "/websearch", "/crawl", "/crawl/status", "/crawl/cancel")
+        # Lightweight test and embedding hosts may provide only a subset of hosted operations.
+        # Register the compatibility surface only when its complete backing API is present.
+        if all(path in operations for path in compat_operations):
+            hosted_firecrawl_compat.install(app, *(operations[path] for path in compat_operations))
         install(app, billing, operations, hosted.site)
     return app
 

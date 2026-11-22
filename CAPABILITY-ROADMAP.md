@@ -201,9 +201,13 @@ search-first volume. [Google guidance for generative search](https://developers.
    and reported cost. Its format and limitations are in
    `tests/benchmark/GOLDSET-GUIDE.md`. Still required: owner-authorized,
    multi-layout gold data and an identical-condition cross-vendor run.
-2. **Build a migration path:** document and implement a tested Firecrawl v2
-   compatibility mode for the subset Apex supports; list unsupported features
-   explicitly and preserve source receipts and billing semantics.
+2. **Migration adapter started in branch:** Firecrawl-shaped `/v2/scrape`,
+   `/v2/map`, `/v2/search`, and crawl create/status/cancel routes now translate
+   to Apex's existing metered features and reject unsupported options. The
+   async batch route returns an explicit 501. Five endpoint tests cover the
+   current subset. Still required: same-client compatibility tests, more
+   response-schema coverage, broader endpoints, and a reviewed production
+   release before customers can use it live.
 3. **Build safe persistent local sessions:** owner login, MFA, explicit human
    challenge handling, encrypted site-bound state, expiry, scope and
    revocation. Keep sessions off the hosted service and out of chat.
