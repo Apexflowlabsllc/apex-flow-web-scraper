@@ -60,11 +60,13 @@ Grok expands the environment variable when loading headers, so the key stays out
 
 The npm package is not published yet. The checked-out source includes a `setup --source` mode for all 16 MCP client targets, so teams can use the installer now without waiting for npm publication. It backs up settings, preserves unrelated servers, prompts before writing, and stores environment references instead of credentials. Keep the source checkout at the same path after setup. The copyable install command follows.
 
+The source installer currently lives on draft PR #34. To try it before that PR is merged, clone its branch below. After it is merged, use the default branch instead.
+
 Clone and configure a local AI client (Node.js 18+):
 
 ```bash
 APEX_FLOW_SCRAPER_CHECKOUT=/path/to/apex-flow-web-scraper
-git clone https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git "$APEX_FLOW_SCRAPER_CHECKOUT"
+git clone --branch codex/handoff-2026-11-21-scraper --single-branch https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git "$APEX_FLOW_SCRAPER_CHECKOUT"
 npm ci --prefix "$APEX_FLOW_SCRAPER_CHECKOUT/sdk/node"
 node "$APEX_FLOW_SCRAPER_CHECKOUT/sdk/node/bin/apex-flow-web-scraper.mjs" setup --source --client claude-code
 ```

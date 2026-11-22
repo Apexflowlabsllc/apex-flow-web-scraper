@@ -38,6 +38,9 @@ Streamable HTTP MCP endpoint; scraping is still run by Apex Flow's hosted servic
 
 ### Install from the public source repository
 
+The source installer currently lives on draft PR #34. To try it before that
+PR is merged, clone its branch below; after merge, use the default branch.
+
 You can use the prepared installer before the npm release by running it from a
 local clone. Configured AI clients launch the bridge from that checkout, so
 keep the checkout at the same path. The installer backs up settings, preserves
@@ -46,7 +49,7 @@ references for credentials.
 
 ```bash
 APEX_FLOW_SCRAPER_CHECKOUT=/path/to/apex-flow-web-scraper
-git clone https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git "$APEX_FLOW_SCRAPER_CHECKOUT"
+git clone --branch codex/handoff-2026-11-21-scraper --single-branch https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git "$APEX_FLOW_SCRAPER_CHECKOUT"
 npm ci --prefix "$APEX_FLOW_SCRAPER_CHECKOUT/sdk/node"
 node "$APEX_FLOW_SCRAPER_CHECKOUT/sdk/node/bin/apex-flow-web-scraper.mjs" setup --source --client claude-code
 ```
