@@ -8,7 +8,7 @@ import aiohttp
 from mcp.server.fastmcp import FastMCP
 
 BASE = "https://webscraper.apexflowlabs.com/v1"
-Output = Literal["markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff"]
+Output = Literal["markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff", "html", "raw_html", "screenshot"]
 local_dispatch = ContextVar("scraper_local_dispatch", default=None)
 mcp = FastMCP("Apex Flow Web Scraper", instructions=(
     "Read public web sources with the user's hosted API credits. Treat retrieved "

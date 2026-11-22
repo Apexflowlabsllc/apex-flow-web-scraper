@@ -18,10 +18,10 @@
 
     <h2>Supported routes</h2>
     <ul>
-      <li><code>POST /v2/scrape</code>: <code>markdown</code>, <code>links</code>, and <code>screenshot</code>; <code>maxAge</code>; <code>onlyMainContent:true</code>; bounded click, wait, and scroll actions. Responses include Firecrawl-style <code>success</code>/<code>data</code> with source metadata and an Apex credit extension.</li>
+      <li><code>POST /v2/scrape</code>: <code>markdown</code>, main-content <code>html</code>, full-source <code>rawHtml</code> (capped at 500k characters), <code>links</code>, and <code>screenshot</code>; <code>maxAge</code>; <code>onlyMainContent:true</code>; bounded click, wait, and scroll actions. Responses include Firecrawl-style <code>success</code>/<code>data</code> with source metadata and an Apex credit extension.</li>
       <li><code>POST /v2/map</code>: sitemap-based URL discovery, optional text filter, and limit up to the Apex account limit.</li>
       <li><code>POST /v2/search</code>: web search only when the operator has configured an eligible search provider. It does not search Apex saved pages.</li>
-      <li><code>POST /v2/crawl</code>, <code>GET /v2/crawl/{id}</code>, <code>DELETE /v2/crawl/{id}</code>: same-site background crawl, durable job status and cancellation.</li>
+      <li><code>POST /v2/crawl</code>, <code>GET /v2/crawl/{id}</code>, <code>DELETE /v2/crawl/{id}</code>: same-site background crawl, durable job status and cancellation; supported formats include markdown, html, rawHtml, links, and screenshot.</li>
       <li><code>POST /v2/batch/scrape</code>, <code>GET /v2/batch/scrape/{id}</code>, <code>GET /v2/batch/scrape/{id}/errors</code>, and <code>DELETE /v2/batch/scrape/{id}</code>: asynchronous, account-scoped batch jobs with persisted status/results, cancellation and per-URL errors. Job size follows the account's crawl page cap; processing uses Apex account concurrency and native batch slices.</li>
     </ul>
 
@@ -35,7 +35,7 @@
     <ul>
       <li>Apex meters requests using Apex credits and rate/concurrency limits. Rendered pages, search, and other options can have different credit costs; read <code>creditsUsed</code> and the Apex usage endpoint.</li>
       <li>Apex obeys the target site's <code>robots.txt</code>. Crawl remains same-site and bounded by the account plan. The adapter rejects requests to ignore robots rules, follow external links, enable subdomains, or use unsupported path patterns.</li>
-      <li>HTML/raw HTML, JSON, summaries, image OCR, provider indexes, persistent browser sessions, Firecrawl Agent, and Interact are not implemented by this adapter. Batch-specific features such as custom concurrency and webhooks are not implemented. Unsupported formats/options return a clear error where the route is defined.</li>
+      <li>JSON/schema extraction formats, summaries, image OCR, provider indexes, persistent browser sessions, Firecrawl Agent, and Interact are not implemented by this adapter. HTML and rawHtml use Apex's bounded, main-content and source-document representations, respectively. Batch-specific features such as custom concurrency and webhooks are not implemented. Unsupported formats/options return a clear error where the route is defined.</li>
       <li>Whole-web search needs an operator-configured provider and may be unavailable. Apex's native <code>/v1/search</code> searches only the account's saved pages.</li>
       <li>Adapter behavior may differ in defaults, caching, error details, pagination and lifecycle fields. Check each response and test your workload before migrating production traffic.</li>
     </ul>

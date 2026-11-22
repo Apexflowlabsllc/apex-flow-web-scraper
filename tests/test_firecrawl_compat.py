@@ -23,18 +23,27 @@ async def test_v2_scrape_uses_firecrawl_envelope_and_apex_metering(hosted):
     assert payload["data"]["markdown"] == "# Fixture"
     assert payload["data"]["metadata"]["apexCreditsUsed"] == payload["creditsUsed"] == 1
     assert h.billing.remaining(h.billing.account_for(headers["Authorization"][7:])) == 109999
+    response = await client.post("/v2/scrape", headers=headers, json={
+        "url": "https://example.com/formats", "formats": ["html", "rawHtml", "screenshot"],
+    })
+    formatted = await response.json()
+    assert response.status == 200
+    assert formatted["data"]["html"] == "<main><h1>Fixture</h1></main>"
+    assert "<nav>source shell" in formatted["data"]["rawHtml"]
+    assert formatted["data"]["screenshot"].startswith("data:image/png;base64,")
+    assert "markdown" not in formatted["data"]
     unsupported = await client.post("/v2/batch/scrape", headers=headers,
                                     json={"urls": ["https://example.com"], "maxConcurrency": 1})
     assert unsupported.status == 400
     assert (await unsupported.json())["code"] == "unsupported_option"
 
 
-async def test_v2_requires_auth_and_rejects_unimplemented_formats(hosted):
+async def test_v2_requires_auth_and_rejects_unsupported_formats(hosted):
     _, client, *_ = hosted
     assert (await client.post("/v2/scrape", json={"url": "https://example.com"})).status == 401
     _, client, headers = await _auth(hosted)
     response = await client.post("/v2/scrape", headers=headers,
-                                json={"url": "https://example.com", "formats": ["rawHtml"]})
+                                json={"url": "https://example.com", "formats": ["json"]})
     assert response.status == 400
     payload = await response.json()
     assert payload["success"] is False and payload["code"] == "unsupported_option"
@@ -97,6 +106,19 @@ async def test_v2_batch_reports_per_url_errors_and_supports_cancel(hosted):
     errors = await response.json()
     assert len(errors["errors"]) == 1
     assert errors["errors"][0]["url"] == "https://example.com/failure"
+
+    response = await client.post("/v2/batch/scrape", headers=headers, json={
+        "urls": ["https://example.com/html"], "formats": ["html", "rawHtml"],
+    })
+    job = (await response.json())["id"]
+    for _ in range(20):
+        status = await client.get(f"/v2/batch/scrape/{job}", headers=headers)
+        status_payload = await status.json()
+        if status_payload["status"] != "scraping":
+            break
+        await asyncio.sleep(0.01)
+    assert status_payload["data"][0]["html"] == "<main><h1>Fixture</h1></main>"
+    assert "rawHtml" in status_payload["data"][0]
 
     response = await client.post("/v2/batch/scrape", headers=headers, json={
         "urls": ["https://example.com/slow"] * 5,

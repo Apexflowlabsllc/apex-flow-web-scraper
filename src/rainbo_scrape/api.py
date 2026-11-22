@@ -13,7 +13,7 @@ from .policy import ScrapeError
 
 ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "scrolls", "actions", "recipe", "outputs", "page", "fallback", "max_tokens"}
 LIMIT = 262144  # hosted response budget in bytes
-OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff"}
+OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff", "html", "raw_html", "screenshot"}
 SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors", "archive", "extracted", "browser"}
 # Failures where the live site refused or could not serve us; a public archive copy may still exist.
 ARCHIVABLE = {"access_challenge", "http_error", "upstream_error", "rate_limited", "fetch_failed", "dns_failed",
@@ -213,6 +213,12 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
                 raise ValueError("outputs must list one or more of: " + ", ".join(sorted(OUTPUTS)))
             if "chunks" in outputs and "chunks" not in body:
                 body["chunks"] = 1500
+            if "html" in outputs:
+                body["include_html"] = True
+            if "raw_html" in outputs:
+                body["include_raw_html"] = True
+            if "screenshot" in outputs:
+                body["screenshot"] = True
         if hosted and body.get("extract"):
             import os
             from .llm import providers
@@ -275,6 +281,8 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
             response_result = dict(result) if outputs is None else {
                 field: value for field, value in result.items() if field in outputs or field in SOURCE_FIELDS
             }
+            if outputs is not None and "screenshot" in outputs and result.get("screenshot_png_base64"):
+                response_result["screenshot_png_base64"] = result["screenshot_png_base64"]
             pagination = None
             if hosted:
                 response_result, pagination = paginate(response_result, page, max_tokens=max_tokens)

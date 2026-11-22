@@ -411,7 +411,7 @@
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 8,
+                    "maxItems": 11,
                     "items": {
                       "type": "string",
                       "enum": [
@@ -422,7 +422,10 @@
                         "chunks",
                         "links",
                         "structured_data",
-                        "diff"
+                        "diff",
+                        "html",
+                        "raw_html",
+                        "screenshot"
                       ]
                     },
                     "description": "Return selected content with available source receipt and validation warnings. Selecting chunks defaults to a 1,500-character target. Select diff to receive change.diff, the lines that changed since this account last read the URL."
@@ -631,7 +634,7 @@
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 8,
+                    "maxItems": 11,
                     "items": {
                       "type": "string",
                       "enum": [
@@ -642,7 +645,10 @@
                         "chunks",
                         "links",
                         "structured_data",
-                        "diff"
+                        "diff",
+                        "html",
+                        "raw_html",
+                        "screenshot"
                       ]
                     },
                     "description": "Return selected content with available source receipt and validation warnings. Selecting chunks defaults to a 1,500-character target. Select diff to receive change.diff, the lines that changed since this account last read the URL."
@@ -2294,10 +2300,40 @@
                     "items": {
                       "oneOf": [
                         {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "markdown",
+                            "html",
+                            "rawHtml",
+                            "links",
+                            "screenshot"
+                          ]
                         },
                         {
-                          "type": "object"
+                          "type": "object",
+                          "enum": [
+                            "markdown",
+                            "html",
+                            "rawHtml",
+                            "links",
+                            "screenshot"
+                          ],
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "markdown",
+                                "html",
+                                "rawHtml",
+                                "links",
+                                "screenshot"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
                         }
                       ]
                     }
@@ -2554,7 +2590,52 @@
                     ]
                   },
                   "scrapeOptions": {
-                    "type": "object"
+                    "type": "object",
+                    "properties": {
+                      "formats": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "markdown",
+                                "html",
+                                "rawHtml",
+                                "links",
+                                "screenshot"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "markdown",
+                                    "html",
+                                    "rawHtml",
+                                    "links",
+                                    "screenshot"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "onlyMainContent": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 }
               }
@@ -2726,6 +2807,8 @@
                           "type": "string",
                           "enum": [
                             "markdown",
+                            "html",
+                            "rawHtml",
                             "links",
                             "screenshot"
                           ]
@@ -2737,6 +2820,8 @@
                               "type": "string",
                               "enum": [
                                 "markdown",
+                                "html",
+                                "rawHtml",
                                 "links",
                                 "screenshot"
                               ]
