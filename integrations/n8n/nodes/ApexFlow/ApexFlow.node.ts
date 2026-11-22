@@ -67,6 +67,9 @@ export function buildRequestPlan(operation: Operation, params: Record<string, un
 			const query = String(params.query ?? '').trim();
 			if (!query) fail('Search query is required.');
 			const body: Record<string, unknown> = { query, limit: Number(params.resultLimit ?? params.limit ?? 10) };
+			const topic = String(params.searchTopic ?? 'general');
+			if (topic !== 'general' && topic !== 'news') fail('Search topic must be General or News.');
+			if (topic === 'news') body.topic = topic;
 			const includeDomains = domainList(params.includeDomains, 'Include domains');
 			const excludeDomains = domainList(params.excludeDomains, 'Exclude domains');
 			if (includeDomains && excludeDomains) fail('Use include domains or exclude domains, not both.');
@@ -143,6 +146,7 @@ export class ApexFlow implements INodeType {
 			{ displayName: 'Limit', name: 'mapLimit', type: 'number', default: 1000, displayOptions: { show: { operation: ['map'] } } },
 			{ displayName: 'Search Filter', name: 'search', type: 'string', default: '', displayOptions: { show: { operation: ['map'] } } },
 			{ displayName: 'Result Limit', name: 'resultLimit', type: 'number', default: 10, displayOptions: { show: { operation: ['webSearch'] } } },
+			{ displayName: 'Search Topic', name: 'searchTopic', type: 'options', options: [{ name: 'General Web', value: 'general' }, { name: 'News', value: 'news' }], default: 'general', displayOptions: { show: { operation: ['webSearch'] } }, description: 'News requires the service operator to configure Tavily or Exa; Brave provides general web search' },
 			{ displayName: 'Include Domains', name: 'includeDomains', type: 'string', typeOptions: { rows: 2 }, default: '', displayOptions: { show: { operation: ['webSearch'] } }, description: 'Optional hostnames, separated by commas or new lines. Cannot be used with Exclude Domains.' },
 			{ displayName: 'Exclude Domains', name: 'excludeDomains', type: 'string', typeOptions: { rows: 2 }, default: '', displayOptions: { show: { operation: ['webSearch'] } }, description: 'Optional hostnames, separated by commas or new lines. Cannot be used with Include Domains.' },
 			{ displayName: 'Page Limit', name: 'pageLimit', type: 'number', default: 25, displayOptions: { show: { operation: ['startCrawl'] } } },

@@ -678,9 +678,10 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 elif isinstance(source, dict) and set(source) == {"type"}:
                     source_types.append(source["type"])
                 else:
-                    return error("sources must contain 'web' or {type: 'web'}")
-        if source_types != ["web"]:
-            return error("This adapter supports only the Firecrawl web search source")
+                    return error("sources must contain 'web' or 'news' (string or {type: ...})")
+        if len(source_types) != 1 or source_types[0] not in ("web", "news"):
+            return error("This adapter supports one Firecrawl source per request: web or news")
+        topic = "news" if source_types[0] == "news" else "general"
         origin = body.get("origin")
         if origin is not None and (not isinstance(origin, str) or len(origin) > 200):
             return error("origin must be a string no longer than 200 characters")
@@ -690,6 +691,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         except ValueError as exc:
             return error(str(exc), code="invalid_search_filter")
         request_body = {key: body[key] for key in ("query", "limit") if key in body}
+        if topic == "news":
+            request_body["topic"] = "news"
         if include_domains is not None:
             request_body["include_domains"] = include_domains
         if exclude_domains is not None:
@@ -699,10 +702,16 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         failure = forwarded(response, payload)
         if failure:
             return failure
-        reply = {"success": True,
-                 "data": {"web": [{"url": item.get("url"), "title": item.get("title"),
-                                    "description": item.get("snippet"), "position": index}
-                                   for index, item in enumerate(payload.get("results", []), start=1)]}}
+        key = "news" if topic == "news" else "web"
+        if topic == "news":
+            results = [{"url": item.get("url"), "title": item.get("title"),
+                        "snippet": item.get("snippet"), "date": item.get("date"), "position": index}
+                       for index, item in enumerate(payload.get("results", []), start=1)]
+        else:
+            results = [{"url": item.get("url"), "title": item.get("title"),
+                        "description": item.get("snippet"), "position": index}
+                       for index, item in enumerate(payload.get("results", []), start=1)]
+        reply = {"success": True, "data": {key: results}}
         if origin:
             reply["warning"] = "Search SDK origin telemetry is accepted but not recorded by Apex."
         return web.json_response(reply)

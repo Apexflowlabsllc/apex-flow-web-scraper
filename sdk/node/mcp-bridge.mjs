@@ -26,7 +26,10 @@ function normalize(results, snippetField, limit) {
     const value = item[snippetField];
     const snippet = Array.isArray(value) ? value.filter((part) => typeof part === "string").join(" ")
       : typeof value === "string" ? value : item.text || item.summary || "";
-    normalized.push({ url: item.url, title: item.title || "", snippet });
+    const normalizedItem = { url: item.url, title: item.title || "", snippet };
+    const date = item.publishedDate || item.published_date || item.date;
+    if (typeof date === "string") normalizedItem.date = date;
+    normalized.push(normalizedItem);
     if (normalized.length >= limit) break;
   }
   return normalized;
@@ -64,8 +67,11 @@ export async function localByokSearch(query, limit = 10, { env = process.env, fe
   if (typeof query !== "string" || query.length < 1 || query.length > 300) throw new Error("query must be 1–300 characters");
   if (!Number.isInteger(limit) || limit < 1 || limit > 20) throw new Error("limit must be an integer from 1 to 20");
   const { includeDomains, excludeDomains } = normalizeDomainFilters(filters.includeDomains, filters.excludeDomains);
+  const topic = filters.topic ?? "general";
+  if (!["general", "news"].includes(topic)) throw new Error("topic must be 'general' or 'news'");
   const provider = selectLocalSearchProvider(env);
   if (!provider) throw new Error("Configure exactly one local provider key (BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, or EXA_API_KEY); set APEX_SEARCH_PROVIDER when more than one is present.");
+  if (topic === "news" && provider === "brave") throw new Error("The configured Brave provider does not expose a dedicated news source; use Tavily or Exa");
   const timeout = AbortSignal.timeout(15_000);
   let response;
   let body;
@@ -82,7 +88,7 @@ export async function localByokSearch(query, limit = 10, { env = process.env, fe
   }
   if (provider === "tavily") {
     response = await fetchImpl("https://api.tavily.com/search", { method: "POST", headers: { Authorization: `Bearer ${env[providerKeys.tavily]}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ query, topic: "general", search_depth: "basic", max_results: limit, include_answer: false, include_raw_content: false,
+      body: JSON.stringify({ query, topic, search_depth: "basic", max_results: limit, include_answer: false, include_raw_content: false,
         ...(includeDomains ? { include_domains: includeDomains } : {}), ...(excludeDomains ? { exclude_domains: excludeDomains } : {}) }), signal: timeout, redirect: "error" });
     if (!response.ok) throw new Error(`Tavily Search returned HTTP ${response.status}`);
     body = await response.json();
@@ -90,7 +96,7 @@ export async function localByokSearch(query, limit = 10, { env = process.env, fe
       note: "Search was sent directly to your selected provider; Apex did not receive your provider key. Pass a result url to scrape_page to read it." };
   }
   response = await fetchImpl("https://api.exa.ai/search", { method: "POST", headers: { "x-api-key": env[providerKeys.exa], "Content-Type": "application/json" },
-    body: JSON.stringify({ query, type: "auto", numResults: limit, contents: { highlights: true },
+    body: JSON.stringify({ query, type: "auto", numResults: limit, contents: { highlights: true }, ...(topic === "news" ? { category: "news" } : {}),
       ...(includeDomains ? { includeDomains } : {}), ...(excludeDomains ? { excludeDomains } : {}) }), signal: timeout, redirect: "error" });
   if (!response.ok) throw new Error(`Exa Search returned HTTP ${response.status}`);
   body = await response.json();
@@ -101,7 +107,7 @@ export async function localByokSearch(query, limit = 10, { env = process.env, fe
 const byokTool = {
   name: "web_search_byok",
   description: "Search directly through your provider key in this local MCP process, optionally restricting or excluding hostname sets. Requires BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, or EXA_API_KEY in the process environment. The provider bills you directly and your key is never sent to Apex. Pass result URLs to scrape_page; scraping still uses Apex credits.",
-  inputSchema: { type: "object", properties: { query: { type: "string", minLength: 1, maxLength: 300 }, limit: { type: "integer", minimum: 1, maximum: 20, default: 10 },
+  inputSchema: { type: "object", properties: { query: { type: "string", minLength: 1, maxLength: 300 }, limit: { type: "integer", minimum: 1, maximum: 20, default: 10 }, topic: { type: "string", enum: ["general", "news"], default: "general" },
     includeDomains: { type: "array", minItems: 1, maxItems: 50, items: { type: "string", format: "hostname" } },
     excludeDomains: { type: "array", minItems: 1, maxItems: 50, items: { type: "string", format: "hostname" } } }, required: ["query"], additionalProperties: false },
 };
@@ -130,9 +136,9 @@ export async function startMcpBridge({
   });
   local.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (request.params.name === byokTool.name) {
-      const { query, limit = 10, includeDomains, excludeDomains } = request.params.arguments || {};
+      const { query, limit = 10, includeDomains, excludeDomains, topic = "general" } = request.params.arguments || {};
       try {
-        const result = await byokSearch(query, limit, { includeDomains, excludeDomains });
+        const result = await byokSearch(query, limit, { includeDomains, excludeDomains, topic });
         return { content: [{ type: "text", text: JSON.stringify(result) }] };
       } catch (error) {
         return { isError: true, content: [{ type: "text", text: error.message }] };

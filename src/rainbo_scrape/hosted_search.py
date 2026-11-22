@@ -33,14 +33,18 @@ def local_provider_name(env=None):
     return name if name in _PROVIDER_KEYS and name in available else None
 
 
-async def local_search(query, count, include_domains=None, exclude_domains=None):
+async def local_search(query, count, include_domains=None, exclude_domains=None, topic="general"):
     """Search directly with a provider key held in this process environment."""
     name = local_provider_name()
     fetch = {"brave": brave, "tavily": tavily, "exa": exa}.get(name)
     if fetch is None:
         raise ValueError("Configure exactly one local provider key (BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, or EXA_API_KEY); set APEX_SEARCH_PROVIDER when more than one is present.")
+    if topic not in ("general", "news"):
+        raise ValueError("topic must be 'general' or 'news'")
+    if topic == "news" and name == "brave":
+        raise ValueError("The configured Brave provider does not expose a dedicated news source; use Tavily or Exa")
     include_domains, exclude_domains = normalize_domain_filters(include_domains, exclude_domains)
-    results = await fetch(query, count, include_domains, exclude_domains)
+    results = await fetch(query, count, include_domains, exclude_domains, topic) if topic == "news" else await fetch(query, count, include_domains, exclude_domains)
     if include_domains is not None or exclude_domains is not None:
         results = [item for item in results if _domain_allowed(item["url"], include_domains, exclude_domains)]
     return results[:count]
@@ -148,7 +152,9 @@ def configured():
     return provider_name() is not None
 
 
-async def brave(query, count, include_domains=None, exclude_domains=None):
+async def brave(query, count, include_domains=None, exclude_domains=None, topic="general"):
+    if topic != "general":
+        raise ValueError("The configured Brave provider does not expose a dedicated news source; use Tavily or Exa")
     headers = {"X-Subscription-Token": os.environ["BRAVE_SEARCH_API_KEY"], "Accept": "application/json"}
     query = _brave_query(query, include_domains, exclude_domains)
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as client:
@@ -160,9 +166,9 @@ async def brave(query, count, include_domains=None, exclude_domains=None):
     return _normalize(data.get("web", {}).get("results", []), "description", count)
 
 
-async def tavily(query, count, include_domains=None, exclude_domains=None):
+async def tavily(query, count, include_domains=None, exclude_domains=None, topic="general"):
     headers = {"Authorization": "Bearer " + os.environ["TAVILY_API_KEY"], "Content-Type": "application/json"}
-    payload = {"query": query, "topic": "general", "search_depth": "basic", "max_results": count,
+    payload = {"query": query, "topic": topic, "search_depth": "basic", "max_results": count,
                "include_answer": False, "include_raw_content": False}
     if include_domains is not None:
         payload["include_domains"] = include_domains
@@ -176,9 +182,11 @@ async def tavily(query, count, include_domains=None, exclude_domains=None):
     return _normalize(data.get("results", []), "content", count)
 
 
-async def exa(query, count, include_domains=None, exclude_domains=None):
+async def exa(query, count, include_domains=None, exclude_domains=None, topic="general"):
     headers = {"x-api-key": os.environ["EXA_API_KEY"], "Content-Type": "application/json"}
     payload = {"query": query, "type": "auto", "numResults": count, "contents": {"highlights": True}}
+    if topic == "news":
+        payload["category"] = "news"
     if include_domains is not None:
         payload["includeDomains"] = include_domains
     if exclude_domains is not None:
@@ -208,7 +216,11 @@ def _normalize(results, snippet_field, count):
             snippet = " ".join(item for item in snippet if isinstance(item, str))
         if not isinstance(snippet, str):
             snippet = result.get("text") or result.get("summary") or ""
-        normalized.append({"url": url, "title": result.get("title") or "", "snippet": snippet})
+        item = {"url": url, "title": result.get("title") or "", "snippet": snippet}
+        published = result.get("publishedDate") or result.get("published_date")
+        if isinstance(published, str):
+            item["date"] = published
+        normalized.append(item)
         if len(normalized) >= count:
             break
     return normalized
@@ -220,9 +232,17 @@ async def search(query, count, options=None):
     if fetch is None:
         raise aiohttp.ClientError("search provider is not configured unambiguously")
     options = options or {}
+    topic = options.get("topic", "general")
+    if topic not in ("general", "news"):
+        raise ValueError("topic must be 'general' or 'news'")
+    if topic == "news" and name == "brave":
+        raise ValueError("The configured Brave provider does not expose a dedicated news source; use Tavily or Exa")
     include_domains, exclude_domains = normalize_domain_filters(
         options.get("include_domains"), options.get("exclude_domains"))
-    results = await fetch(query, count, include_domains, exclude_domains)
+    if topic == "news":
+        results = await fetch(query, count, include_domains, exclude_domains, topic)
+    else:
+        results = await fetch(query, count, include_domains, exclude_domains)
     if include_domains is not None or exclude_domains is not None:
         results = [item for item in results if _domain_allowed(item["url"], include_domains, exclude_domains)]
     return results[:count]
@@ -236,14 +256,21 @@ def install(h, app, provider=None):
             return web.json_response({"error": "Web search is not enabled on this service yet. Use /v1/search for pages you have already scraped.",
                                       "code": "not_configured", "retryable": False}, status=503)
         query = body.get("query") if isinstance(body, dict) else None
-        allowed = {"query", "limit", "include_domains", "exclude_domains"}
+        allowed = {"query", "limit", "include_domains", "exclude_domains", "topic"}
         if not isinstance(query, str) or not 1 <= len(query) <= 300 or set(body) - allowed:
             raise ValueError("Use query (1–300 characters), optional limit, and optional domain filters")
         limit = body.get("limit", 10)
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
             raise ValueError("limit must be 1–20")
         include_domains, exclude_domains = normalize_domain_filters(body.get("include_domains"), body.get("exclude_domains"))
+        topic = body.get("topic", "general")
+        if topic not in ("general", "news"):
+            raise ValueError("topic must be 'general' or 'news'")
+        if topic == "news" and selected_provider == "brave":
+            raise ValueError("The configured Brave provider does not expose a dedicated news source; use Tavily or Exa")
         search_options = {"include_domains": include_domains, "exclude_domains": exclude_domains}
+        if topic == "news":
+            search_options["topic"] = topic
         reserved = credit_reservation(selected_provider, limit)
         try:
             h.billing.reserve(account, reserved, kind="search")

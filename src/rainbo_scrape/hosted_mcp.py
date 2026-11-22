@@ -163,18 +163,20 @@ async def crawl_status(job_id: str, offset: int = 0):
 
 @mcp.tool()
 async def web_search(query: str, limit: int = 10, include_domains: list[str] | None = None,
-                     exclude_domains: list[str] | None = None):
-    """Search the whole web with optional mutually exclusive hostname filters. Provider-aware credit pricing applies; pass a result url to scrape_page to read it."""
+                     exclude_domains: list[str] | None = None, topic: str = "general"):
+    """Search the web or news with optional mutually exclusive hostname filters. News requires a Tavily or Exa provider. Pass a result url to scrape_page to read it."""
     payload = {"query": query, "limit": limit}
     if include_domains is not None:
         payload["include_domains"] = include_domains
     if exclude_domains is not None:
         payload["exclude_domains"] = exclude_domains
+    if topic != "general":
+        payload["topic"] = topic
     return await request("/websearch", payload)
 
 
 async def web_search_byok(query: str, limit: int = 10, include_domains: list[str] | None = None,
-                          exclude_domains: list[str] | None = None):
+                          exclude_domains: list[str] | None = None, topic: str = "general"):
     """Search directly through the provider configured in this local MCP process. Requires your own provider key in its environment; provider bills you directly, and the key is never sent to Apex. Pass result URLs to scrape_page; scraping still uses Apex credits."""
     if not isinstance(query, str) or not 1 <= len(query) <= 300:
         raise ValueError("query must be 1–300 characters")
@@ -182,7 +184,7 @@ async def web_search_byok(query: str, limit: int = 10, include_domains: list[str
         raise ValueError("limit must be 1–20")
     provider = hosted_search.local_provider_name()
     include_domains, exclude_domains = hosted_search.normalize_domain_filters(include_domains, exclude_domains)
-    results = await hosted_search.local_search(query, limit, include_domains, exclude_domains)
+    results = await hosted_search.local_search(query, limit, include_domains, exclude_domains, topic)
     return {"provider": provider, "results": results,
             "note": "Search was sent directly to your selected provider; Apex did not receive your provider key. Pass a result url to scrape_page to read it."}
 

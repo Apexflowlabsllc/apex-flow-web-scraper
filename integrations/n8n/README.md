@@ -46,7 +46,8 @@ silently switch to a different provider or expose local bring-your-own-key
 search, which belongs in a local client process. Search accepts optional Include
 Domains or Exclude Domains hostnames, entered as comma-separated or newline-
 separated values. The two filters are mutually exclusive and accept up to 50
-hostnames.
+hostnames. Select General Web or News; dedicated news results require Tavily or
+Exa to be selected by the service operator (Brave supports general web only).
 
 The package passes `@n8n/node-cli` 0.57.4 lint/build, TypeScript checks, 8
 contract tests and a tarball dry run. A local `n8n-node dev` session booted n8n

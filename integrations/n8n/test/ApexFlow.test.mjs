@@ -22,6 +22,9 @@ test('map and web search build the hosted API payloads', () => {
 	assert.deepEqual(plan('webSearch', { query: 'web scraping API', limit: 5 }), {
 		method: 'POST', path: '/websearch', body: { query: 'web scraping API', limit: 5 },
 	});
+	assert.deepEqual(plan('webSearch', { query: 'web scraping API', limit: 5, searchTopic: 'news' }), {
+		method: 'POST', path: '/websearch', body: { query: 'web scraping API', limit: 5, topic: 'news' },
+	});
 	assert.deepEqual(plan('webSearch', { query: 'web scraping API', limit: 5, includeDomains: 'docs.example.com, api.example.com' }), {
 		method: 'POST', path: '/websearch', body: { query: 'web scraping API', limit: 5, include_domains: ['docs.example.com', 'api.example.com'] },
 	});

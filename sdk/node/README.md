@@ -109,7 +109,9 @@ URLs with `scrape_page`; those page reads still use Apex credits. Both hosted
 `webSearch()` and local `web_search_byok` accept optional `includeDomains` or
 `excludeDomains` hostname arrays (mutually exclusive, up to 50 values). This local
 option is separate from hosted `web_search`, which uses Apex's configured
-provider and credits.
+provider and credits. Both expose a `topic` option with `general` (default) or
+`news`; dedicated news search requires Tavily or Exa, while Brave is general-web
+only. News dates are returned when the provider supplies them.
 
 ```bash
 npm install apex-flow-web-scraper

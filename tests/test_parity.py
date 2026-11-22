@@ -372,6 +372,63 @@ async def test_search_adapters_forward_domain_filters_to_provider(monkeypatch, n
         assert method == "post" and kwargs["json"]["includeDomains"] == ["docs.example.com"]
 
 
+@pytest.mark.parametrize("name,key,published_field", [
+    ("tavily", "TAVILY_API_KEY", "published_date"),
+    ("exa", "EXA_API_KEY", "publishedDate"),
+])
+async def test_search_news_uses_provider_news_index_and_normalizes_publish_date(monkeypatch, name, key, published_field):
+    for provider_key in ("BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY"):
+        monkeypatch.delenv(provider_key, raising=False)
+    monkeypatch.setenv(key, "fixture-secret")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", name)
+    calls = []
+
+    class Response:
+        status = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def json(self):
+            return {"results": [{"url": "https://news.example/story", "title": "Story",
+                                 "content": "Recent event", "highlights": ["Recent event"],
+                                 published_field: "2026-11-22T12:00:00Z"}]}
+
+    class Session:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def post(self, *args, **kwargs):
+            calls.append(kwargs)
+            return Response()
+
+    monkeypatch.setattr(hosted_search.aiohttp, "ClientSession", Session)
+    assert await hosted_search.search("market update", 4, {"topic": "news"}) == [{
+        "url": "https://news.example/story", "title": "Story", "snippet": "Recent event",
+        "date": "2026-11-22T12:00:00Z",
+    }]
+    payload = calls[0]["json"]
+    if name == "tavily":
+        assert payload["topic"] == "news"
+    else:
+        assert payload["category"] == "news"
+
+
+async def test_news_search_requires_provider_with_native_news_support(monkeypatch):
+    import rainbo_scrape.hosted_search as hosted_search
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "fixture-secret")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "brave")
+    with pytest.raises(ValueError, match="dedicated news source"):
+        await hosted_search.search("market update", 4, {"topic": "news"})
 def test_local_search_provider_selection_does_not_depend_on_hosted_prices():
     assert hosted_search.local_provider_name({}) is None
     assert hosted_search.local_provider_name({"BRAVE_SEARCH_API_KEY": "local"}) == "brave"
@@ -388,8 +445,8 @@ async def test_python_mcp_byok_search_uses_local_provider_without_hosted_dispatc
     monkeypatch.delenv("EXA_API_KEY", raising=False)
     calls = []
 
-    async def local_search(query, limit, include_domains=None, exclude_domains=None):
-        calls.append((query, limit, include_domains, exclude_domains))
+    async def local_search(query, limit, include_domains=None, exclude_domains=None, topic="general"):
+        calls.append((query, limit, include_domains, exclude_domains, topic))
         return [{"url": "https://example.com/", "title": "Example", "snippet": "A result"}]
 
     async def forbidden_dispatch(*args):
@@ -401,7 +458,7 @@ async def test_python_mcp_byok_search_uses_local_provider_without_hosted_dispatc
         result = await hosted_mcp.web_search_byok("example", 4, include_domains=["EXAMPLE.com"])
     finally:
         hosted_mcp.local_dispatch.reset(token)
-    assert calls == [("example", 4, ["example.com"], None)] and result["provider"] == "brave"
+    assert calls == [("example", 4, ["example.com"], None, "general")] and result["provider"] == "brave"
     assert "never received" not in result["note"]
     assert "Apex did not receive your provider key" in result["note"]
     with pytest.raises(ValueError, match="limit must be"):

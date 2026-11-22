@@ -492,8 +492,8 @@ async def test_v2_search_domain_filters_match_firecrawl_request_and_response(hos
     monkeypatch.setenv("APEX_SEARCH_PROVIDER", "tavily")
     calls = []
 
-    async def fixture_tavily(query, count, include_domains=None, exclude_domains=None):
-        calls.append((query, count, include_domains, exclude_domains))
+    async def fixture_tavily(query, count, include_domains=None, exclude_domains=None, topic="general"):
+        calls.append((query, count, include_domains, exclude_domains, topic))
         return [
             {"url": "https://docs.example.com/guide", "title": "Guide", "snippet": "Useful"},
             {"url": "https://other.example.net/page", "title": "Other", "snippet": "Filtered"},
@@ -506,7 +506,7 @@ async def test_v2_search_domain_filters_match_firecrawl_request_and_response(hos
     })
     payload = await response.json()
     assert response.status == 200 and payload["success"] is True
-    assert calls == [("scraping API", 5, ["example.com"], None)]
+    assert calls == [("scraping API", 5, ["example.com"], None, "general")]
     assert payload["data"]["web"] == [{
         "url": "https://docs.example.com/guide", "title": "Guide", "description": "Useful", "position": 1,
     }]
@@ -528,10 +528,14 @@ async def test_v2_search_domain_filters_match_firecrawl_request_and_response(hos
     conflict_payload = await conflict.json()
     assert conflict.status == 400 and conflict_payload["code"] == "invalid_search_filter"
 
-    unsupported_source = await client.post("/v2/search", headers=headers, json={
+    news = await client.post("/v2/search", headers=headers, json={
         "query": "scraping API", "sources": ["news"],
     })
-    assert unsupported_source.status == 400
+    news_payload = await news.json()
+    assert news.status == 200 and news_payload["data"]["news"][0] == {
+        "url": "https://docs.example.com/guide", "title": "Guide", "snippet": "Useful", "date": None, "position": 1,
+    }
+    assert calls[-1] == ("scraping API", 10, None, None, "news")
 
 
 async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hosted, monkeypatch):
@@ -544,15 +548,21 @@ async def test_official_firecrawl_python_sdk_v2_client_against_apex_routes(hoste
     monkeypatch.setenv("TAVILY_API_KEY", "fixture-search-key")
     monkeypatch.setenv("APEX_SEARCH_PROVIDER", "tavily")
 
-    async def fixture_search(query, count, include_domains=None, exclude_domains=None):
+    async def fixture_search(query, count, include_domains=None, exclude_domains=None, topic="general"):
         assert (query, count, include_domains, exclude_domains) == ("fixture search", 3, ["example.com"], None)
-        return [{"url": "https://docs.example.com/start", "title": "Start", "snippet": "Search result"}]
+        assert topic in ("general", "news")
+        return [{"url": "https://docs.example.com/start", "title": "Start", "snippet": "Search result",
+                 **({"date": "2026-11-22T12:00:00Z"} if topic == "news" else {})}]
 
     monkeypatch.setattr(hosted_search, "tavily", fixture_search)
     searched = await asyncio.to_thread(app.v2.search, "fixture search", sources=["web"], limit=3,
                                        include_domains=["example.com"])
     assert searched.web[0].url == "https://docs.example.com/start"
     assert searched.web[0].position == 1
+    news = await asyncio.to_thread(app.v2.search, "fixture search", sources=[{"type": "news"}], limit=3,
+                                   include_domains=["example.com"])
+    assert news.news[0].url == "https://docs.example.com/start"
+    assert news.news[0].date == "2026-11-22T12:00:00Z"
 
     scraped = await asyncio.to_thread(app.v2.scrape, "https://example.com", formats=["markdown"], wait_for=1200)
     assert scraped.markdown == "# Fixture"

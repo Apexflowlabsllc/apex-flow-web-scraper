@@ -34,6 +34,12 @@ test("hosted web search forwards optional hostname filters", async () => {
   assert.deepEqual(calls[0].body, { query: "official docs", limit: 7, include_domains: ["docs.example.com"] });
 });
 
+test("hosted web search can request dedicated news results", async () => {
+  const { apex, calls } = fake([{ data: { results: [] } }]);
+  await apex.webSearch("market update", 4, { topic: "news" });
+  assert.deepEqual(calls[0].body, { query: "market update", limit: 4, topic: "news" });
+});
+
 test("crawl yields pages until the job reports no more", async () => {
   const { apex, calls } = fake([
     { data: { id: "crawl_1", status: "running" } },

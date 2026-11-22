@@ -68,8 +68,9 @@ export class Apex {
   monitorEvents(id, limit = 20) { return this.#call("POST", "/monitors/events", { id, limit }); }
   map(url, limit = 1000, search) { return this.#call("POST", "/map", search ? { url, limit, search } : { url, limit }); }
   search(query, limit = 10) { return this.#call("POST", "/search", { query, limit }); }
-  webSearch(query, limit = 10, { includeDomains, excludeDomains } = {}) {
+  webSearch(query, limit = 10, { includeDomains, excludeDomains, topic } = {}) {
     return this.#call("POST", "/websearch", { query, limit,
+      ...(topic === undefined || topic === "general" ? {} : { topic }),
       ...(includeDomains === undefined ? {} : { include_domains: includeDomains }),
       ...(excludeDomains === undefined ? {} : { exclude_domains: excludeDomains }) });
   }
