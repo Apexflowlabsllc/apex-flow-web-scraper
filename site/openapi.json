@@ -971,7 +971,8 @@
         "parameters": [{"name": "key_id", "in": "path", "required": true, "schema": {"type": "string"}}],
         "responses": {"200": {"description": "Revoked", "content": {"application/json": {"schema": {"type": "object", "properties": {
           "id": {"type": "string"}, "revoked": {"type": "boolean"}
-        }}}}}, "404": {"description": "Key not found, belongs to another account, or already revoked"}}
+        }}}}}, "404": {"description": "Key not found, belongs to another account, or already revoked"},
+        "409": {"description": "Create a replacement before revoking the account's last active key"}}
       }
     },
     "/usage": {

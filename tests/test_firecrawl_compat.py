@@ -25,6 +25,7 @@ async def test_v1_api_key_management_is_account_scoped_and_returns_secret_once(h
     assert initial.status == 200
     assert initial_payload["keys"]
     assert all("key" not in row and "hash" not in row for row in initial_payload["keys"])
+    original_id = next(row["id"] for row in initial_payload["keys"] if not row["revoked"])
 
     created = await client.post("/v1/keys", headers=headers, json={"label": "Claude Code"})
     created_payload = await created.json()
@@ -45,6 +46,9 @@ async def test_v1_api_key_management_is_account_scoped_and_returns_secret_once(h
     assert revoked.status == 200
     assert (await client.get("/v1/usage", headers=new_headers)).status == 401
     assert (await client.delete(f"/v1/keys/{created_payload['id']}", headers=headers)).status == 404
+    last_key = await client.delete(f"/v1/keys/{original_id}", headers=headers)
+    assert last_key.status == 409
+    assert h.billing.account_for(headers["Authorization"][7:]) == account
 
 
 async def test_v2_scrape_uses_firecrawl_envelope_and_apex_metering(hosted):

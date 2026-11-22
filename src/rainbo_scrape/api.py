@@ -399,9 +399,18 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         return web.json_response({"id": row[0], "key": key, "label": label, "created_at": row[1]}, status=201)
 
     async def revoke_key(request):
-        if not billing.revoke_key_id(request["account"], request.match_info["key_id"]):
+        account = request["account"]
+        ident = request.match_info["key_id"]
+        owns_key = billing.db.execute("SELECT 1 FROM keys WHERE account=? AND key_id=? AND revoked=0",
+                                      (account, ident)).fetchone()
+        if not owns_key:
             return fail(404, "API key not found or already revoked", code="not_found")
-        return web.json_response({"id": request.match_info["key_id"], "revoked": True})
+        active_keys = billing.db.execute("SELECT COUNT(*) FROM keys WHERE account=? AND revoked=0", (account,)).fetchone()[0]
+        if active_keys <= 1:
+            return fail(409, "Create a replacement key before revoking the last active key.", code="last_active_key")
+        if not billing.revoke_key_id(account, ident):
+            return fail(404, "API key not found or already revoked", code="not_found")
+        return web.json_response({"id": ident, "revoked": True})
 
     app = web.Application(middlewares=[guard], client_max_size=50000)
     app.router.add_post("/v1/scrape", scrape)
