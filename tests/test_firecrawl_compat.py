@@ -74,6 +74,9 @@ async def test_owner_funnel_report_is_gateway_protected_and_only_returns_aggrega
     event(h, "trial_submit")
     event(h, "checkout_created", "starter")
     event(h, "activated", "starter")
+    first_scrape = await client.post("/api/event", json={"event": "first_scrape_success"},
+                                     headers={"Origin": h.site, "X-Scraper-Gateway": "fixture-gateway-secret"})
+    assert first_scrape.status == 200
     headers = {"X-Scraper-Gateway": "fixture-gateway-secret"}
     report = await client.get("/api/internal/funnel?days=30", headers=headers)
     payload = await report.json()
@@ -82,6 +85,7 @@ async def test_owner_funnel_report_is_gateway_protected_and_only_returns_aggrega
     assert payload["totals"]["trial_view"] == payload["totals"]["trial_submit"] == 1
     assert payload["event_ratios"]["trial_submit_events_per_trial_view_event"] == 1.0
     assert payload["event_ratios"]["paid_activation_events_per_checkout_created_event"] == 1.0
+    assert payload["totals"]["first_scrape_success"] == 1
     assert payload["counts_are_events_not_unique_visitors"] is True
     assert payload["ratios_are_same_window_event_counts_not_cohort_conversions"] is True
     assert "email" not in json.dumps(payload).lower()

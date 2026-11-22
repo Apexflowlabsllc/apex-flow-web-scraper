@@ -164,7 +164,7 @@ def install(h, app):
     async def funnel(request):
         h.limit(request,"funnel",120)
         body=await request.json()
-        allowed={"page_view","trial_view","trial_submit"}
+        allowed={"page_view","trial_view","trial_submit","first_scrape_success"}
         if not isinstance(body,dict) or body.get("event") not in allowed:
             raise ValueError("Unsupported event")
         event(h,body["event"])
