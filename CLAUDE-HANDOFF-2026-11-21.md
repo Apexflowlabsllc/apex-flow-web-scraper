@@ -3,8 +3,7 @@
 **Prepared:** 2026-11-22 (Pacific)
 **Project:** `E:\apex\work\codex-brief-20261121\scraper`  
 **Branch:** `codex/handoff-2026-11-21-scraper`  
-**Latest committed product-code commit:** `ed51fba` (`Add draft n8n workflow integration`)  
-**Current committed branch HEAD before this in-progress n8n polish:** `0766328` (`Refresh Claude handoff for n8n integration`)
+**Latest committed product-code commit:** `a7caa11` (`Validate n8n node with official tooling`)
 **Pull request:** [#34 — Upgrade Web Scraper hero and AI distribution](https://github.com/Apexflowlabsllc/apex-flow-web-scraper/pull/34)
 
 ## Assignment
