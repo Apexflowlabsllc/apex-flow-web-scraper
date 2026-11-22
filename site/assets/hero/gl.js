@@ -97,16 +97,22 @@ export function qFromBasis(out, o, xx, xy, xz, yx, yy, yz, zx, zy, zz) {
   else { s = Math.sqrt(1 + zz - xx - yy) * 2; out[o + 3] = (xy - yx) / s; out[o] = (zx + xz) / s; out[o + 1] = (zy + yz) / s; out[o + 2] = s / 4; }
 }
 
-export function program(gl, vs, fs) {
+/* Programs compile in two steps so the browser can build them in parallel without blocking the page. */
+export function beginProgram(gl, vs, fs) {
   const p = gl.createProgram();
   for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
     const s = gl.createShader(type);
-    gl.shaderSource(s, src); gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) || 'shader compile failed');
-    gl.attachShader(p, s);
+    gl.shaderSource(s, src); gl.compileShader(s); gl.attachShader(p, s);
   }
   gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) || 'program link failed');
+  return p;
+}
+
+export function finishProgram(gl, p) {
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    const logs = (gl.getAttachedShaders(p) || []).map((s) => gl.getShaderInfoLog(s)).filter(Boolean).join(' | ');
+    throw new Error(gl.getProgramInfoLog(p) || logs || 'program link failed');
+  }
   const u = {};
   for (let i = 0, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); i < n; i++) {
     const info = gl.getActiveUniform(p, i);
