@@ -34,13 +34,20 @@ h1 em,.chapter h2 em{font-style:normal;background:linear-gradient(100deg,var(--v
 .hero{position:relative;height:440vh}
 .stage{position:sticky;top:0;height:100vh;height:100svh;min-height:540px;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;background:#03090d radial-gradient(110% 80% at 68% 45%,#0a2531 0%,rgba(3,9,13,0) 65%)}
 .hero.flat{height:auto}.hero.flat .stage{position:relative;height:auto;min-height:min(100svh,1040px)}
+.hero.flat #crawl-scene{height:min(100%,100svh);-webkit-mask-image:linear-gradient(#000 72%,transparent);mask-image:linear-gradient(#000 72%,transparent)}
 .hero.no-gl .stage{background:#03090d url(/assets/hero-poster.webp) 62% 50%/cover no-repeat}
 #crawl-scene{position:absolute;inset:0;width:100%;height:100%;z-index:-2;opacity:0;transition:opacity 1.1s ease}
 #crawl-scene.on{opacity:1}
-.hero-scrim{position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(54% 66% at 19% 46%,rgba(2,8,12,.9) 0%,rgba(2,8,12,.74) 46%,rgba(2,8,12,0) 100%),linear-gradient(180deg,rgba(2,8,12,.92) 0,rgba(2,8,12,.6) 9%,rgba(2,8,12,0) 21%,rgba(2,8,12,0) 86%,#03090d 100%)}
+.hero-scrim{position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(54% 66% at 19% 46%,rgba(2,8,12,.9) 0%,rgba(2,8,12,.74) 46%,rgba(2,8,12,0) 100%)}
+/* While the scene sits in its screen frame the top and bottom shades stay off, so the frame and what comes out of it stay crisp.
+   They come in as the frame opens (--open runs 0 to 1 with the first scroll). */
+.hero-scrim::before,.hero-scrim::after{content:"";position:absolute;left:0;right:0;opacity:var(--open,0)}
+.hero-scrim::before{top:0;height:21%;background:linear-gradient(180deg,rgba(2,8,12,.92) 0,rgba(2,8,12,.6) 43%,rgba(2,8,12,0) 100%)}
+.hero-scrim::after{bottom:0;height:14%;background:linear-gradient(180deg,rgba(3,9,13,0),#03090d)}
+.hero.flat .hero-scrim::before,.hero.flat .hero-scrim::after{opacity:1}
 .stage>.wrap{width:100%;flex:1;display:flex;flex-direction:column}
 .chapters{position:relative;flex:1}
-.chapter{position:absolute;left:0;top:47%;max-width:580px;opacity:0;pointer-events:none;transform:translateY(-50%) translateY(26px);transition:opacity .55s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+.chapter{position:absolute;left:0;top:38%;max-width:580px;opacity:0;pointer-events:none;transform:translateY(-50%) translateY(26px);transition:opacity .55s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
 .chapter.on{opacity:1;pointer-events:auto;transform:translateY(-50%)}
 .chapter .note{color:#a9c6d2}
 .chapter .eyebrow b{color:var(--ink);margin-right:10px}
@@ -60,7 +67,7 @@ h1 em,.chapter h2 em{font-style:normal;background:linear-gradient(100deg,var(--v
 .ds-row span:nth-child(3){color:var(--o)}.ds-row span:nth-child(4){color:#8fd8ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @keyframes ds-flash{0%{background:rgba(215,247,93,.38)}100%{background:rgba(215,247,93,0)}}
 @keyframes apex-pulse{50%{opacity:.35}}
-.stages{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;margin:0;padding:0;list-style:none;font:700 12px ui-monospace,Consolas,monospace;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap}
+.stages{position:absolute;left:max(20px,calc(50% - 570px));bottom:34px;display:flex;align-items:center;gap:10px;margin:0;padding:0;list-style:none;font:700 12px ui-monospace,Consolas,monospace;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap}
 .stages li{display:flex;align-items:center;gap:10px}
 .stages li+li::before{content:"\00bb";color:var(--v);font-size:18px;letter-spacing:0;opacity:.8}
 .stages span{padding:10px 20px;border:1px solid rgba(25,217,238,.38);border-radius:999px;background:rgba(3,14,20,.76);color:#9cc4d0;transition:color .4s,background .4s,box-shadow .4s,border-color .4s}
@@ -69,11 +76,15 @@ h1 em,.chapter h2 em{font-style:normal;background:linear-gradient(100deg,var(--v
 .hero.flat .chapter{position:static;opacity:1;pointer-events:auto;transform:none;transition:none}
 .hero.flat .chapter h2{font-size:clamp(26px,2.6vw,38px)}.hero.flat .scroll-hint{display:none}
 @media (max-width:1100px){.dataset{width:300px;font-size:11.5px}}
+/* short desktop windows: the opening copy hangs from the top of the screen frame instead of centring past it */
+@media (max-height:820px) and (min-width:901px){.chapter{top:6px;transform:translateY(22px)}.chapter.on{transform:none}h1{font-size:clamp(32px,3.7vw,52px);margin:10px 0 12px}.chapter .lede{font-size:16px}.chapter .cta{margin-top:16px}.chapter .note{margin:8px 0 0}.scroll-hint{display:none}.stages{bottom:20px}}
 @media (max-width:900px){nav .links a.hide{display:none}.hero{height:400vh}
 .chapter{top:6px;max-width:none;transform:translateY(22px)}.chapter.on{transform:none}
 .dataset,.scroll-hint{display:none}
-.hero-scrim{background:linear-gradient(180deg,rgba(2,8,12,.96) 0,rgba(2,8,12,.93) 50%,rgba(2,8,12,0) 64%,rgba(2,8,12,0) 90%,#03090d 100%)}
-.stages{bottom:18px;gap:5px;font-size:9px;letter-spacing:.1em}.stages li{gap:5px}.stages span{padding:7px 9px}.stages li+li::before{font-size:13px}}
+/* phones: the shade behind the copy sits inside the screen frame, and widens to the whole stage as the frame opens */
+.hero-scrim{clip-path:inset(calc((var(--ft,84px) + 4px)*(1 - var(--open,0))) calc(12px*(1 - var(--open,0))) 0 round calc(15px*(1 - var(--open,0))) calc(15px*(1 - var(--open,0))) 0 0);background:linear-gradient(180deg,rgba(2,8,12,.96) 0,rgba(2,8,12,.93) 55%,rgba(2,8,12,0) 70%)}.hero-scrim::before{display:none}.hero-scrim::after{height:10%}
+.hero.flat .hero-scrim{clip-path:none}.stages{opacity:var(--open,0)}.hero.flat .stages{opacity:1}.chapter .note{text-shadow:0 1px 5px #02080c,0 0 12px #02080c,0 0 20px #02080c}
+.stages{left:50%;transform:translateX(-50%);bottom:18px;gap:5px;font-size:9px;letter-spacing:.1em}.stages li{gap:5px}.stages span{padding:7px 9px}.stages li+li::before{font-size:13px}}
 @media (prefers-reduced-motion:reduce){.ds-row.on,.ds-foot i,.scroll-hint::after{animation:none}.chapter,.dataset{transition:none}}
 /* live transform demo */
 .demo{position:relative;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));padding:14px;box-shadow:0 40px 80px -30px rgba(25,217,238,.5)}

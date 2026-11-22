@@ -202,8 +202,9 @@ void main(){
     vec2 e = min(vUv, 1.0 - vUv)*uDim; float edge = smoothstep(0.06, 0.0, min(e.x, e.y));
     col = mix(col, vec3(0.12, 0.82, 1.0)*2.4, edge*0.85);
   } else {                                                                    // the panel's metal body
-    col = lit(N, V, vec3(0.04, 0.045, 0.055), 1.0, 0.36, 0.9, 1.0, 0.0);
-    col += vec3(0.1, 0.8, 1.0)*pow(smoothstep(-0.5, 0.0, vY), 6.0)*2.2;
+    float along = abs(N.x) > 0.5 ? vWorld.z : vWorld.x, rib = smoothstep(0.46, 0.5, abs(fract(along*1.6) - 0.5));   // machined ribs along the edge
+    col = lit(N, V, vec3(0.04, 0.045, 0.055)*(1.0 - 0.5*rib), 1.0, 0.3 + 0.2*rib, 0.9, 1.0, 0.0);
+    col += vec3(0.1, 0.8, 1.0)*(pow(smoothstep(-0.5, 0.0, vY), 6.0)*2.2 + smoothstep(0.05, 0.0, abs(vY + 0.62))*(1.0 - rib)*(0.5 + 0.5*sin(along*0.9 - uTime*1.6))*1.4*uMain);
   }
   o = vec4(fogged(col, vWorld), depthOf(vWorld));
 }`;
@@ -224,8 +225,9 @@ void main(){
 /* Floor: dark polished stone with a faint grid, lit by the page above it. */
 export const FLOOR_VS = HEAD + `layout(location=0) in vec2 aXZ; uniform mat4 uVP; uniform float uY; out vec3 vWorld;
 void main(){ vWorld = vec3(aXZ.x, uY, aXZ.y); gl_Position = uVP*vec4(vWorld, 1.0); }`;
-export const FLOOR_FS = HEAD + VIEW + PBR + `in vec3 vWorld; uniform float uTime; out vec4 o;
+export const FLOOR_FS = HEAD + VIEW + PBR + `in vec3 vWorld; uniform float uTime; uniform float uPlane; out vec4 o;
 void main(){
+  if (uPlane > 0.0 && depthOf(vWorld) < uPlane + 0.6) discard;   // nothing of the floor comes out through the window
   vec3 N = vec3(0.0, 1.0, 0.0), V = normalize(uEye - vWorld);
   vec2 g = vWorld.xz/1.6, fw = fwidth(g), a = abs(fract(g - 0.5) - 0.5)/max(fw, vec2(1e-4));
   float line = (1.0 - min(min(a.x, a.y), 1.0))*clamp(0.5/max(fw.x, fw.y), 0.0, 1.0);
@@ -311,16 +313,50 @@ void main(){
 /* Scan light: a fan of cyan on the page in front of a robot that is reading. */
 export const BEAM_VS = HEAD + `layout(location=0) in vec2 aCorner;
 layout(location=3) in vec3 iPos; layout(location=4) in vec4 iQuat; layout(location=5) in vec4 iA;
-uniform mat4 uVP; out vec2 vUv; out float vGlow;
+uniform mat4 uVP; out vec2 vUv; out float vGlow; out vec2 vXZ;
 vec3 rot(vec3 v, vec4 q){ return v + 2.0*cross(q.xyz, cross(q.xyz, v) + q.w*v); }
 void main(){
   float t = aCorner.x*0.5 + 0.5; vUv = vec2(t, aCorner.y); vGlow = iA.w;
   vec3 p = vec3(0.42 + t*1.5, 0.014, aCorner.y*(0.1 + 0.62*t))*iA.x*step(0.06, iA.w);
-  gl_Position = uVP*vec4(iPos + rot(p, iQuat), 1.0);
+  vec3 w = iPos + rot(p, iQuat); vXZ = w.xz;
+  gl_Position = uVP*vec4(w, 1.0);
 }`;
-export const BEAM_FS = HEAD + `in vec2 vUv; in float vGlow; uniform float uTime; out vec4 o;
+export const BEAM_FS = HEAD + `in vec2 vUv; in float vGlow; in vec2 vXZ; uniform float uTime; uniform vec2 uHalf; out vec4 o;
 void main(){
+  if (abs(vXZ.x) > uHalf.x || abs(vXZ.y) > uHalf.y) discard;     // the light stays on the page
   float a = (1.0 - vUv.x)*(1.0 - smoothstep(0.45, 1.0, abs(vUv.y)))*vGlow;
   a += smoothstep(0.07, 0.0, abs(vUv.x - fract(uTime*1.4)))*(1.0 - abs(vUv.y))*vGlow*0.9;
   o = vec4(vec3(0.1, 0.85, 1.0)*a*1.5, 0.0);
+}`;
+
+/* The screen the scene comes out of: a wall with a window in it, standing at one view depth. Whatever is nearer than
+   the wall (the page's corner and the robots on it) is drawn over the wall, so it reads as leaving the screen. */
+export const MASK_BOT_VS = HEAD + RIG + `uniform mat4 uVP; uniform vec3 uEye; uniform vec3 uFwd; out float vD;
+void main(){ vec3 p = aPos, n = aNor; pose(p, n); vec3 w = iPos + rot(p*iA.x, iQuat); vD = dot(w - uEye, uFwd); gl_Position = uVP*vec4(w, 1.0); }`;
+export const MASK_SLAB_VS = HEAD + `layout(location=0) in vec3 aPos; uniform mat4 uVP; uniform vec3 uEye; uniform vec3 uFwd; uniform vec3 uPos; uniform vec3 uSize; out float vD;
+void main(){ vec3 w = uPos + aPos*uSize; vD = dot(w - uEye, uFwd); gl_Position = uVP*vec4(w, 1.0); }`;
+export const MASK_FS = HEAD + `in float vD; uniform float uPlane; out vec4 o; void main(){ if (vD > uPlane) discard; o = vec4(1.0); }`;
+export const WALL_VS = HEAD + `uniform float uZ;
+void main(){ vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)); gl_Position = vec4(p*2.0 - 1.0, uZ, 1.0); }`;
+export const WALL_FS = HEAD + `uniform sampler2D uTex; uniform vec4 uRect; uniform vec2 uRes; uniform float uRad; uniform float uPx; uniform float uFocus; uniform float uMode; out vec4 o;
+float sdBox(vec2 p){ vec2 q = abs(p - (uRect.xy + uRect.zw)*0.5) - (uRect.zw - uRect.xy)*0.5 + uRad; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uRad; }
+void main(){
+  vec2 p = gl_FragCoord.xy; float sd = sdBox(p), s = uPx; vec3 cy = vec3(0.1, 0.8, 1.0);
+  if (uMode > 0.5) {                                             // the lit edge of the glass, and the shade just inside it
+    float line = smoothstep(1.5*s, 0.2*s, abs(sd)), inner = smoothstep(-34.0*s, 0.0, sd)*step(sd, 0.0)*0.42;
+    o = vec4(cy*2.6*line, max(line, inner)); return;
+  }
+  if (sd < 0.0) discard;
+  float bw = 13.0*s, band = smoothstep(bw + 1.0*s, bw - 0.5*s, sd), t = clamp(sd/bw, 0.0, 1.0);
+  vec2 n = normalize(vec2(sdBox(p + vec2(1.0, 0.0)) - sd, sdBox(p + vec2(0.0, 1.0)) - sd) + 1e-5);
+  float top = clamp(dot(n, normalize(vec2(-0.45, 0.9)))*0.5 + 0.5, 0.0, 1.0);
+  vec3 bezel = mix(vec3(0.016, 0.02, 0.026), vec3(0.2, 0.225, 0.25), pow(top, 3.0))*(0.55 + 0.45*sin(t*3.14159));   // a rounded metal rim, lit from above
+  bezel += cy*0.5*smoothstep(0.3, 0.0, t) + vec3(0.5, 0.56, 0.62)*smoothstep(1.2*s, 0.0, abs(sd - bw))*0.5;
+  float out_ = max(sd - bw, 0.0);
+  vec3 wall = vec3(0.0062, 0.0105, 0.0142) + cy*(0.07*exp(-out_/(40.0*s)) + 0.05*exp(-out_/(240.0*s))*smoothstep(uRect.y + 90.0*s, uRect.y - 30.0*s, p.y));   // light spilling from the screen, most of it below the sill
+  vec3 col = mix(wall, bezel, band);
+  vec2 uv = p/uRes, off = vec2(-30.0, 40.0)*s/uRes;              // what has come out throws a shadow back onto the wall
+  float sh = texture(uTex, uv + off).r*0.5 + texture(uTex, uv + off*0.55).r*0.3 + texture(uTex, uv + off*0.2).r*0.3;
+  col *= 1.0 - clamp(sh, 0.0, 1.0)*0.86;
+  o = vec4(col, uFocus);
 }`;

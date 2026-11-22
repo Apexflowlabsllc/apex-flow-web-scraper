@@ -17,24 +17,26 @@ const sheet = (w, h) => { if (typeof OffscreenCanvas === 'function') return new 
 /* The camera's four stops along the scroll: target, bearing, height angle, distance, picture shift, lens opening. */
 const SHOTS = {
   wide: [
-    { t: [0.6, 0.4, 1.6], az: -30, el: 19, d: 10.2, sx: 0.3, sy: -0.02, ap: 0.42 },
+    { t: [5.6, 0.2, 3.0], az: 44, el: 17, d: 9.5, sx: 0.2, sy: -0.2, ap: 0.3 },
     { t: [3.2, 0.6, -0.6], az: -15, el: 31, d: 35, sx: 0.3, sy: -0.14, ap: 0.09 },
     { t: [2.2, 0.1, 2.3], az: 14, el: 34, d: 11.5, sx: 0.5, sy: -0.04, ap: 0.36 },
     { t: [8.6, 1.9, -0.4], az: -26, el: 13, d: 15.5, sx: 0.4, sy: -0.06, ap: 0.3 }
   ],
   tall: [
-    { t: [0.2, 0.3, 1.3], az: -14, el: 15, d: 10.5, sx: 0, sy: -0.62, ap: 0.45 },
+    { t: [6.0, 0.2, 3.4], az: 45, el: 26, d: 17, sx: -0.02, sy: -0.58, ap: 0.3 },
     { t: [1.4, 0, 0.4], az: -10, el: 33, d: 24, sx: 0, sy: -0.6, ap: 0.1 },
     { t: [4.2, 0.1, -1.2], az: 10, el: 44, d: 12.5, sx: 0, sy: -0.5, ap: 0.33 },
     { t: [1.2, 0.2, 0.9], az: -30, el: 22, d: 19, sx: 0, sy: -0.55, ap: 0.28 }
-  ]
+  ],
+  /* the still picture for visitors who ask for reduced motion: no screen frame, the page seen across its front */
+  still: { wide: { t: [0.6, 0.4, 1.6], az: -30, el: 19, d: 10.2, sx: 0.3, sy: -0.02, ap: 0.42 }, tall: { t: [0.2, 0.3, 1.3], az: -14, el: 15, d: 10.5, sx: 0, sy: -0.62, ap: 0.45 } }
 };
 
 /* cfg: { calm, compact, weak, cssW, cssH, dpr, anchor }. post(message) reports to the page. Returns { input(message) }. */
 export async function run(canvas, cfg, post) {
   const mark = (name) => post({ t: 'mark', name });
   const { calm, compact, weak } = cfg;
-  let cssW = cfg.cssW, cssH = cfg.cssH, dpr = cfg.dpr;
+  let cssW = cfg.cssW, cssH = cfg.cssH, dpr = cfg.dpr, sillPx = cfg.sill || 0, topPx = cfg.top || 86;
   const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, powerPreference: 'high-performance' });
   if (!gl) throw new Error('WebGL2 is not available');
   mark('context');
@@ -42,13 +44,14 @@ export async function run(canvas, cfg, post) {
   if (info && /swiftshader|llvmpipe|software|basic render/i.test(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))) throw new Error('no graphics hardware, showing the still picture');
   if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) throw new Error('no high-range colour buffers, showing the still picture');
   const dprCap = compact ? 2 : 3, pixelCap = compact ? 2.0e6 : 8.4e6, mirror = !compact;
-  let quality = 1, W = 2, H = 2, scene = null, half = null, soft = null, refl = null, b1 = null, b1b = null, b2 = null, b2b = null;
+  let quality = 1, W = 2, H = 2, scene = null, half = null, soft = null, refl = null, b1 = null, b1b = null, b2 = null, b2b = null, pop = null, popB = null;
 
   /* Shaders build in the browser's compiler threads while the art and meshes are made here. */
   const building = [['bot', S.BOT_VS, S.BOT_FS], ['depth', S.DEPTH_VS, S.DEPTH_FS], ['contact', S.CONTACT_VS, S.CONTACT_FS], ['page', S.PAGE_VS, S.PAGE_FS],
     ['trail', S.TRAIL_VS, S.TRAIL_FS], ['flat', S.QUAD_VS, S.FLAT_FS], ['env', S.QUAD_VS, S.ENV_FS], ['sky', S.QUAD_VS, S.SKY_FS], ['floor', S.FLOOR_VS, S.FLOOR_FS],
     ['link', S.LINK_VS, S.LINK_FS], ['stream', S.LINK_VS, S.STREAM_FS], ['beam', S.BEAM_VS, S.BEAM_FS], ['glow', S.GLOW_VS, S.GLOW_FS], ['half', S.QUAD_VS, S.HALF_FS], ['dof', S.QUAD_VS, S.DOF_FS],
-    ['bright', S.QUAD_VS, S.BRIGHT_FS], ['blur', S.QUAD_VS, S.BLUR_FS], ['final', S.QUAD_VS, S.FINAL_FS]]
+    ['bright', S.QUAD_VS, S.BRIGHT_FS], ['blur', S.QUAD_VS, S.BLUR_FS], ['final', S.QUAD_VS, S.FINAL_FS],
+    ['maskBot', S.MASK_BOT_VS, S.MASK_FS], ['maskSlab', S.MASK_SLAB_VS, S.MASK_FS], ['wall', S.WALL_VS, S.WALL_FS]]
     .map(([k, vs, fs]) => [k, G.beginProgram(gl, vs, fs)]);
   mark('shaders-sent');
   const firstW = compact ? 1024 : 1280;
@@ -176,7 +179,8 @@ export async function run(canvas, cfg, post) {
 
   /* Camera: glides between the four stops as the page scrolls, with a little life of its own. */
   const proj = G.mat4(), view = G.mat4(), vp = G.mat4(), inv = G.mat4(), mview = G.mat4(), mvp = G.mat4(), eye = [0, 0, 0], meye = [0, 0, 0], fwd = [0, 0, -1];
-  const shots = compact ? SHOTS.tall : SHOTS.wide, fov = (compact ? 34 : 30) * DEG, cam = { focus: 8, ap: 1 };
+  const shots = (compact ? SHOTS.tall : SHOTS.wide).slice(), fov = (compact ? 34 : 30) * DEG, cam = { focus: 8, ap: 1 };
+  if (calm) shots[0] = SHOTS.still[compact ? 'tall' : 'wide'];
   let px = 0, py = 0, pxT = 0, pyT = 0, intro = calm ? 1 : 0, clock = 0, scroll = 0, eased = 0, anchor = null;
   function camera(dt) {
     px += (pxT - px) * Math.min(1, dt * 3); py += (pyT - py) * Math.min(1, dt * 3);
@@ -195,6 +199,23 @@ export async function run(canvas, cfg, post) {
     G.mul(vp, proj, view); G.invert(inv, vp);
     mview.set(view); mview[4] = -view[4]; mview[5] = -view[5]; mview[6] = -view[6]; mview[7] = -view[7];   // the same view, seen in the glass
     G.mul(mvp, proj, mview); meye[0] = eye[0]; meye[1] = -eye[1]; meye[2] = eye[2];
+    window_(Math.max(0, eased));
+  }
+  /* The screen the scene comes out of: a window in a wall. Its sill lies on the page, so the page's near corner and the
+     robots on it pass through. As the visitor scrolls on, the window opens until the scene fills the whole view. */
+  const win = { on: false, rect: new Float32Array(4), plane: 0, z: 0, s: 1 };
+  function window_(v) {
+    const open = calm ? 1 : Math.min(1, Math.max(0, (v - 0.012) / 0.15)), e = open * open * (3 - 2 * open), k = W / cssW, far = 90 * k;
+    const side = compact ? 8 : Math.min(44, Math.max(18, cssW * 0.02)), top = topPx, sill = sillPx || cssH * 0.22;
+    const at = (a, b) => a + (b - a) * e;
+    win.rect.set([at(side * k, -far), at(sill * k, -far), at(W - side * k, W + far), at(H - top * k, H + far)]);
+    win.s = k * (compact ? 0.62 : 1); win.on = false; win.plane = 0;
+    if (e > 0.999) return;
+    const hit = pick(0, (win.rect[1] / H) * 2 - 1, 0);
+    if (!hit) return;
+    const dP = (hit[0] - eye[0]) * fwd[0] + (hit[1] - eye[1]) * fwd[1] + (hit[2] - eye[2]) * fwd[2];
+    if (dP < 0.8) return;
+    win.on = true; win.plane = dP; win.z = (-proj[10] * dP + proj[14]) / dP;
   }
   /* Where a point of the picture (x and y from -1 to 1, y up) meets the plane y = planeY. */
   function pick(nx, ny, planeY) {
@@ -209,7 +230,7 @@ export async function run(canvas, cfg, post) {
     const w = Math.max(8, Math.round(cssW * k)), h = Math.max(8, Math.round(cssH * k));
     if (w === W && h === H) return;
     W = canvas.width = w; H = canvas.height = h;
-    [scene, half, soft, refl, b1, b1b, b2, b2b].forEach((t) => t && t.dispose());
+    [scene, half, soft, refl, b1, b1b, b2, b2b, pop, popB].forEach((t) => t && t.dispose());
     const samples = Math.min(gl.getParameter(gl.MAX_SAMPLES), W * H > 5e6 || compact ? 2 : 4);
     const hw = W >> 1, hh = H >> 1;
     scene = G.target(gl, W, H, { depth: true, samples, hdr: true });
@@ -217,6 +238,7 @@ export async function run(canvas, cfg, post) {
     refl = mirror ? G.target(gl, hw, hh, { depth: true, hdr: true, mips: true }) : null;
     b1 = G.target(gl, W >> 2, H >> 2, { hdr: true }); b1b = G.target(gl, b1.w, b1.h, { hdr: true });
     b2 = G.target(gl, W >> 3, H >> 3, { hdr: true }); b2b = G.target(gl, b2.w, b2.h, { hdr: true });
+    pop = G.target(gl, W >> 2, H >> 2); popB = G.target(gl, pop.w, pop.h);
   }
 
   const stats = { fps: 0, ms: 0, cpu: 0, draws: 0, bots: count, tris: 0 };
@@ -230,7 +252,7 @@ export async function run(canvas, cfg, post) {
   function render(dt) {
     let u;
     const scale = 1080 / Math.max(H, 400) * (weak ? 1.7 : 1);
-    swarm.fill(eye, model[0] ? 0.11 * scale * detail : 1e9, 0.017 * scale * detail);
+    swarm.fill(eye, model[0] ? 0.08 * scale * detail : 1e9, 0.017 * scale * detail);
     lod.forEach((l, k) => { gl.bindBuffer(gl.ARRAY_BUFFER, l.inst); gl.bufferSubData(gl.ARRAY_BUFFER, 0, swarm.bufs[k], 0, swarm.counts[k] * STRIDE); });
     gl.disable(gl.CULL_FACE);
 
@@ -271,12 +293,26 @@ export async function run(canvas, cfg, post) {
       bind(4, gl.TEXTURE_2D, refl.tex);
     }
 
+    const pass = (p, to, tex, set) => { gl.bindFramebuffer(gl.FRAMEBUFFER, to ? to.fbo : null); gl.viewport(0, 0, to ? to.w : W, to ? to.h : H); const uu = use(p); bind(0, gl.TEXTURE_2D, tex); if (uu.uFocus) { gl.uniform1f(uu.uFocus, cam.focus); gl.uniform1f(uu.uAperture, cam.ap); } if (set) set(uu); fullscreen(); };
+    if (win.on) {     /* what has come out through the window, as a soft shape: it shades the wall behind it */
+      gl.bindFramebuffer(gl.FRAMEBUFFER, pop.fbo); gl.viewport(0, 0, pop.w, pop.h);
+      gl.disable(gl.DEPTH_TEST); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+      u = use(prog.maskSlab); eyeTo(u, vp, eye); gl.uniform1f(u.uPlane, win.plane); gl.uniform3f(u.uPos, 0, 0, 0); gl.uniform3f(u.uSize, PAGE_W, 0.34, PAGE_D);
+      gl.bindVertexArray(slabVao); gl.drawArrays(gl.TRIANGLES, 0, 36); draws++;
+      u = use(prog.maskBot); eyeTo(u, vp, eye); gl.uniform1f(u.uPlane, win.plane);
+      robots([2, 2, 2]);
+      gl.bindVertexArray(null);
+      pass(prog.blur, popB, pop.tex, (uu) => gl.uniform2f(uu.uDir, 1.5 / pop.w, 0));
+      pass(prog.blur, pop, popB.tex, (uu) => gl.uniform2f(uu.uDir, 0, 1.5 / pop.h));
+      gl.enable(gl.DEPTH_TEST);
+    }
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, scene.draw); gl.viewport(0, 0, W, H);
     gl.clearColor(FOGC[0], FOGC[1], FOGC[2], 400); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.disable(gl.DEPTH_TEST); gl.bindVertexArray(null);
     u = use(prog.sky); gl.uniformMatrix4fv(u.uInv, false, inv); gl.uniform3fv(u.uEye, eye); gl.uniform3fv(u.uFog, FOGC); fullscreen();
     gl.enable(gl.DEPTH_TEST);
-    u = use(prog.floor); eyeTo(u, vp, eye); gl.uniform1f(u.uY, -1.05); gl.bindVertexArray(floorVao); gl.drawArrays(gl.TRIANGLES, 0, 6); draws++;
+    u = use(prog.floor); eyeTo(u, vp, eye); gl.uniform1f(u.uY, -1.05); gl.uniform1f(u.uPlane, win.plane); gl.bindVertexArray(floorVao); gl.drawArrays(gl.TRIANGLES, 0, 6); draws++;
 
     u = use(prog.page); eyeTo(u, vp, eye); gl.uniformMatrix4fv(u.uLightVP, false, lightVP);
     gl.uniform4fv(u.uHi, hiRect); gl.uniform1fv(u.uHiA, hiA); gl.uniform1fv(u.uHiC, hiC);
@@ -305,13 +341,22 @@ export async function run(canvas, cfg, post) {
     u = use(prog.contact); gl.uniformMatrix4fv(u.uVP, false, vp);
     lod.forEach((l, k) => { if (swarm.counts[k]) { gl.bindVertexArray(l.contact); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, swarm.counts[k]); draws++; } });
     gl.blendFunc(gl.ONE, gl.ONE);         // light: scan fans on the page and the data streams
-    u = use(prog.beam); gl.uniformMatrix4fv(u.uVP, false, vp); gl.uniform1f(u.uTime, clock);
+    u = use(prog.beam); gl.uniformMatrix4fv(u.uVP, false, vp); gl.uniform1f(u.uTime, clock); gl.uniform2f(u.uHalf, PAGE_W / 2, PAGE_D / 2);
     for (let k = 0; k < 2; k++) if (swarm.counts[k]) { gl.bindVertexArray(lod[k].contact); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, swarm.counts[k]); draws++; }
     u = use(prog.stream); eyeTo(u, vp, eye); gl.uniform1fv(u.uPulse, pulse);
     gl.bindVertexArray(fibreVao); gl.drawArrays(gl.TRIANGLES, 0, fibres.length / 6); draws++;
     gl.disable(gl.BLEND); gl.depthMask(true);
     u = use(prog.bot); eyeTo(u, vp, eye); gl.uniform1f(u.uMirror, 0); gl.uniformMatrix4fv(u.uLightVP, false, lightVP); gl.uniform2f(u.uPageSize, PAGE_W, PAGE_D);
     robots([0, 1, 2]);
+    if (win.on) {     /* the wall and its window, standing in the scene at the sill's depth */
+      gl.bindVertexArray(null);
+      u = use(prog.wall); bind(0, gl.TEXTURE_2D, pop.tex);
+      gl.uniform4fv(u.uRect, win.rect); gl.uniform2f(u.uRes, W, H); gl.uniform1f(u.uRad, 20 * win.s); gl.uniform1f(u.uPx, win.s); gl.uniform1f(u.uZ, win.z); gl.uniform1f(u.uFocus, cam.focus);
+      gl.uniform1f(u.uMode, 0); fullscreen();
+      gl.enable(gl.BLEND); gl.depthMask(false); gl.depthFunc(gl.LEQUAL); gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
+      gl.uniform1f(u.uMode, 1); fullscreen();
+      gl.disable(gl.BLEND); gl.depthMask(true); gl.depthFunc(gl.LESS);
+    }
 
     /* additive sprites: packets, the dataset dock, link ports, dust in the light */
     let g = packets.count * 8;
@@ -330,7 +375,6 @@ export async function run(canvas, cfg, post) {
 
     /* lens: focus, bloom, grade */
     gl.bindVertexArray(null);
-    const pass = (p, to, tex, set) => { gl.bindFramebuffer(gl.FRAMEBUFFER, to ? to.fbo : null); gl.viewport(0, 0, to ? to.w : W, to ? to.h : H); const uu = use(p); bind(0, gl.TEXTURE_2D, tex); if (uu.uFocus) { gl.uniform1f(uu.uFocus, cam.focus); gl.uniform1f(uu.uAperture, cam.ap); } if (set) set(uu); fullscreen(); };
     pass(prog.half, half, scene.tex);
     pass(prog.dof, soft, half.tex, (uu) => { gl.uniform2f(uu.uPx, 1 / half.w, 1 / half.h); gl.uniform1f(uu.uRadius, half.h * 0.026); });
     pass(prog.bright, b1, half.tex);
@@ -384,7 +428,7 @@ export async function run(canvas, cfg, post) {
       swarm.pointer = hit && Math.abs(hit[0]) < PAGE_W / 2 && Math.abs(hit[2]) < PAGE_D / 2 ? [hit[0], hit[2]] : null;
     } else if (m.t === 'scroll') { scroll = m.v; if (calm) still(); }
     else if (m.t === 'show') { visible = m.on; wake(); }
-    else if (m.t === 'size') { cssW = m.cssW; cssH = m.cssH; dpr = m.dpr; anchor = m.anchor; resize(); if (calm) still(); }
+    else if (m.t === 'size') { cssW = m.cssW; cssH = m.cssH; dpr = m.dpr; anchor = m.anchor; sillPx = m.sill || sillPx; topPx = m.top || topPx; resize(); if (calm) still(); }
   }
 
   /* After the first picture: the full-detail robot for close shots, then sharper page art (2048 px, 4096 px on big screens). */

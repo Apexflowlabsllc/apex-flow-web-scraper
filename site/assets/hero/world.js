@@ -92,10 +92,13 @@ export function makeWorld(elements, compact) {
   /* A field of other pages running off behind the main one. */
   const tiles = [];
   if (!compact) for (let j = 0; j < 3; j++) for (let i = 0; i < 8; i++) tiles.push(surface(7.4, 4.6, [-30 + i * 8.4 + (j % 2) * 3, -0.5 - j * 0.25, -9.6 - j * 5.3], 0, 0, (i + j * 3) % 4));
-  /* Where the large robots stand when the page opens, and the area they keep to (x min, x max, z min, z max). */
-  const stage = compact ? [[-0.6, 2.6], [2.4, 1.2], [-3.0, 0.6], [1.0, -1.6]] : [[0.5, 2.7], [-2.9, 1.3], [3.6, 0.9], [-0.3, -1.1], [5.6, 2.6], [-4.4, -2.4], [3.0, -2.6]];
-  const stageBox = compact ? [-4.5, 4.5, -2.5, 3.6] : [-6.6, 6.2, -3.2, 3.9];
-  return { surfaces, bridges, elements, stage, stageBox, data, rowPos, streams, tiles };
+  /* Where the large robots stand when the page opens, and the area they keep to (x min, x max, z min, z max).
+     The first few are the front crew: they work the page's near corner, the part that comes out of the screen.
+     tip: that corner (x, z, set back from the edges) and how far from it the crew roams. */
+  const stage = compact ? [[5.9, 3.4], [6.9, 2.6], [3.4, 2.2], [4.6, 0.2]] : [[5.7, 3.3], [4.9, 4.3], [6.7, 2.3], [3.2, 2.2], [4.9, 0.2], [0.8, 3.1], [2.2, -1.9]];
+  const front = compact ? 2 : 3, tip = [PAGE_W / 2 - 0.62, PAGE_D / 2 - 0.55, 2.3];
+  const stageBox = compact ? [0.5, 5.4, -2.2, 3.2] : [-1.8, 5.4, -3.0, 3.4];
+  return { surfaces, bridges, elements, stage, stageBox, front, tip, data, rowPos, streams, tiles };
 }
 
 /* Ribbon geometry for every bridge: position xyz, then t, side, length. */
