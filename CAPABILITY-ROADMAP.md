@@ -231,7 +231,7 @@ search-first volume. [Google guidance for generative search](https://developers.
    revocation. Keep sessions off the hosted service and out of chat.
 
 The current public feature-surface comparison is tracked in
-`FIRECRAWL-PARITY-MATRIX-2026-11-22.md`. Its top gaps remain general web search,
+`FIRECRAWL-PARITY-MATRIX-2026-11-22.md`. Its top gaps remain hosted search-provider operations and quality benchmarks,
 durable browser sessions, autonomous research, large-scale data providers,
 async batch throughput, keyless team access and measured service capacity.
 Do not treat the matrix as proof of feature equivalence or production release.

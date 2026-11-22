@@ -2677,7 +2677,7 @@
       "post": {
         "operationId": "firecrawlCompatSearch",
         "summary": "Firecrawl-compatible web, news, and image search",
-        "description": "Requires an operator-configured web search provider. Supports query, limit, one or more distinct sources per request: web, news, and/or images (string and {type:...} forms), the pdf category with web as the sole source, and mutually exclusive includeDomains/excludeDomains arrays of 1–50 hostnames. Multi-source results are grouped under matching data keys, with limit applying per source and creditsUsed aggregating successful search and page-scrape charges; partial provider failures appear in sourceErrors alongside successful results. News uses Tavily or Exa; images use Brave's dedicated index with strict SafeSearch. The configured provider must support every requested source. The pdf category appends the filetype:pdf query operator and retains only results whose URL path ends in .pdf; this is not a dedicated PDF index. Optional web/news scrapeOptions support markdown, html, rawHtml, links, images, screenshot and bounded actions/waitFor; it cannot be combined with images. Each returned page uses Apex safety checks and metering, with failures reported on individual results. Image scraping, JSON extraction and summary formats are not supported. Returns Firecrawl-shaped results with position. Firecrawl SDK origin telemetry is accepted but not recorded. Does not call Apex saved-page search.",
+        "description": "Requires an operator-configured web search provider. Supports query, limit, one or more distinct sources per request: web, news, and/or images (string and {type:...} forms); categories research and pdf can only be used with web as the sole source. Multi-source results are grouped under matching data keys, with limit applying per source and creditsUsed aggregating successful search and page-scrape charges; partial provider failures appear in sourceErrors alongside successful results. News uses Tavily or Exa; images use Brave's dedicated index with strict SafeSearch. The configured provider must support every requested source. Research applies a curated academic-domain filter to provider results; it is not a proprietary research index. The pdf category appends the filetype:pdf query operator and retains only results whose URL path ends in .pdf; it is not a dedicated PDF index. Research and pdf may be combined. Optional web/news scrapeOptions support markdown, html, rawHtml, links, images, screenshot and bounded actions/waitFor; it cannot be combined with images. Each returned page uses Apex safety checks and metering, with failures reported on individual results. Image scraping, JSON extraction and summary formats are not supported. Returns Firecrawl-shaped results with position. Firecrawl SDK origin telemetry is accepted but not recorded. Does not call Apex saved-page search.",
         "servers": [
           {
             "url": "https://webscraper.apexflowlabs.com"
@@ -2737,9 +2737,9 @@
                   },
                   "categories": {
                     "type": "array",
-                    "maxItems": 1,
-                    "items": {"oneOf": [{"type": "string", "enum": ["pdf"]}, {"type": "object", "required": ["type"], "properties": {"type": {"type": "string", "enum": ["pdf"]}}, "additionalProperties": false}]},
-                    "description": "Supports pdf only, with a filetype:pdf provider query and post-filtering to PDF URLs. This is not a dedicated PDF index."
+                    "maxItems": 2,
+                    "items": {"oneOf": [{"type": "string", "enum": ["pdf", "research"]}, {"type": "object", "required": ["type"], "properties": {"type": {"type": "string", "enum": ["pdf", "research"]}}, "additionalProperties": false}]},
+                    "description": "Supports pdf (filetype:pdf query and PDF URL post-filter) and research (curated academic-domain filter); these can be combined. Neither uses a proprietary index."
                   },
                   "includeDomains": {
                     "type": "array",

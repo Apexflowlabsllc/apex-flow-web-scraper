@@ -674,9 +674,59 @@ async def test_v2_search_pdf_category_uses_operator_and_filters_non_pdf_results(
     }]
 
     unsupported = await client.post("/v2/search", headers=headers, json={
-        "query": "research", "sources": ["web"], "categories": ["research"],
+        "query": "research", "sources": ["web"], "categories": ["developer"],
     })
     assert unsupported.status == 400
+
+
+async def test_v2_search_research_category_uses_academic_domains_and_combines_pdf(hosted, monkeypatch):
+    import rainbo_scrape.hosted_search as hosted_search
+
+    _, client, headers = await _auth(hosted)
+    monkeypatch.setenv("TAVILY_API_KEY", "fixture-search-key")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "tavily")
+    calls = []
+
+    async def fixture_search(query, count, include_domains=None, exclude_domains=None, topic="general"):
+        calls.append((query, include_domains, exclude_domains))
+        return [
+            {"url": "https://arxiv.org/pdf/2401.01234.pdf", "title": "Paper PDF", "snippet": "Abstract"},
+            {"url": "https://arxiv.org/abs/2401.01234", "title": "Paper HTML", "snippet": "Abstract"},
+            {"url": "https://nature.com/articles/abc.pdf", "title": "Nature PDF", "snippet": "Research"},
+            {"url": "https://example.com/guide.pdf", "title": "Unrelated PDF", "snippet": "Guide"},
+        ]
+
+    monkeypatch.setattr(hosted_search, "tavily", fixture_search)
+    response = await client.post("/v2/search", headers=headers, json={
+        "query": "retrieval augmented generation", "sources": ["web"],
+        "includeDomains": ["arxiv.org"], "categories": [{"type": "research"}, {"type": "pdf"}],
+    })
+    payload = await response.json()
+    assert response.status == 200 and payload["success"] is True
+    assert calls == [("retrieval augmented generation filetype:pdf", ["arxiv.org"], None)]
+    assert payload["data"]["web"] == [{
+        "url": "https://arxiv.org/pdf/2401.01234.pdf", "title": "Paper PDF",
+        "description": "Abstract", "position": 1, "category": "pdf",
+    }]
+
+    research = await client.post("/v2/search", headers=headers, json={
+        "query": "retrieval augmented generation", "categories": ["research"],
+    })
+    research_payload = await research.json()
+    assert research.status == 200 and research_payload["success"] is True
+    assert [item["url"] for item in research_payload["data"]["web"]] == [
+        "https://arxiv.org/pdf/2401.01234.pdf", "https://arxiv.org/abs/2401.01234",
+        "https://nature.com/articles/abc.pdf",
+    ]
+    assert all(item["category"] == "research" for item in research_payload["data"]["web"])
+
+    excluded = await client.post("/v2/search", headers=headers, json={
+        "query": "retrieval augmented generation", "categories": ["research"],
+        "excludeDomains": ["arxiv.org"],
+    })
+    excluded_payload = await excluded.json()
+    assert excluded.status == 200
+    assert [item["url"] for item in excluded_payload["data"]["web"]] == ["https://nature.com/articles/abc.pdf"]
 
 
 async def test_current_langchain_mcp_client_discovers_and_calls_hosted_scraper(hosted):

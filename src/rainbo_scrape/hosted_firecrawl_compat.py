@@ -33,6 +33,20 @@ BATCH_WEBHOOK_EVENTS = {
     "page": "batch_scrape.page",
     "completed": "batch_scrape.completed",
 }
+RESEARCH_SEARCH_DOMAINS = (
+    "academic.oup.com", "arxiv.org", "biorxiv.org", "cell.com", "doi.org",
+    "frontiersin.org", "ieeexplore.ieee.org", "jstor.org", "nature.com",
+    "ncbi.nlm.nih.gov", "pnas.org", "plos.org", "pubmed.ncbi.nlm.nih.gov",
+    "sciencedirect.com", "science.org", "springer.com", "wiley.com",
+)
+
+
+def _matches_search_domains(url, domains):
+    try:
+        host = (urlsplit(url).hostname or "").lower().rstrip(".")
+    except (TypeError, ValueError):
+        return False
+    return any(host == domain or host.endswith("." + domain) for domain in domains)
 
 
 def _claim_firecrawl_batch(db, job, now, lease_seconds=BATCH_LEASE_SECONDS):
@@ -689,17 +703,27 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if configured_provider == "brave" and "news" in source_types:
             return error("The configured Brave provider does not expose a dedicated news source; use Tavily or Exa")
         categories = body.get("categories", [])
-        if not isinstance(categories, list) or len(categories) > 1:
-            return error("This adapter supports at most one search category: pdf")
-        if categories and isinstance(categories[0], dict):
-            if set(categories[0]) != {"type"}:
-                return error("Category objects must contain only type")
-            categories = [categories[0]["type"]]
-        if any(category != "pdf" for category in categories):
-            return error("This adapter currently supports only the pdf search category")
-        pdf_category = categories == ["pdf"]
-        if pdf_category and source_types != ["web"]:
-            return error("The pdf category can only be used with web as the sole source")
+        if not isinstance(categories, list) or len(categories) > 2:
+            return error("This adapter supports the research and pdf categories")
+        category_forms = {"object" if isinstance(category, dict) else "string" for category in categories}
+        if len(category_forms) > 1:
+            return error("Use either string categories or {type: ...} category objects, not both")
+        normalized_categories = []
+        for category in categories:
+            if isinstance(category, str):
+                normalized_categories.append(category)
+            elif isinstance(category, dict) and set(category) == {"type"} and isinstance(category.get("type"), str):
+                normalized_categories.append(category["type"])
+            else:
+                return error("Category objects must contain only a string type")
+        if any(category not in ("pdf", "research") for category in normalized_categories):
+            return error("This adapter supports only the research and pdf categories")
+        if len(set(normalized_categories)) != len(normalized_categories):
+            return error("categories must not contain duplicates")
+        pdf_category = "pdf" in normalized_categories
+        research_category = "research" in normalized_categories
+        if normalized_categories and source_types != ["web"]:
+            return error("Search categories can only be used with web as the sole source")
         scrape_options = body.get("scrapeOptions")
         scrape_actions = []
         if scrape_options is not None:
@@ -749,9 +773,25 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 request_body["query"] = query + " filetype:pdf"
             if topic != "general":
                 request_body["topic"] = topic
-            if include_domains is not None:
-                request_body["include_domains"] = include_domains
-            if exclude_domains is not None:
+            search_include_domains = include_domains
+            if research_category:
+                if include_domains is None:
+                    search_include_domains = list(RESEARCH_SEARCH_DOMAINS)
+                else:
+                    narrowed = set()
+                    for requested_domain in include_domains:
+                        for research_domain in RESEARCH_SEARCH_DOMAINS:
+                            if requested_domain == research_domain or requested_domain.endswith("." + research_domain):
+                                narrowed.add(requested_domain)
+                            elif research_domain.endswith("." + requested_domain):
+                                narrowed.add(research_domain)
+                    search_include_domains = sorted(narrowed)
+                    if not search_include_domains:
+                        data["web"] = []
+                        continue
+            if search_include_domains is not None:
+                request_body["include_domains"] = search_include_domains
+            if exclude_domains is not None and not research_category:
                 request_body["exclude_domains"] = exclude_domains
             try:
                 response = await websearch_for(request["account"], request_body)
@@ -792,9 +832,16 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                                         and urlsplit(item["url"]).path.lower().endswith(".pdf")]
                     if isinstance(body.get("limit", 10), int) and not isinstance(body.get("limit", 10), bool):
                         provider_results = provider_results[:body.get("limit", 10)]
+                if research_category:
+                    provider_results = [item for item in provider_results if isinstance(item, dict)
+                                        and isinstance(item.get("url"), str)
+                                        and _matches_search_domains(item["url"], RESEARCH_SEARCH_DOMAINS)
+                                        and (include_domains is None or _matches_search_domains(item["url"], include_domains))
+                                        and not _matches_search_domains(item["url"], exclude_domains or ())]
                 data["web"] = [{"url": item.get("url"), "title": item.get("title"),
                                 "description": item.get("snippet"), "position": index,
-                                **({"category": "pdf"} if pdf_category else {})}
+                                **({"category": "pdf" if pdf_category and urlsplit(item.get("url", "")).path.lower().endswith(".pdf") else "research"}
+                                   if pdf_category or research_category else {})}
                                for index, item in enumerate(provider_results, start=1)]
         if not data and source_errors:
             return first_source_failure or error("Search provider request failed", "search_failed", 503)
