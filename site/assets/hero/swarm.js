@@ -38,7 +38,7 @@ export class Swarm {
       this.yaw[i] = this.rnd() * TAU; this.hops[i] = 5 + ((this.rnd() * 14) | 0);
       this.tk[i] = (this.rnd() * (S.targets.pts.length / 3)) | 0;
       this.pick(i);
-      if (lead) { this.tx[i] = world.tip[0] - [0.22, 1.3, 0.1][i % 3]; this.tz[i] = world.tip[1] - [0.2, 0.1, 1.25][i % 3]; }   // first walk: out onto the corner
+      if (lead) { this.tx[i] = world.zones[i][1] - 0.2; this.tz[i] = world.zones[i][3] - 0.2; }   // first walk: out onto the corner
     }
   }
 
@@ -46,7 +46,15 @@ export class Swarm {
     const w = this.world, s = this.surf[i], S = w.surfaces[s], T = S.targets.pts, n = T.length / 3, r = this.rnd();
     this.goal[i] = -1; this.want[i] = 0;
     if (i < this.heroes) {   // the large robots keep to the front of the page, where the camera opens
-      if (i < w.front) { const u = this.rnd() * w.tip[2], v = this.rnd() * (w.tip[2] - u); this.tx[i] = w.tip[0] - u; this.tz[i] = w.tip[1] - v; return; }   // the front crew: out on the corner
+      if (i < w.front) {   // the front crew: out on the corner, moving across or towards the visitor rather than away
+        const zn = w.zones[i];
+        for (let k = 0; k < 8; k++) {
+          this.tx[i] = zn[0] + this.rnd() * (zn[1] - zn[0]); this.tz[i] = zn[2] + this.rnd() * (zn[3] - zn[2]);
+          const dx = this.tx[i] - this.x[i], dz = this.tz[i] - this.z[i];
+          if (Math.abs(dx - dz) >= -(dx + dz) * 1.3) break;
+        }
+        return;
+      }
       const a = w.stageBox;
       this.tx[i] = a[0] + this.rnd() * (a[1] - a[0]); this.tz[i] = a[2] + this.rnd() * (a[3] - a[2]);
       return;
@@ -104,7 +112,7 @@ export class Swarm {
         this.phase[i] += dt * 2.2;
         if (i < world.front) {   // the front crew turn to look out of the screen while they stand
           let t = -Math.PI / 4 + (i - 1) * 0.5 - yaw[i]; t -= Math.round(t / TAU) * TAU;
-          const m = 1.5 * dt; yaw[i] += t > m ? m : t < -m ? -m : t;
+          const m = 2.6 * dt; yaw[i] += t > m ? m : t < -m ? -m : t;
           if (Math.abs(t) > 0.06) { this.phase[i] += dt * 7; this.amp[i] += (0.75 - this.amp[i]) * Math.min(1, dt * 10); }
         }
         if ((this.timer[i] -= dt) <= 0) {
@@ -141,7 +149,7 @@ export class Swarm {
           if (c < 0 || c >= cell.length) continue;
           for (let j = cell[c]; j >= 0; j = next[j]) {
             if (j === i) continue;
-            const ax = x[i] - x[j], az = z[i] - z[j], d2 = ax * ax + az * az, r = (size[i] + size[j]) * (hero && j < this.heroes ? 0.98 : 0.62);
+            const ax = x[i] - x[j], az = z[i] - z[j], d2 = ax * ax + az * az, r = (size[i] + size[j]) * (hero && j < this.heroes ? 0.8 : 0.62);
             if (d2 < r * r && d2 > 1e-6) { const d = Math.sqrt(d2), push = (r - d) / d * (size[j] > size[i] * 1.3 ? 0.6 : size[i] > size[j] * 1.3 ? 0.02 : 0.2); x[i] += ax * push; z[i] += az * push; }
           }
         }
