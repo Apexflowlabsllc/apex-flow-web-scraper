@@ -35,9 +35,13 @@ not a sales claim.
    comparison runner at `tests/benchmark/`. The runner validates the signed
    host scope, saves per-engine requests/responses, requires an explicit flag
    for billable calls, and does not infer USD from different credit systems.
-   Next create a multi-layout gold set only for Apex-owned or explicitly
-   authorized sources, run both APIs under identical conditions, and publish
-   raw data and uncertainty. No valid head-to-head result exists yet.
+   The repository now adds six synthetic, project-owned fixture pages across
+   product (two layouts), article, job, event, and directory formats. A test
+   runs Apex's production extractor and scores 23 expected fields using the
+   signed evaluator; it makes no network calls. This is a parser regression
+   gate only. Next obtain a broader gold set from Apex-owned or explicitly
+   authorized live sources, run both APIs under identical conditions, and
+   publish raw data and uncertainty. No valid head-to-head result exists yet.
 2. **Win migration and reach.** The branch has a documented, tested Firecrawl
    v2 adapter subset for `scrape`, `map`, configured `search`, `crawl`, and
    asynchronous `batch/scrape` create/status/cancel/errors. Node tests exercise

@@ -7,6 +7,23 @@ own or have explicit permission to test.
 
 ## Signed manifest
 
+### Local synthetic regression fixtures
+
+`fixtures/` contains six source pages authored in this repository: two product
+layouts, an article, a job posting, an event and a directory table. The fixture
+test runs the production HTML and recipe extractor, checks that expected values
+and evidence quotes appear in each fixture, and scores page reach, field
+coverage and field accuracy with the evaluator. Run it with:
+
+```powershell
+python -m pytest tests/test_owned_fixture_benchmark.py -q
+```
+
+These pages are synthetic and never fetched from a network. This is a
+repeatable parser regression gate, not evidence of live-site coverage or an
+Apex-versus-Firecrawl result. The test-only HMAC key exists only to exercise
+signature validation and must never be reused for a real benchmark.
+
 Create a JSON manifest with `schema_version: 1`, a unique `dataset_id`, a
 semantic `version`, timezone-qualified `created_at` and `expires_at`, and a
 `permission` object that records `explicit_owner_consent: true`, the owner,

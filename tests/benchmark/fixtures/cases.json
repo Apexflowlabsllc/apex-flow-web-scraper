@@ -1,0 +1,113 @@
+{
+  "dataset_id": "apex-owned-synthetic-layouts-v1",
+  "version": "1.0.0",
+  "allowed_domain": "fixtures.apex.test",
+  "cases": [
+    {
+      "id": "product-modern",
+      "category": "product",
+      "url": "https://fixtures.apex.test/product-modern",
+      "fixture": "product-modern.html",
+      "recipe": {"fields": {
+        "name": {"selector": "main h1", "required": true},
+        "price": {"selector": ".price", "required": true},
+        "sku": {"selector": ".sku", "required": true},
+        "description": {"selector": ".description", "required": true}
+      }},
+      "expected_fields": {
+        "name": {"value": "Orbit Desk Lamp", "evidence": {"quote": "Orbit Desk Lamp"}},
+        "price": {"value": "$129.00", "evidence": {"quote": "$129.00"}},
+        "sku": {"value": "ODL-042", "evidence": {"quote": "ODL-042"}},
+        "description": {"value": "A dimmable lamp with a weighted base.", "evidence": {"quote": "A dimmable lamp with a weighted base."}}
+      }
+    },
+    {
+      "id": "product-legacy",
+      "category": "product",
+      "url": "https://fixtures.apex.test/product-legacy",
+      "fixture": "product-legacy.html",
+      "recipe": {"fields": {
+        "name": {"selector": ".item h1.title", "required": true},
+        "price": {"selector": ".product-price", "required": true},
+        "sku": {"selector": "[data-sku]", "attribute": "data-sku", "required": true},
+        "description": {"selector": ".details", "required": true}
+      }},
+      "expected_fields": {
+        "name": {"value": "Harbor Desk Lamp", "evidence": {"quote": "Harbor Desk Lamp"}},
+        "price": {"value": "$89.00", "evidence": {"quote": "$89.00"}},
+        "sku": {"value": "HDL-014", "evidence": {"quote": "HDL-014"}},
+        "description": {"value": "A compact brass reading light.", "evidence": {"quote": "A compact brass reading light."}}
+      }
+    },
+    {
+      "id": "article",
+      "category": "article",
+      "url": "https://fixtures.apex.test/article",
+      "fixture": "article.html",
+      "recipe": {"fields": {
+        "headline": {"selector": "article h1", "required": true},
+        "author": {"selector": ".byline", "required": true},
+        "published": {"selector": "article time", "attribute": "datetime", "required": true},
+        "summary": {"selector": ".article-body p", "required": true}
+      }},
+      "expected_fields": {
+        "headline": {"value": "Why Local Caches Matter", "evidence": {"quote": "Why Local Caches Matter"}},
+        "author": {"value": "By Maya Chen", "evidence": {"quote": "By Maya Chen"}},
+        "published": {"value": "2026-11-18", "evidence": {"quote": "November 18, 2026"}},
+        "summary": {"value": "Local caches reduce repeat requests and keep extraction costs predictable.", "evidence": {"quote": "Local caches reduce repeat requests and keep extraction costs predictable."}}
+      }
+    },
+    {
+      "id": "job",
+      "category": "job",
+      "url": "https://fixtures.apex.test/job",
+      "fixture": "job.html",
+      "recipe": {"fields": {
+        "title": {"selector": "h1", "required": true},
+        "company": {"selector": ".company", "required": true},
+        "location": {"selector": ".location", "required": true},
+        "salary": {"selector": ".salary", "required": true}
+      }},
+      "expected_fields": {
+        "title": {"value": "Senior Data Engineer", "evidence": {"quote": "Senior Data Engineer"}},
+        "company": {"value": "Acme Analytics", "evidence": {"quote": "Acme Analytics"}},
+        "location": {"value": "Portland, Oregon", "evidence": {"quote": "Portland, Oregon"}},
+        "salary": {"value": "$145,000–$175,000", "evidence": {"quote": "$145,000–$175,000"}}
+      }
+    },
+    {
+      "id": "event",
+      "category": "event",
+      "url": "https://fixtures.apex.test/event",
+      "fixture": "event.html",
+      "recipe": {"fields": {
+        "name": {"selector": "article.event h1", "required": true},
+        "starts_at": {"selector": "article.event time", "attribute": "datetime", "required": true},
+        "venue": {"selector": ".venue", "required": true},
+        "price": {"selector": ".ticket-price", "required": true}
+      }},
+      "expected_fields": {
+        "name": {"value": "Open Data Summit", "evidence": {"quote": "Open Data Summit"}},
+        "starts_at": {"value": "2027-04-12T09:00:00-07:00", "evidence": {"quote": "April 12, 2027"}},
+        "venue": {"value": "Civic Hall, Seattle", "evidence": {"quote": "Civic Hall, Seattle"}},
+        "price": {"value": "$45", "evidence": {"quote": "$45"}}
+      }
+    },
+    {
+      "id": "directory",
+      "category": "directory",
+      "url": "https://fixtures.apex.test/directory",
+      "fixture": "directory.html",
+      "recipe": {"fields": {
+        "businesses": {"selector": "tr.listing td:nth-child(1)", "all": true, "required": true},
+        "cities": {"selector": "tr.listing td:nth-child(2)", "all": true, "required": true},
+        "websites": {"selector": "tr.listing a", "attribute": "href", "all": true, "required": true}
+      }},
+      "expected_fields": {
+        "businesses": {"value": ["Beacon Bicycle Repair", "Juniper Wheel Works"], "evidence": {"quote": "Beacon Bicycle Repair"}},
+        "cities": {"value": ["Salem", "Eugene"], "evidence": {"quote": "Salem"}},
+        "websites": {"value": ["https://beacon.example", "https://juniper.example"], "evidence": {"quote": "beacon.example"}}
+      }
+    }
+  ]
+}
