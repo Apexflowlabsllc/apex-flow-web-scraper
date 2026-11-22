@@ -45,6 +45,8 @@ Publish an open benchmark harness that compares identical URLs, fields and fresh
 
 For every installer target, pin a supported client/version matrix and test a clean install, upgrade, existing-config preservation, secret handling, MCP discovery and a real low-cost test request. Add turnkey adapters only when the vendor actually supports the transport. Keep SDK examples current with vendor APIs, and add copyable troubleshooting for auth, DNS, rate limits and credits. Track install-to-first-success, not the count of clients listed.
 
+The prepared Node installer now includes `doctor`: it validates the API key in the current shell, authenticates to the configured MCP endpoint and checks `scrape_page` discovery without issuing a scrape. This makes auth and endpoint failures diagnosable without credit cost. It does not prove that a separately launched AI client inherited the same environment or that a real scrape will succeed.
+
 ### 5. Earn scale and buyer trust before claiming enterprise parity
 
 Measure public uptime, p50/p95 latency, queue wait, source-specific reach, refund correctness and operational recovery. Then add fair queues, regional workers, tenant isolation, key restrictions, audit logs, deletion/export and a tested incident/recovery process. Set a capacity ceiling before increasing concurrency. Add a scoped SLA only after measured evidence and operational ownership exist.

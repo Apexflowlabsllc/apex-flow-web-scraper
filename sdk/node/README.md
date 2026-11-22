@@ -24,6 +24,7 @@ npx -y apex-flow-web-scraper setup --client amazon-q
 npx -y apex-flow-web-scraper setup --client jetbrains-air
 npx -y apex-flow-web-scraper setup --client zed
 npx -y apex-flow-web-scraper setup --all --dry-run
+npx -y apex-flow-web-scraper doctor
 ```
 
 Grok CLI connects to the hosted server directly over remote MCP; the remaining
@@ -33,6 +34,12 @@ your API key into client settings. Set `APEX_SCRAPER_API_KEY` in the environment
 inherited by the AI client, then restart it. The bridge connects to the hosted
 Streamable HTTP MCP endpoint; scraping is still run by Apex Flow's hosted service.
 `npm install apex-flow-web-scraper` is not available until the package release.
+
+`doctor` checks the key in the current shell, authenticates to the MCP endpoint,
+and confirms that `scrape_page` is available. It only lists tools: it does not
+scrape a page or spend credits. Run it in the same environment where the API key
+is available; an AI client launched with a different environment may still need
+its own key setup.
 
 ### Use the Vercel AI SDK
 

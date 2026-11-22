@@ -6,6 +6,8 @@ import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { applyEdits, modify, parse } from "jsonc-parser";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { startMcpBridge } from "../mcp-bridge.mjs";
 
 export const SERVER_NAME = "apex-flow-web-scraper";
@@ -123,9 +125,50 @@ export function installClient(target, { force = false, dryRun = false, os = plat
 
 function printHelp() {
   stdout.write(`Apex Flow Web Scraper ${process.env.npm_package_version || ""}\n\n`);
-  stdout.write("Commands:\n  setup [--all | --client <name>] [--yes] [--force] [--dry-run]\n  mcp\n  clients\n\n");
+  stdout.write("Commands:\n  setup [--all | --client <name>] [--yes] [--force] [--dry-run]\n  doctor\n  mcp\n  clients\n\n");
   stdout.write("Clients: codex, claude-code, claude-desktop, grok, cursor, gemini, windsurf, copilot, cline, roo-code, continue, opencode, amazon-q, jetbrains-air, zed\n");
   stdout.write("The MCP bridge reads APEX_SCRAPER_API_KEY from its environment. It never writes the key into client settings.\n");
+}
+
+export async function runDoctor({
+  apiKey = process.env.APEX_SCRAPER_API_KEY,
+  remoteUrl = process.env.APEX_SCRAPER_MCP_URL || "https://webscraper.apexflowlabs.com/v1/mcp",
+  stderr = process.stderr,
+} = {}) {
+  if (!apiKey) throw new Error("Set APEX_SCRAPER_API_KEY in this environment, then run doctor again.");
+  let endpoint;
+  try { endpoint = new URL(remoteUrl); }
+  catch { throw new Error("APEX_SCRAPER_MCP_URL must be a valid HTTPS MCP endpoint."); }
+  const local = ["localhost", "127.0.0.1", "::1"].includes(endpoint.hostname);
+  if (endpoint.protocol !== "https:" && !(local && endpoint.protocol === "http:")) {
+    throw new Error("The MCP endpoint must use HTTPS; HTTP is allowed only for localhost tests.");
+  }
+  if (endpoint.username || endpoint.password || endpoint.hash) {
+    throw new Error("The MCP endpoint must not contain credentials or a fragment.");
+  }
+
+  const client = new Client({ name: "apex-flow-web-scraper-doctor", version: "0.11.0" });
+  const transport = new StreamableHTTPClientTransport(endpoint, {
+    requestInit: { headers: { Authorization: `Bearer ${apiKey}` } },
+  });
+  try {
+    await client.connect(transport);
+    const { tools = [] } = await client.listTools();
+    const names = new Set(tools.map((tool) => tool.name));
+    if (!names.has("scrape_page")) {
+      throw new Error("The MCP server connected but did not advertise the required scrape_page tool.");
+    }
+    const displayEndpoint = `${endpoint.origin}${endpoint.pathname}`;
+    stderr.write(`Apex Flow Web Scraper connection is healthy (${displayEndpoint}).\n`);
+    stderr.write(`Authenticated MCP tool discovery succeeded (${tools.length} tools; scrape_page is available).\n`);
+    stderr.write("No scrape was run and no credits were used. Restart your AI client, then ask it to inspect a page you choose.\n");
+    return { endpoint: displayEndpoint, toolCount: tools.length, tools: [...names] };
+  } catch (error) {
+    if (error?.message?.includes("did not advertise")) throw error;
+    throw new Error("Could not authenticate or discover Apex MCP tools. Check the API key, endpoint, network, and account status.");
+  } finally {
+    await client.close().catch(() => {});
+  }
 }
 
 function parseArgs(argv) {
@@ -187,6 +230,7 @@ export async function main(argv = process.argv.slice(2)) {
     return;
   }
   if (options.command === "setup") return runSetup(options);
+  if (options.command === "doctor") return runDoctor();
   if (options.command === "mcp") return startMcpBridge();
   throw new Error(`Unknown command: ${options.command}`);
 }

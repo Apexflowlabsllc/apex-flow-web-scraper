@@ -7,6 +7,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { runDoctor } from "./bin/apex-flow-web-scraper.mjs";
 import { localByokSearch, selectLocalSearchProvider, startMcpBridge } from "./mcp-bridge.mjs";
 
 test("stdio bridge requires its API key in the process environment", async () => {
@@ -14,6 +15,45 @@ test("stdio bridge requires its API key in the process environment", async () =>
     startMcpBridge({ apiKey: "", stderr: { write() {} } }),
     /Set APEX_SCRAPER_API_KEY/,
   );
+});
+
+test("doctor verifies authenticated MCP discovery without scraping or exposing the key", async () => {
+  const key = "private-doctor-key";
+  const authHeaders = [];
+  const http = createServer(async (req, res) => {
+    authHeaders.push(req.headers.authorization);
+    let raw = "";
+    for await (const part of req) raw += part;
+    const body = raw ? JSON.parse(raw) : undefined;
+    const server = new Server({ name: "mock-apex", version: "1.0.0" }, { capabilities: { tools: {} } });
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: [{ name: "scrape_page", description: "Mock scraper", inputSchema: { type: "object", properties: {} } }],
+    }));
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    await server.connect(transport);
+    await transport.handleRequest(req, res, body);
+    res.on("close", () => { void transport.close(); void server.close(); });
+  });
+  await new Promise((resolve) => http.listen(0, "127.0.0.1", resolve));
+  const address = http.address();
+  let output = "";
+  try {
+    const result = await runDoctor({ apiKey: key, remoteUrl: `http://127.0.0.1:${address.port}/mcp`,
+      stderr: { write: (text) => { output += text; } } });
+    assert.equal(result.toolCount, 1);
+    assert.match(output, /tool discovery succeeded/);
+    assert.match(output, /No scrape was run and no credits were used/);
+    assert.ok(authHeaders.length >= 2);
+    assert.ok(authHeaders.every((header) => header === `Bearer ${key}`));
+    assert.equal(output.includes(key), false);
+  } finally {
+    await new Promise((resolve) => http.close(resolve));
+  }
+});
+
+test("doctor rejects missing keys and non-HTTPS remote endpoints", async () => {
+  await assert.rejects(runDoctor({ apiKey: "", stderr: { write() {} } }), /Set APEX_SCRAPER_API_KEY/);
+  await assert.rejects(runDoctor({ apiKey: "secret", remoteUrl: "http://example.com/mcp", stderr: { write() {} } }), /must use HTTPS/);
 });
 
 test("stdio bridge forwards list and tool calls to authenticated remote MCP", async () => {
