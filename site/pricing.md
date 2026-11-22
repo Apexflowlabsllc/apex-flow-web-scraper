@@ -1,4 +1,4 @@
-# Apex Flow 3D Scraper: pricing (machine-readable)
+# Apex Flow Web Scraper: pricing (machine-readable)
 
 Last checked: 13 November 2026. Hosted API: https://webscraper.apexflowlabs.com/v1. Docs: https://webscraper.apexflowlabs.com/docs.html. OpenAPI: https://webscraper.apexflowlabs.com/openapi.json.
 

@@ -1,9 +1,9 @@
 ---
 name: apex-flow-scraper
-description: Use the Apex Flow 3D Scraper API to turn public web pages, PDFs and DOCX files into clean Markdown, map or crawl a site, detect page changes, and fit a page into a token budget. Use when an agent needs web content as Markdown and a Bearer API key is available.
+description: Use the Apex Flow Web Scraper API to turn public web pages, PDFs and DOCX files into clean Markdown, map or crawl a site, detect page changes, and fit a page into a token budget. Use when an agent needs web content as Markdown and a Bearer API key is available.
 ---
 
-# Apex Flow 3D Scraper for agents
+# Apex Flow Web Scraper for agents
 
 Base URL `https://webscraper.apexflowlabs.com/v1`. Auth: `Authorization: Bearer $APEX_SCRAPER_API_KEY`. Machine-readable pricing: https://webscraper.apexflowlabs.com/pricing.md. Docs: https://webscraper.apexflowlabs.com/docs.html. OpenAPI: https://webscraper.apexflowlabs.com/openapi.json.
 
