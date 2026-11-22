@@ -216,7 +216,7 @@ def head(title, description, path, extra=""):
 
 
 FOOT = ('<footer><span>Apex Flow Web Scraper, by Apex Flow Labs.</span><a href="/integrations/">Integrations</a><a href="/docs.html">Docs</a><a href="/compare.html">Compare</a>'
-        '<a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a></footer><script src="/integrations/int.js" defer></script></body></html>\n')
+        '<a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a></footer><script src="/integrations/int.js" defer></script><script src="/assets/cursor.js" defer></script></body></html>\n')
 
 
 def tile(p):
