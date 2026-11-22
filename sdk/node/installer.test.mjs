@@ -61,7 +61,7 @@ test("Zed context_servers format keeps unrelated settings and never embeds a key
   assert.doesNotMatch(JSON.stringify(value), /API_KEY|Bearer/);
 });
 
-test("target registry includes individually selectable Cline, Roo Code, Continue, OpenCode, Amazon Q, JetBrains Air and Zed installs", () => {
+test("target registry includes individually selectable Cline, Roo Code, Continue, OpenCode, Amazon Q, JetBrains Air, Zed and Kiro installs", () => {
   const home = "E:/fixture-home";
   const cwd = "E:/fixture-project";
   const targets = getClientTargets({ home, cwd, appData: "E:/fixture-appdata", xdgConfigHome: "E:/fixture-config", os: "win32" });
@@ -76,6 +76,12 @@ test("target registry includes individually selectable Cline, Roo Code, Continue
   assert.equal(byId["jetbrains-air"].path, join(home, ".jetbrains", "mcp", "mcp.json"));
   assert.equal(byId.zed.path, join("E:/fixture-appdata", "Zed", "settings.json"));
   assert.equal(byId.zed.rootKey, "context_servers");
+  assert.equal(byId.kiro.path, join(home, ".kiro", "settings", "mcp.json"));
+  assert.equal(byId.kiro.rootKey, "mcpServers");
+  assert.deepEqual(byId.kiro.entryFactory(), {
+    url: "https://webscraper.apexflowlabs.com/v1/mcp",
+    headers: { Authorization: "Bearer ${APEX_SCRAPER_API_KEY}" },
+  });
   assert.equal(byId.grok.path, join(home, ".grok", "config.toml"));
   assert.equal(byId.grok.remoteUrl, "https://webscraper.apexflowlabs.com/v1/mcp");
   assert.equal(byId.grok.authEnvVar, "APEX_SCRAPER_API_KEY");

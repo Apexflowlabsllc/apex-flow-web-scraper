@@ -8,7 +8,7 @@ After the npm package is published, run the interactive installer to add a local
 stdio MCP bridge to detected clients. It supports Codex CLI, Claude Code,
 Claude Desktop, Grok CLI, Cursor, Gemini CLI, Windsurf, GitHub Copilot CLI and VS Code,
 Cline, Roo Code (workspace config), Continue (workspace config), OpenCode,
-Amazon Q Developer (legacy MCP config), JetBrains Air, and Zed. Cline CLI can be selected with
+Amazon Q Developer (legacy MCP config), JetBrains Air, Zed, and Kiro IDE/CLI. Cline CLI can be selected with
 `--client cline`; the Cline IDE extension also supports a direct remote setup
 from its MCP Servers panel. Each installer target is individually selectable.
 
@@ -23,6 +23,7 @@ npx -y apex-flow-web-scraper setup --client opencode
 npx -y apex-flow-web-scraper setup --client amazon-q
 npx -y apex-flow-web-scraper setup --client jetbrains-air
 npx -y apex-flow-web-scraper setup --client zed
+npx -y apex-flow-web-scraper setup --client kiro
 npx -y apex-flow-web-scraper setup --all --dry-run
 npx -y apex-flow-web-scraper doctor
 ```
@@ -34,6 +35,11 @@ your API key into client settings. Set `APEX_SCRAPER_API_KEY` in the environment
 inherited by the AI client, then restart it. The bridge connects to the hosted
 Streamable HTTP MCP endpoint; scraping is still run by Apex Flow's hosted service.
 `npm install apex-flow-web-scraper` is not available until the package release.
+
+Kiro uses its native remote MCP endpoint. To let Kiro expand `${APEX_SCRAPER_API_KEY}`
+from your environment, approve that variable in Kiro's **Mcp Approved Env Vars**
+setting; Kiro may show a warning until it is approved. See the
+[Kiro MCP configuration guide](https://kiro.dev/docs/mcp/configuration/).
 
 `doctor` checks the key in the current shell, authenticates to the MCP endpoint,
 and confirms that `scrape_page` is available. It only lists tools: it does not

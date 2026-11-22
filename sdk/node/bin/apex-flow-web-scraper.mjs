@@ -50,6 +50,7 @@ export function getClientTargets({ home = homedir(), appData = process.env.APPDA
     { id: "amazon-q", label: "Amazon Q Developer (legacy MCP config)", format: "jsonc", path: join(home, ".aws", "amazonq", "mcp.json"), detect: join(home, ".aws", "amazonq") },
     { id: "jetbrains-air", label: "JetBrains Air", format: "jsonc", path: jetbrainsAirSettings, detect: dirname(jetbrainsAirSettings) },
     { id: "zed", label: "Zed", format: "jsonc", path: zedSettings, detect: dirname(zedSettings), rootKey: "context_servers" },
+    { id: "kiro", label: "Kiro IDE and CLI", format: "jsonc", path: join(home, ".kiro", "settings", "mcp.json"), detect: join(home, ".kiro"), rootKey: "mcpServers", entryFactory: () => ({ url: "https://webscraper.apexflowlabs.com/v1/mcp", headers: { Authorization: "Bearer ${APEX_SCRAPER_API_KEY}" } }) },
   ];
 }
 
@@ -126,7 +127,7 @@ export function installClient(target, { force = false, dryRun = false, os = plat
 function printHelp() {
   stdout.write(`Apex Flow Web Scraper ${process.env.npm_package_version || ""}\n\n`);
   stdout.write("Commands:\n  setup [--all | --client <name>] [--yes] [--force] [--dry-run]\n  doctor\n  mcp\n  clients\n\n");
-  stdout.write("Clients: codex, claude-code, claude-desktop, grok, cursor, gemini, windsurf, copilot, cline, roo-code, continue, opencode, amazon-q, jetbrains-air, zed\n");
+  stdout.write("Clients: codex, claude-code, claude-desktop, grok, cursor, gemini, windsurf, copilot, cline, roo-code, continue, opencode, amazon-q, jetbrains-air, zed, kiro\n");
   stdout.write("The MCP bridge reads APEX_SCRAPER_API_KEY from its environment. It never writes the key into client settings.\n");
 }
 
