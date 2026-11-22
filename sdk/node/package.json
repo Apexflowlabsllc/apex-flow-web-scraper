@@ -1,16 +1,24 @@
 {
   "name": "apex-flow-web-scraper",
   "version": "0.11.0",
-  "description": "Dependency-free Node.js clients for the hosted Apex Flow Web Scraper API and local workspace.",
+  "description": "Hosted scraping API clients and MCP setup tools for Apex Flow Web Scraper.",
   "type": "module",
   "main": "./index.mjs",
   "exports": {
     ".": "./index.mjs",
-    "./hosted": "./hosted.mjs"
+    "./hosted": "./hosted.mjs",
+    "./mcp": "./mcp-bridge.mjs"
   },
-  "files": ["index.mjs", "hosted.mjs", "README.md"],
+  "files": ["bin/", "index.mjs", "hosted.mjs", "mcp-bridge.mjs", "README.md"],
+  "bin": {
+    "apex-flow-web-scraper": "./bin/apex-flow-web-scraper.mjs"
+  },
   "engines": { "node": ">=18" },
   "scripts": { "test": "node --test" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "jsonc-parser": "^3.3.1"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

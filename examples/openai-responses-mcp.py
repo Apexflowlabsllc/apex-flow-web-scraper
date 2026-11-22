@@ -7,14 +7,14 @@ from openai import OpenAI
 
 client = OpenAI()
 response = client.responses.create(
-    model="gpt-6.2-astra",
+    model=os.environ["OPENAI_MODEL"],
     tools=[
         {
             "type": "mcp",
             "server_label": "apex_flow_scraper",
             "server_description": "Read public web pages as clean Markdown for research and extraction.",
             "server_url": "https://webscraper.apexflowlabs.com/v1/mcp",
-            "authorization": f"Bearer {os.environ['APEX_SCRAPER_API_KEY']}",
+            "headers": {"Authorization": f"Bearer {os.environ['APEX_SCRAPER_API_KEY']}"},
             "require_approval": "always",
             "allowed_tools": ["scrape_page"],
         }

@@ -3,16 +3,17 @@
 **Hosted API for developers and AI agents: scrape, crawl and monitor the public web as clean Markdown.** [Get 1,000 free credits](https://webscraper.apexflowlabs.com/trial.html) · [Docs](https://webscraper.apexflowlabs.com/docs.html) · [Pricing](https://webscraper.apexflowlabs.com/#pricing) · [OpenAPI](https://webscraper.apexflowlabs.com/openapi.json)
 
 ```python
-from rainbo_scrape.hosted_client import Apex   # python -m pip install apex-flow-web-scraper
+from rainbo_scrape.hosted_client import Apex   # PyPI package release pending
 apex = Apex()                                   # reads APEX_SCRAPER_API_KEY
 page = apex.scrape("https://example.com", outputs=["markdown"], max_tokens=4000)
 for page in apex.crawl("https://www.sqlite.org/docs.html", limit=25):
     print(page["url"], page["status"])
 ```
 
-Node.js 18+:
+Node.js 18+ (npm package publication is pending):
 
 ```bash
+# Available after the npm release
 npm install apex-flow-web-scraper
 ```
 
@@ -37,7 +38,7 @@ curl https://webscraper.apexflowlabs.com/v1/scrape \
 
 3. Or connect its hosted MCP server to Claude Code, Codex, VS Code Copilot, Cursor, Gemini CLI, Cascade/Windsurf, or another MCP client: [copy-paste setup guides](https://webscraper.apexflowlabs.com/docs.html#agents).
 
-For an OpenAI Responses API app, use the [working remote-MCP example](examples/openai-responses-mcp.py). It keeps approval enabled and restricts access to page scraping.
+The npm package is not published yet. Its prepared installer will configure Codex CLI, Claude Code/Desktop, Cursor, Gemini CLI, Windsurf and GitHub Copilot CLI individually or in one pass. For OpenAI Responses API apps, use the [remote-MCP example](examples/openai-responses-mcp.py); examples are also available for the [Anthropic Messages API](examples/anthropic-messages-mcp.py) and [Google ADK](examples/google-adk-mcp.py). These are developer API integrations. ChatGPT's built-in MCP connections have separate plan and workspace requirements.
 
 ## Price per page
 

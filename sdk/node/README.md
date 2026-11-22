@@ -1,6 +1,25 @@
 # Apex Flow Web Scraper for Node.js
 
-Dependency-free Node.js 18+ clients for the hosted API and a self-hosted workspace.
+Node.js 18+ clients for the hosted API, AI-client setup, and a self-hosted workspace.
+
+## Add the hosted scraper to AI clients
+
+After the npm package is published, run the interactive installer to add a local
+stdio MCP bridge to detected clients. It supports Codex CLI, Claude Code,
+Claude Desktop, Cursor, Gemini CLI, Windsurf, and GitHub Copilot CLI.
+
+```bash
+npx -y apex-flow-web-scraper setup
+npx -y apex-flow-web-scraper setup --client cursor
+npx -y apex-flow-web-scraper setup --all --dry-run
+```
+
+The installer backs up edited files, preserves existing JSONC settings, refuses
+to overwrite a conflicting server unless `--force` is passed, and never writes
+your API key into client settings. Set `APEX_SCRAPER_API_KEY` in the environment
+inherited by the AI client, then restart it. The bridge connects to the hosted
+Streamable HTTP MCP endpoint; scraping is still run by Apex Flow's hosted service.
+`npm install apex-flow-web-scraper` is not available until the package release.
 
 ```bash
 npm install apex-flow-web-scraper
