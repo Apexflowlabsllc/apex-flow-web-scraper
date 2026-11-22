@@ -51,6 +51,36 @@ async def test_v1_api_key_management_is_account_scoped_and_returns_secret_once(h
     assert h.billing.account_for(headers["Authorization"][7:]) == account
 
 
+async def test_owner_funnel_report_is_gateway_protected_and_only_returns_aggregates(hosted, monkeypatch):
+    h, client, *_ = hosted
+    hidden = await client.get("/api/internal/funnel")
+    assert hidden.status == 404
+
+    monkeypatch.setenv("SCRAPER_GATEWAY_SECRET", "fixture-gateway-secret")
+    wrong = await client.get("/api/internal/funnel", headers={"X-Scraper-Gateway": "wrong"})
+    assert wrong.status == 403
+
+    from rainbo_scrape.hosted_features import event
+    event(h, "page_view")
+    event(h, "page_view")
+    event(h, "trial_view")
+    event(h, "trial_submit")
+    event(h, "checkout_created", "starter")
+    event(h, "activated", "starter")
+    headers = {"X-Scraper-Gateway": "fixture-gateway-secret"}
+    report = await client.get("/api/internal/funnel?days=30", headers=headers)
+    payload = await report.json()
+    assert report.status == 200
+    assert payload["totals"]["page_view"] == 2
+    assert payload["totals"]["trial_view"] == payload["totals"]["trial_submit"] == 1
+    assert payload["event_ratios"]["trial_submit_events_per_trial_view_event"] == 1.0
+    assert payload["event_ratios"]["paid_activation_events_per_checkout_created_event"] == 1.0
+    assert payload["counts_are_events_not_unique_visitors"] is True
+    assert payload["ratios_are_same_window_event_counts_not_cohort_conversions"] is True
+    assert "email" not in json.dumps(payload).lower()
+    assert (await client.get("/api/internal/funnel?days=0", headers=headers)).status == 400
+
+
 async def test_v2_scrape_uses_firecrawl_envelope_and_apex_metering(hosted):
     h, client, headers = await _auth(hosted)
     response = await client.post("/v2/scrape", headers=headers, json={
