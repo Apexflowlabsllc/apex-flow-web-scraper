@@ -195,12 +195,16 @@ search-first volume. [Google guidance for generative search](https://developers.
 
 ## Immediate next three builds
 
-1. **Evaluator implemented in branch:** `tests/benchmark/goldset_evaluator.py`
-   verifies signed permission-scoped manifests and reports reach, field
-   coverage, field accuracy, Wilson confidence intervals, failures, latency,
-   and reported cost. Its format and limitations are in
+1. **Evaluation tooling implemented in branch:**
+   `tests/benchmark/goldset_evaluator.py` verifies signed permission-scoped
+   manifests and reports reach, field coverage, field accuracy, Wilson
+   confidence intervals, failures, latency, and reported cost.
+   `tests/benchmark/compare_engines.py` runs one API at a time against the
+   same signed cases, retains request/response evidence, and requires an
+   explicit billable-call flag. Its format and limitations are in
    `tests/benchmark/GOLDSET-GUIDE.md`. Still required: owner-authorized,
-   multi-layout gold data and an identical-condition cross-vendor run.
+   multi-layout gold data and an identical-condition cross-vendor run. No
+   valid head-to-head result exists yet.
 2. **Migration adapter advanced in branch:** Firecrawl-shaped `/v2/scrape`,
    `/v2/map`, `/v2/search`, and crawl create/status/cancel routes now translate
    to Apex's existing metered features and reject unsupported options. The

@@ -61,3 +61,38 @@ freshness window, and permission scope. Preserve each engine's raw output and
 receipt separately. Report blocked/challenged pages as failures in reach, not
 as inaccurate extracted fields. Refresh gold values when source pages change
 and issue a newly signed manifest version.
+
+## Run an API comparison
+
+`compare_engines.py` sends the same signed cases through one API at a time and
+stores normalized run records plus raw responses. It checks the manifest HMAC
+and exact hostname scope before sending requests, uses structured JSON
+extraction with a schema derived from expected field types, disables cached
+results, runs sequentially, does not retry, and does not print API keys. It
+makes no requests unless `--allow-billable-requests` is supplied. Responses are
+capped at 20 MiB, and existing output paths are never overwritten. Each API may
+consume its own credits; a request is billable even if the target blocks it.
+The script does not estimate USD cost or reconcile differences in provider
+credit units. API keys are sent only to the matching official API host or a
+loopback endpoint by default; a custom HTTPS host also requires
+`--allow-custom-api-host`.
+
+```powershell
+$env:APEX_GOLDSET_SIGNING_KEY = '<load from your secret manager>'
+$env:APEX_SCRAPER_API_KEY = '<load from your secret manager>'
+$env:FIRECRAWL_API_KEY = '<load from your secret manager>'
+python tests/benchmark/compare_engines.py apex path/to/owned-gold-set.json `
+  --only case-1,case-2 --output work/benchmark/apex.json --allow-billable-requests
+python tests/benchmark/compare_engines.py firecrawl path/to/owned-gold-set.json `
+  --only case-1,case-2 --output work/benchmark/firecrawl.json --allow-billable-requests
+python tests/benchmark/goldset_evaluator.py evaluate path/to/owned-gold-set.json `
+  work/benchmark/apex.json --output work/benchmark/apex-score.json
+python tests/benchmark/goldset_evaluator.py evaluate path/to/owned-gold-set.json `
+  work/benchmark/firecrawl.json --output work/benchmark/firecrawl-score.json
+```
+
+Run only against cases for which current written permission is recorded in the
+signed manifest. Keep keys in the operator's secret manager and artifacts in a
+private workspace; raw responses may contain source text. The runner does not
+create permission, a Firecrawl account, or budget approval. Review each API's
+current billing and terms before a run.

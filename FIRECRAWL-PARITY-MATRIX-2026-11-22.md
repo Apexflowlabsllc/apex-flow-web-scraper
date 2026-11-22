@@ -30,10 +30,14 @@ not a sales claim.
 
 ## Priority sequence
 
-1. **Make quality evidence repeatable.** The branch now contains an offline
-   signed permissioned gold-set evaluator at `tests/benchmark/`. Next create a
-   gold set only for Apex-owned or explicitly authorized sources, run Apex and
-   competitors under identical conditions, publish raw data and uncertainty.
+1. **Make quality evidence repeatable.** The branch contains an offline,
+   signed permissioned gold-set evaluator and a sequential Apex/Firecrawl API
+   comparison runner at `tests/benchmark/`. The runner validates the signed
+   host scope, saves per-engine requests/responses, requires an explicit flag
+   for billable calls, and does not infer USD from different credit systems.
+   Next create a multi-layout gold set only for Apex-owned or explicitly
+   authorized sources, run both APIs under identical conditions, and publish
+   raw data and uncertainty. No valid head-to-head result exists yet.
 2. **Win migration and reach.** The branch has a documented, tested Firecrawl
    v2 adapter subset for `scrape`, `map`, configured `search`, `crawl`, and
    asynchronous `batch/scrape` create/status/cancel/errors. Node tests exercise
