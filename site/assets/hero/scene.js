@@ -19,10 +19,15 @@ function boot() {
 
   /* Size of the stage, and where the dataset panel sits in the picture (x and y from -1 to 1) so data flies to it. */
   const measure = () => {
-    const r = stage.getBoundingClientRect();
+    const r = (hero.classList.contains('flat') ? live : stage).getBoundingClientRect();   // the still picture fills the first screen only
     let anchor = [0.62, -0.35];
     if (panel && panel.offsetParent) { const p = panel.getBoundingClientRect(); anchor = [((p.left + 22 - r.left) / r.width) * 2 - 1, 1 - ((p.top + p.height / 2 - r.top) / r.height) * 2]; }
-    return { cssW: r.width, cssH: r.height, dpr: window.devicePixelRatio || 1, anchor };
+    // the screen frame starts under the menu, and its sill sits just under the opening copy so it never cuts through it
+    const copy = chapters[0].getBoundingClientRect(), small = r.width < 900 || r.width / r.height < 1.05;
+    const top = Math.round(stage.querySelector('nav').getBoundingClientRect().bottom - r.top) - (small ? 8 : 0);
+    const sill = Math.round(small ? r.height * 0.2 : Math.min(r.height * 0.27, Math.max(96, r.bottom - copy.bottom - 20)));
+    stage.style.setProperty('--ft', top + 'px');
+    return { cssW: r.width, cssH: r.height, dpr: window.devicePixelRatio || 1, anchor, sill, top };
   };
   const first = measure();
   const compact = first.cssW < 900 || first.cssW / first.cssH < 1.05;
@@ -85,11 +90,12 @@ function boot() {
   } else onPage('no worker canvas');
 
   /* Inputs. Pointer and scroll are sent at most once a frame. */
-  let pending = null, ticking = false;
+  let pending = null, ticking = false, opened = -1;
   const flush = () => {
     ticking = false;
     if (pending) { tell(pending); pending = null; }
-    const v = progress();
+    const v = progress(), open = Math.round(Math.min(1, Math.max(0, (v - 0.012) / 0.15)) * 50) / 50;   // the screen frame opens over the first scroll
+    if (open !== opened) { opened = open; stage.style.setProperty('--open', open); }
     tell({ t: 'scroll', v });
     if (!hero.classList.contains('flat')) setChapter(Math.round(v * 3));
   };
@@ -106,5 +112,6 @@ function boot() {
   if ('IntersectionObserver' in window) new IntersectionObserver((es) => { inView = es[0].isIntersecting; show(); }, { threshold: 0 }).observe(hero);
   document.addEventListener('visibilitychange', show);
   addEventListener('resize', () => { clearTimeout(timer); timer = setTimeout(() => { tell({ t: 'size', ...measure() }); soon(); }, 120); }, { passive: true });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => tell({ t: 'size', ...measure() }));
   if (scrollY) soon();
 }

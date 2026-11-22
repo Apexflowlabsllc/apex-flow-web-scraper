@@ -25,8 +25,8 @@ export class Swarm {
     this.P = [0, 0, 0]; this.T = [0, 0, 0]; this.Q = [0, 0, 0, 1];
     const sats = world.surfaces.length - 1;
     for (let i = 0; i < count; i++) {
-      const hero = i < heroes, r = this.rnd();
-      this.size[i] = hero ? 0.95 + this.rnd() * 0.4 : r < 0.014 ? 0.34 + this.rnd() * 0.2 : 0.1 + this.rnd() * 0.075;
+      const hero = i < heroes, lead = i < world.front, r = this.rnd();
+      this.size[i] = lead ? 0.64 + this.rnd() * 0.16 : hero ? 0.95 + this.rnd() * 0.4 : r < 0.014 ? 0.34 + this.rnd() * 0.2 : 0.1 + this.rnd() * 0.075;
       this.speed[i] = hero ? 0.5 + this.rnd() * 0.25 : 0.5 + this.size[i] * 1.2 + this.rnd() * 0.3;
       this.tint[i] = hero ? (i % 3 === 1 ? 0.9 : 1.15) : 0.8 + this.rnd() * 0.48;     // above 1: pearl shell, below: graphite
       this.phase[i] = this.rnd() * TAU; this.grow[i] = 1; this.amp[i] = 1; this.goal[i] = -1;
@@ -38,6 +38,7 @@ export class Swarm {
       this.yaw[i] = this.rnd() * TAU; this.hops[i] = 5 + ((this.rnd() * 14) | 0);
       this.tk[i] = (this.rnd() * (S.targets.pts.length / 3)) | 0;
       this.pick(i);
+      if (lead) { this.tx[i] = world.tip[0] - [0.22, 1.3, 0.1][i % 3]; this.tz[i] = world.tip[1] - [0.2, 0.1, 1.25][i % 3]; }   // first walk: out onto the corner
     }
   }
 
@@ -45,6 +46,7 @@ export class Swarm {
     const w = this.world, s = this.surf[i], S = w.surfaces[s], T = S.targets.pts, n = T.length / 3, r = this.rnd();
     this.goal[i] = -1; this.want[i] = 0;
     if (i < this.heroes) {   // the large robots keep to the front of the page, where the camera opens
+      if (i < w.front) { const u = this.rnd() * w.tip[2], v = this.rnd() * (w.tip[2] - u); this.tx[i] = w.tip[0] - u; this.tz[i] = w.tip[1] - v; return; }   // the front crew: out on the corner
       const a = w.stageBox;
       this.tx[i] = a[0] + this.rnd() * (a[1] - a[0]); this.tz[i] = a[2] + this.rnd() * (a[3] - a[2]);
       return;
@@ -100,6 +102,11 @@ export class Swarm {
       if (st === SCAN) {
         this.glow[i] += (1 - this.glow[i]) * Math.min(1, dt * 9); this.amp[i] += (0.1 - this.amp[i]) * Math.min(1, dt * 8);
         this.phase[i] += dt * 2.2;
+        if (i < world.front) {   // the front crew turn to look out of the screen while they stand
+          let t = -Math.PI / 4 + (i - 1) * 0.5 - yaw[i]; t -= Math.round(t / TAU) * TAU;
+          const m = 1.5 * dt; yaw[i] += t > m ? m : t < -m ? -m : t;
+          if (Math.abs(t) > 0.06) { this.phase[i] += dt * 7; this.amp[i] += (0.75 - this.amp[i]) * Math.min(1, dt * 10); }
+        }
         if ((this.timer[i] -= dt) <= 0) {
           if (!hero && surf[i] === 0 && rnd() < 0.02 && size[i] < 0.3) { state[i] = DYING; if (this.onPacket) this.onPacket(x[i], z[i], -1); }
           else { state[i] = WALK; this.pick(i); }
@@ -120,8 +127,8 @@ export class Swarm {
       if (dist < 0.1 + size[i] * 0.22) {
         if (this.goal[i] >= 0) { state[i] = BRIDGE; this.br[i] = this.goal[i]; this.bt[i] = this.bdir[i] > 0 ? 0 : 1; surf[i] = -1; this.goal[i] = -1; continue; }
         const el = S.targets.pts[this.tk[i] * 3 + 2], hot = this.want[i] === 2;
-        if (hot || rnd() < (hero ? 0.6 : this.want[i] ? 0.7 : 0.26)) {
-          state[i] = SCAN; this.timer[i] = hero ? 1.2 + rnd() * 1.8 : hot ? 0.5 + rnd() * 0.7 : 0.3 + rnd() * 0.9;
+        if (hot || i < world.front || rnd() < (hero ? 0.6 : this.want[i] ? 0.7 : 0.26)) {
+          state[i] = SCAN; this.timer[i] = i < world.front ? 3.5 + rnd() * 4 : hero ? 1.2 + rnd() * 1.8 : hot ? 0.5 + rnd() * 0.7 : 0.3 + rnd() * 0.9;
           if (!this.want[i] && el >= 0 && !hero) this.heat[el] = Math.min(1, this.heat[el] + 0.3);
         } else this.pick(i);
         this.want[i] = 0;
@@ -134,7 +141,7 @@ export class Swarm {
           if (c < 0 || c >= cell.length) continue;
           for (let j = cell[c]; j >= 0; j = next[j]) {
             if (j === i) continue;
-            const ax = x[i] - x[j], az = z[i] - z[j], d2 = ax * ax + az * az, r = (size[i] + size[j]) * 0.62;
+            const ax = x[i] - x[j], az = z[i] - z[j], d2 = ax * ax + az * az, r = (size[i] + size[j]) * (hero && j < this.heroes ? 0.98 : 0.62);
             if (d2 < r * r && d2 > 1e-6) { const d = Math.sqrt(d2), push = (r - d) / d * (size[j] > size[i] * 1.3 ? 0.6 : size[i] > size[j] * 1.3 ? 0.02 : 0.2); x[i] += ax * push; z[i] += az * push; }
           }
         }
