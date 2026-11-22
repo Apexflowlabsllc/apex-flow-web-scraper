@@ -2,10 +2,13 @@
 import asyncio
 import difflib
 import hashlib
+import hmac
 import logging
 import json
+import os
 import re
 import time
+from datetime import datetime, timedelta, timezone
 from aiohttp import web
 from .billing import QuotaExceeded
 from .discovery import site_map
@@ -167,7 +170,45 @@ def install(h, app):
         event(h,body["event"])
         return web.json_response({"ok":True})
 
+    async def funnel_report(request):
+        secret=os.environ.get("SCRAPER_GATEWAY_SECRET","")
+        supplied=request.headers.get("X-Scraper-Gateway","")
+        if not secret or not hmac.compare_digest(supplied,secret):
+            return web.json_response({"error":"Not found"},status=404,headers={"Cache-Control":"no-store"})
+        h.limit(request,"funnel_report",30)
+        raw_days=request.query.get("days","30")
+        if not raw_days.isdigit() or not 1<=int(raw_days)<=365:
+            return web.json_response({"error":"days must be an integer from 1 to 365"},status=400,
+                                    headers={"Cache-Control":"no-store"})
+        days=int(raw_days)
+        end=datetime.now(timezone.utc).date()
+        start=end-timedelta(days=days-1)
+        rows=h.db.execute("SELECT day,event,plan,count FROM funnel WHERE day>=? AND day<=? ORDER BY day,event,plan",
+                          (start.isoformat(),end.isoformat())).fetchall()
+        totals={}
+        by_plan={}
+        series=[]
+        for day,name,plan,count in rows:
+            totals[name]=totals.get(name,0)+(count or 0)
+            plan_counts=by_plan.setdefault(name,{})
+            plan_key=plan or "unspecified"
+            plan_counts[plan_key]=plan_counts.get(plan_key,0)+(count or 0)
+            series.append({"day":day,"event":name,"plan":plan or None,"count":count or 0})
+        def ratio(numerator,denominator):
+            return round(numerator/denominator,4) if denominator else None
+        paid_activations=sum(value for plan,value in by_plan.get("activated",{}).items() if plan!="free")
+        free_activations=by_plan.get("activated",{}).get("free",0)
+        response={"window":{"days":days,"from":start.isoformat(),"to":end.isoformat()},
+                  "counts_are_events_not_unique_visitors":True,
+                  "ratios_are_same_window_event_counts_not_cohort_conversions":True,
+                  "totals":totals,"by_plan":by_plan,"daily":series,
+                  "event_ratios":{"trial_submit_events_per_trial_view_event":ratio(totals.get("trial_submit",0),totals.get("trial_view",0)),
+                                  "free_activation_events_per_trial_view_event":ratio(free_activations,totals.get("trial_view",0)),
+                                  "paid_activation_events_per_checkout_created_event":ratio(paid_activations,totals.get("checkout_created",0))}}
+        return web.json_response(response,headers={"Cache-Control":"no-store"})
+
     app.router.add_post('/v1/map',map_site)
     app.router.add_post('/v1/search',search)
     app.router.add_post('/api/event',funnel)
+    app.router.add_get('/api/internal/funnel',funnel_report)
     return {"/map": map_for, "/search": search_for}
