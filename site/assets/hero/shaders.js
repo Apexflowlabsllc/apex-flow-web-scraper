@@ -120,11 +120,13 @@ void main(){
   } else if (id < 3.5) {     // rubber
     alb = vec3(0.012); metal = 0.0; rough = 0.88;
   } else if (id < 4.5) {     // lights
-    alb = vec3(0.01); metal = 0.0; rough = 0.3; emit = mix(vec3(0.12, 0.82, 1.0), vec3(0.62, 1.0, 0.26), clamp(vGlow, 0.0, 1.0))*(2.6 + 1.6*vGlow);
+    alb = vec3(0.01); metal = 0.0; rough = 0.3; emit = vec3(0.12, 0.82, 1.0)*(3.2 + 2.6*vGlow);
   } else if (id < 5.5) {     // lens glass
     alb = vec3(0.004, 0.008, 0.012); metal = 0.0; rough = 0.05; coat = 1.6;
   } else if (id < 6.5) {     // cyan anodised trim
     alb = vec3(0.01, 0.4, 0.58); rough = 0.26 + grain*0.08;
+  } else if (id > 7.5) {     // green side lights
+    alb = vec3(0.01); metal = 0.0; rough = 0.3; emit = vec3(0.45, 1.0, 0.12)*(2.4 + 0.5*sin(uTime*2.0 + vWorld.x*3.0));
   } else {                   // status core
     alb = vec3(0.01); metal = 0.0; rough = 0.2; coat = 1.0;
     emit = mix(vec3(0.1, 0.8, 1.0), vec3(0.62, 1.0, 0.26), clamp(vGlow, 0.0, 1.0))*(2.0 + 0.8*sin(uTime*3.0 + vWorld.x*2.0 + vWorld.z) + 1.8*vGlow);
@@ -163,10 +165,15 @@ export const PAGE_FS = HEAD + VIEW + SHADOW + PBR + `
 in vec2 vUv; in vec3 vWorld; in vec3 vNor; in float vTop; in float vY;
 uniform sampler2D uTex; uniform sampler2D uTrail; uniform sampler2D uRefl;
 uniform vec4 uAtlas; uniform float uMain; uniform float uTime; uniform float uScan; uniform vec2 uDim; uniform vec2 uRes; uniform float uReflOn;
-uniform vec4 uHi[12]; uniform float uHiA[12]; uniform float uHiC[12];
+uniform vec4 uHi[12]; uniform float uHiA[12]; uniform float uHiC[12]; uniform float uHolo; uniform float uLit[8];
 out vec4 o;
 void main(){
   vec3 N = normalize(vNor), V = normalize(uEye - vWorld); vec3 col;
+  if (uHolo > 0.5) {                                                        // the data grid: a sheet of light, each row lit as its record arrives
+    vec3 t = pow(texture(uTex, vUv).rgb, vec3(2.2)); float lit = uLit[int(clamp(floor(vUv.y*8.0), 0.0, 7.0))];
+    col = t*vec3(0.5, 0.95, 1.0)*(0.3 + 3.4*lit) + vec3(0.01, 0.07, 0.09);
+    o = vec4(fogged(col, vWorld), depthOf(vWorld)); return;
+  }
   if (vTop > 0.5) {
     vec3 alb = texture(uTex, vUv*uAtlas.xy + uAtlas.zw, -0.5).rgb; alb = pow(alb, vec3(2.2));
     float ndl = max(dot(N, uSun), 0.0), sh = uMain > 0.5 ? shadowAt(vWorld, ndl) : 1.0;
@@ -191,7 +198,7 @@ void main(){
       }
       if (uReflOn > 0.5) { vec4 rf = textureLod(uRefl, gl_FragCoord.xy/uRes, 1.3); float w = clamp(fr*2.4 + 0.1, 0.0, 0.9)*rf.a; col = mix(col, rf.rgb, w); }
     }
-    col += sky*fr;                                                            // the studio lights on the glass
+    col += sky*fr*0.5;                                                        // the studio lights on the glass
     vec2 e = min(vUv, 1.0 - vUv)*uDim; float edge = smoothstep(0.06, 0.0, min(e.x, e.y));
     col = mix(col, vec3(0.12, 0.82, 1.0)*2.4, edge*0.85);
   } else {                                                                    // the panel's metal body
@@ -292,4 +299,28 @@ void main(){
   col = pow(col, vec3(1.0/2.2));
   col += (h(vUv*uRes + fract(uTime)*91.0) - 0.5)*0.018;
   o = vec4(col, 1.0);
+}`;
+
+/* Data streams: light running along a fibre from a page element to its row in the grid. */
+export const STREAM_FS = HEAD + VIEW + `in vec3 vWorld; in vec3 vInfo; uniform float uTime; uniform float uPulse[6]; out vec4 o;
+void main(){
+  float p = uPulse[int(vInfo.z + 0.5)], core = smoothstep(1.0, 0.15, abs(vInfo.y));
+  float dots = smoothstep(0.5, 1.0, sin(vInfo.x*46.0 - uTime*(5.0 + 7.0*p)));
+  o = vec4(fogged(vec3(0.1, 0.82, 1.0)*core*(1.1 + dots*2.4 + 4.0*p), vWorld), 0.0);
+}`;
+/* Scan light: a fan of cyan on the page in front of a robot that is reading. */
+export const BEAM_VS = HEAD + `layout(location=0) in vec2 aCorner;
+layout(location=3) in vec3 iPos; layout(location=4) in vec4 iQuat; layout(location=5) in vec4 iA;
+uniform mat4 uVP; out vec2 vUv; out float vGlow;
+vec3 rot(vec3 v, vec4 q){ return v + 2.0*cross(q.xyz, cross(q.xyz, v) + q.w*v); }
+void main(){
+  float t = aCorner.x*0.5 + 0.5; vUv = vec2(t, aCorner.y); vGlow = iA.w;
+  vec3 p = vec3(0.42 + t*1.5, 0.014, aCorner.y*(0.1 + 0.62*t))*iA.x*step(0.06, iA.w);
+  gl_Position = uVP*vec4(iPos + rot(p, iQuat), 1.0);
+}`;
+export const BEAM_FS = HEAD + `in vec2 vUv; in float vGlow; uniform float uTime; out vec4 o;
+void main(){
+  float a = (1.0 - vUv.x)*(1.0 - smoothstep(0.45, 1.0, abs(vUv.y)))*vGlow;
+  a += smoothstep(0.07, 0.0, abs(vUv.x - fract(uTime*1.4)))*(1.0 - abs(vUv.y))*vGlow*0.9;
+  o = vec4(vec3(0.1, 0.85, 1.0)*a*1.5, 0.0);
 }`;

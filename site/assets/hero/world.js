@@ -81,10 +81,21 @@ export function makeWorld(elements, compact) {
     bezier(b, 0, prev);
     for (let i = 1; i <= 40; i++) { bezier(b, i / 40, tmp); b.len += Math.hypot(tmp[0] - prev[0], tmp[1] - prev[1], tmp[2] - prev[2]); prev[0] = tmp[0]; prev[1] = tmp[1]; prev[2] = tmp[2]; }
   }
+  /* The data grid the records flow into: upright, beside the page, turned to the camera. */
+  const data = surface(4.2, 5.6, compact ? [6.2, 3.6, -5.2] : [12.4, 3.4, -1.4], compact ? -10 : -30, 78, -1);
+  const recs = elements.filter((e) => e.record >= 0).sort((a, b) => a.record - b.record);
+  const rowPos = recs.map((e, r) => at(data, -data.w / 2, ((r + 1.5) / 8 - 0.5) * data.d, 0.05));
+  const streams = recs.map((e, r) => {
+    const p0 = [(e.bx - 0.5) * PAGE_W, 0.05, (e.by - 0.5) * PAGE_D], p3 = rowPos[r];
+    return { p: [p0, add(p0, [0.9, 1.5 + r * 0.12, -0.5]), add(p3, data.ex, -3.2), p3], from: p0 };
+  });
+  /* A field of other pages running off behind the main one. */
+  const tiles = [];
+  if (!compact) for (let j = 0; j < 3; j++) for (let i = 0; i < 8; i++) tiles.push(surface(7.4, 4.6, [-30 + i * 8.4 + (j % 2) * 3, -0.5 - j * 0.25, -9.6 - j * 5.3], 0, 0, (i + j * 3) % 4));
   /* Where the large robots stand when the page opens, and the area they keep to (x min, x max, z min, z max). */
   const stage = compact ? [[-0.6, 2.6], [2.4, 1.2], [-3.0, 0.6], [1.0, -1.6]] : [[0.5, 2.7], [-2.9, 1.3], [3.6, 0.9], [-0.3, -1.1], [5.6, 2.6], [-4.4, -2.4], [3.0, -2.6]];
   const stageBox = compact ? [-4.5, 4.5, -2.5, 3.6] : [-6.6, 6.2, -3.2, 3.9];
-  return { surfaces, bridges, elements, stage, stageBox };
+  return { surfaces, bridges, elements, stage, stageBox, data, rowPos, streams, tiles };
 }
 
 /* Ribbon geometry for every bridge: position xyz, then t, side, length. */
@@ -105,5 +116,20 @@ export function ribbonMesh(world, half = 0.2, seg = 44) {
       a = c;
     }
   }
+  return new Float32Array(v);
+}
+
+/* Thin ribbons for the data streams: position xyz, then t along the stream, side, stream number. */
+export function streamMesh(world, half = 0.06, seg = 48) {
+  const v = [], P = [0, 0, 0], T = [0, 0, 0];
+  world.streams.forEach((b, n) => {
+    const edge = (t) => { bezier(b, t, P); bezierTangent(b, t, T); const s = unit([T[2], 0, -T[0]]); return [[P[0] - s[0] * half, P[1], P[2] - s[2] * half], [P[0] + s[0] * half, P[1], P[2] + s[2] * half]]; };
+    let a = edge(0);
+    for (let i = 1; i <= seg; i++) {
+      const t0 = (i - 1) / seg, t1 = i / seg, c = edge(t1);
+      for (const [p, t, side] of [[a[0], t0, -1], [a[1], t0, 1], [c[1], t1, 1], [a[0], t0, -1], [c[1], t1, 1], [c[0], t1, -1]]) v.push(p[0], p[1], p[2], t, side, n);
+      a = c;
+    }
+  });
   return new Float32Array(v);
 }
