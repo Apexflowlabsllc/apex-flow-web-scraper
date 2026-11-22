@@ -3,7 +3,8 @@
 **Prepared:** 2026-11-21 (Pacific)  
 **Project:** `E:\apex\work\codex-brief-20261121\scraper`  
 **Branch:** `codex/handoff-2026-11-21-scraper`  
-**Head:** `f39ba8babb47451402582c215b239b955b27afc1`  
+**Current branch head:** `2158962740b3d909c6d50384e5cdd552553a813d` (handoff document only)  
+**Verified product/code head:** `f39ba8babb47451402582c215b239b955b27afc1`  
 **Pull request:** [#34 — Upgrade Web Scraper hero and AI distribution](https://github.com/Apexflowlabsllc/apex-flow-web-scraper/pull/34)
 
 ## Assignment
@@ -14,9 +15,9 @@ The user wants a visually distinctive, highly animated crawler product, broader 
 
 ## Current verified state
 
-- PR #34 is **open, draft, and mergeable** at the head above. GitHub reported **no checks** for the branch on the last check.
+- PR #34 is **open, draft, and mergeable** at the current branch head above. GitHub reported **no checks** for the branch on the last check.
 - No production deployment or package publication has occurred. These branch changes are not live in production.
-- Full Python suite: **191 passed, 22 warnings** at this head. Focused billing and compatibility suites: **23 passed**. `node --check site/dashboard.js`, OpenAPI JSON parsing, and `git diff --check` passed.
+- Full Python suite: **191 passed, 22 warnings** at code head f39ba8b. Focused billing and compatibility suites: **23 passed**. `node --check site/dashboard.js`, OpenAPI JSON parsing, and `git diff --check` passed. Commit 2158962 only adds this handoff file.
 - Current committed changes include dashboard API-key controls; create/list/revoke REST endpoints; one-time key display; a 25-active-key limit; and a guard requiring a replacement key before revoking the last active one.
 - Credit usage now supports account and per-key historical views. New usage is attributed using an opaque stable key ID; old ledger entries are preserved and returned as unattributed.
 - Earlier work on this branch includes Firecrawl-style document parsing, crawl active listing, v2 credit usage, schema-based extraction, bounded browser sessions, crawl filters and errors, SDK/CLI/Agent Skill work, and the animated product hero. See the existing parity matrix and PR body for the full list and limits.
