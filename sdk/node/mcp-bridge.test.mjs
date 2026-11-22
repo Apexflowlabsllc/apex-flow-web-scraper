@@ -1,0 +1,105 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createServer } from "node:http";
+import { join } from "node:path";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { localByokSearch, selectLocalSearchProvider, startMcpBridge } from "./mcp-bridge.mjs";
+
+test("stdio bridge requires its API key in the process environment", async () => {
+  await assert.rejects(
+    startMcpBridge({ apiKey: "", stderr: { write() {} } }),
+    /Set APEX_SCRAPER_API_KEY/,
+  );
+});
+
+test("stdio bridge forwards list and tool calls to authenticated remote MCP", async () => {
+  const authHeaders = [];
+  const http = createServer(async (req, res) => {
+    authHeaders.push(req.headers.authorization);
+    let raw = "";
+    for await (const part of req) raw += part;
+    const body = raw ? JSON.parse(raw) : undefined;
+    const remoteServer = new Server({ name: "mock-apex", version: "1.0.0" }, { capabilities: { tools: {} } });
+    remoteServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: [{ name: "scrape_page", description: "Mock page scraper", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } }],
+    }));
+    remoteServer.setRequestHandler(CallToolRequestSchema, async (request) => ({
+      content: [{ type: "text", text: `read:${request.params.arguments.url}` }],
+    }));
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    await remoteServer.connect(transport);
+    await transport.handleRequest(req, res, body);
+    res.on("close", () => { void transport.close(); void remoteServer.close(); });
+  });
+  await new Promise((resolve) => http.listen(0, "127.0.0.1", resolve));
+  const address = http.address();
+  const bridgePath = join(process.cwd(), "bin", "apex-flow-web-scraper.mjs");
+  const bridge = new Client({ name: "installer-e2e-test", version: "1.0.0" });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [bridgePath, "mcp"],
+    env: { ...process.env, APEX_SCRAPER_API_KEY: "test-key", APEX_SCRAPER_MCP_URL: `http://127.0.0.1:${address.port}/mcp` },
+  });
+  try {
+    await bridge.connect(transport);
+    const listed = await bridge.listTools();
+    assert.deepEqual(listed.tools.map((tool) => tool.name), ["scrape_page", "web_search_byok"]);
+    const result = await bridge.callTool({ name: "scrape_page", arguments: { url: "https://example.com" } });
+    assert.equal(result.content[0].text, "read:https://example.com");
+    const localSearch = await bridge.callTool({ name: "web_search_byok", arguments: { query: "example" } });
+    assert.equal(localSearch.isError, true);
+    assert.match(localSearch.content[0].text, /Configure exactly one local provider key/);
+    assert.ok(authHeaders.length >= 3);
+    assert.ok(authHeaders.every((header) => header === "Bearer test-key"));
+  } finally {
+    await bridge.close();
+    await new Promise((resolve) => http.close(resolve));
+  }
+});
+
+test("BYOK search selects one local provider and sends no key to Apex", async () => {
+  const env = { BRAVE_SEARCH_API_KEY: "local-secret" };
+  assert.equal(selectLocalSearchProvider(env), "brave");
+  assert.equal(selectLocalSearchProvider({ ...env, EXA_API_KEY: "another" }), null);
+  assert.equal(selectLocalSearchProvider({ ...env, EXA_API_KEY: "another", APEX_SEARCH_PROVIDER: "exa" }), "exa");
+  let request;
+  const result = await localByokSearch("example query", 2, {
+    env,
+    fetchImpl: async (url, options) => {
+      request = { url: String(url), options };
+      return { ok: true, json: async () => ({ web: { results: [
+        { url: "https://example.com", title: "Example", description: "Direct result" },
+        { url: "javascript:alert(1)", title: "Invalid", description: "Drop" },
+      ] } }) };
+    },
+  });
+  assert.equal(request.url, "https://api.search.brave.com/res/v1/web/search?q=example+query&count=2");
+  assert.equal(request.options.headers["X-Subscription-Token"], "local-secret");
+  assert.equal(request.options.redirect, "error");
+  assert.deepEqual(result.results, [{ url: "https://example.com", title: "Example", snippet: "Direct result" }]);
+  assert.match(result.note, /Apex did not receive your provider key/);
+});
+
+test("BYOK Tavily and Exa requests use direct vendor contracts", async () => {
+  for (const [provider, envKey, expectedUrl, payload, expectedHeader, expectedValue] of [
+    ["tavily", "TAVILY_API_KEY", "https://api.tavily.com/search", { results: [{ url: "https://t.example/", title: "T", content: "Tavily" }] }, "Authorization", "Bearer local-tavily"],
+    ["exa", "EXA_API_KEY", "https://api.exa.ai/search", { results: [{ url: "https://e.example/", title: "E", highlights: ["Exa", "result"] }] }, "x-api-key", "local-exa"],
+  ]) {
+    const env = { [envKey]: `local-${provider}` };
+    let request;
+    const result = await localByokSearch("search", 3, { env, fetchImpl: async (url, options) => {
+      request = { url: String(url), options };
+      return { ok: true, json: async () => payload };
+    } });
+    assert.equal(request.url, expectedUrl);
+    assert.equal(request.options.headers[expectedHeader], expectedValue);
+    assert.equal(request.options.redirect, "error");
+    assert.equal(result.provider, provider);
+    assert.equal(result.results[0].snippet, provider === "tavily" ? "Tavily" : "Exa result");
+    assert.deepEqual(Object.keys(request.options.headers).sort(), ["Content-Type", expectedHeader].sort());
+  }
+});

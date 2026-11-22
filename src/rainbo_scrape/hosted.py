@@ -151,7 +151,7 @@ class Hosted:
                         self.db.execute("UPDATE orders SET period_end=? WHERE session=?", (db_end, session_id))
                     # nonce is already a SHA256 digest, the browser secret is never stored.
                     key = self.key_for(session_id, meta["nonce"])
-                    self.db.execute("INSERT INTO keys(hash,account,label) VALUES (?,?,?)", (_hash(key), account, "Checkout"))
+                    self.billing.register_key(account, key, "Checkout")
                     from .hosted_features import event
                     event(self, "activated", plan)
                     self.db.execute("COMMIT")
@@ -167,10 +167,10 @@ class Hosted:
         async def errors(request, handler):
             try:
                 gateway = os.environ.get("SCRAPER_GATEWAY_SECRET", "")
-                if gateway and not request.path.startswith("/v1/") and request.path not in {"/api/status", "/api/stripe/webhook"} and not hmac.compare_digest(request.headers.get("X-Scraper-Gateway", ""), gateway):
+                if gateway and not request.path.startswith(("/v1/", "/v2/")) and request.path not in {"/api/status", "/api/stripe/webhook"} and not hmac.compare_digest(request.headers.get("X-Scraper-Gateway", ""), gateway):
                     raise web.HTTPForbidden()
                 if request.method == "POST" and request.path != "/api/stripe/webhook" and request.headers.get("Origin") not in ORIGINS | {self.site}:
-                    if not request.path.startswith("/v1/") and request.path != "/api/portal":
+                    if not request.path.startswith(("/v1/", "/v2/")) and request.path != "/api/portal":
                         raise web.HTTPForbidden(text='{"error":"Open this action from the website."}', content_type="application/json")
                 response = await handler(request)
             except (ValueError, KeyError, TypeError):
@@ -182,7 +182,9 @@ class Hosted:
             except Exception:
                 logging.exception("request failed path=%s", request.path)
                 response = web.json_response({"error": "Service temporarily unavailable. Please retry."}, status=503)
-            response.headers.update({"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
+            cache_control = "private, max-age=3600" if request.path == "/v2/parse/formats" else "no-store"
+            response.headers.update({"Cache-Control": cache_control,
+                                     "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
             return response
         app.middlewares.insert(0, errors)
 
@@ -205,7 +207,7 @@ class Hosted:
             form = {"mode": "payment" if plan == "pass" else "subscription",
                     "line_items[0][quantity]": "1", "line_items[0][price_data][currency]": "usd",
                     "line_items[0][price_data][unit_amount]": str(PLANS[plan]["price"]*100),
-                    "line_items[0][price_data][product_data][name]": f"Apex Flow 3D Scraper {plan.title()}",
+                    "line_items[0][price_data][product_data][name]": f"Apex Flow Web Scraper {plan.title()}",
                     "line_items[0][price_data][product_data][description]": f"{PLANS[plan]['credits']:,} credits. Plain pages: 1 credit; rendered pages: 3.",
                     "success_url": self.site + "/thanks.html?session_id={CHECKOUT_SESSION_ID}",
                     "cancel_url": self.site + "/#pricing", "metadata[product]": PRODUCT,
@@ -217,7 +219,7 @@ class Hosted:
                              "subscription_data[metadata][product]": PRODUCT, "subscription_data[metadata][plan]": plan})
             else:
                 form["customer_creation"] = "always"
-                form["line_items[0][price_data][product_data][name]"] = "Apex Flow 3D Scraper Project Pass"
+                form["line_items[0][price_data][product_data][name]"] = "Apex Flow Web Scraper Project Pass"
                 form["line_items[0][price_data][product_data][description]"] = "35,000 credits valid for 30 days from activation. One-time purchase."
             data = await self.stripe("POST", "checkout/sessions", form, "webscraper-" + digest)
             from .hosted_features import event

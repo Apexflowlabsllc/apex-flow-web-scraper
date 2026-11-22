@@ -7,14 +7,14 @@ import time
 from collections import defaultdict, deque
 from functools import partial
 from aiohttp import web
-from .billing import Billing, QuotaExceeded, cost_of
+from .billing import Billing, QuotaExceeded, cost_of, reset_usage_key_hash, set_usage_key_hash, _hash
 from .client import ascrape
 from .policy import ScrapeError
 
-ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "recipe", "outputs", "page", "fallback", "max_tokens"}
+ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "scrolls", "actions", "recipe", "outputs", "page", "fallback", "max_tokens"}
 LIMIT = 262144  # hosted response budget in bytes
-OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff"}
-SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors", "archive", "extracted"}
+OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "structured_data", "diff", "html", "raw_html", "screenshot"}
+SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors", "archive", "extracted", "browser"}
 # Failures where the live site refused or could not serve us; a public archive copy may still exist.
 ARCHIVABLE = {"access_challenge", "http_error", "upstream_error", "rate_limited", "fetch_failed", "dns_failed",
               "robots_denied", "robots_unavailable"}
@@ -133,7 +133,7 @@ def credits_for(body, rendered):
     return total
 
 
-def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot, search_provider=None, package_loader=None, store_reader=None):
+def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot, search_provider=None, package_loader=None, store_reader=None, monitor_sender=None):
     active = defaultdict(int)
     recent = defaultdict(deque)
     api_recent = defaultdict(deque)
@@ -147,7 +147,7 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
 
     @web.middleware
     async def guard(request, handler):
-        if hosted and not request.path.startswith("/v1/"):
+        if hosted and not request.path.startswith(("/v1/", "/v2/")):
             return await handler(request)
         header = request.headers.get("Authorization", "")
         key = header[7:] if header.startswith("Bearer ") else ""
@@ -155,7 +155,8 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         if not account:
             extra = {"docs": hosted.site + "/docs.html", "get_key_url": hosted.site + "/trial.html"} if hosted else {}
             return fail(401, "missing or invalid API key", **extra)
-        if hosted and not hosted.entitled(account):
+        account_management = request.path == "/v1/usage" or request.path.startswith(("/v1/monitors", "/v1/keys"))
+        if hosted and not hosted.entitled(account) and not account_management:
             return fail(402, "Subscription is inactive or its paid period has ended. Open billing from your dashboard.",
                         code="inactive_plan", **buy)
         # Search and usage are credit-free, but must not permit unbounded requests.
@@ -169,12 +170,17 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
                             headers={"Retry-After": "60", "Cache-Control": "no-store"})
             requests.append(now)
         request["account"] = account
+        usage_token = set_usage_key_hash(_hash(key))
         try:
-            response = await handler(request)
-        except (ValueError, KeyError, TypeError, ScrapeError) as exc:
-            details = failure(exc, getattr(exc, "asked_archive", False))
-            response = fail(400, str(exc), details.pop("code"), **{k: v for k, v in details.items() if k != "retryable"})
-        response.headers.update({"X-Content-Type-Options": "nosniff", "Cache-Control": "no-store",
+            try:
+                response = await handler(request)
+            except (ValueError, KeyError, TypeError, ScrapeError) as exc:
+                details = failure(exc, getattr(exc, "asked_archive", False))
+                response = fail(400, str(exc), details.pop("code"), **{k: v for k, v in details.items() if k != "retryable"})
+        finally:
+            reset_usage_key_hash(usage_token)
+        cache_control = "private, max-age=3600" if request.path == "/v2/parse/formats" else "no-store"
+        response.headers.update({"X-Content-Type-Options": "nosniff", "Cache-Control": cache_control,
                                  "X-Request-Id": secrets.token_hex(8),
                                  "X-Credits-Remaining": str(billing.remaining(account))})
         if hosted:
@@ -212,6 +218,12 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
                 raise ValueError("outputs must list one or more of: " + ", ".join(sorted(OUTPUTS)))
             if "chunks" in outputs and "chunks" not in body:
                 body["chunks"] = 1500
+            if "html" in outputs:
+                body["include_html"] = True
+            if "raw_html" in outputs:
+                body["include_raw_html"] = True
+            if "screenshot" in outputs:
+                body["screenshot"] = True
         if hosted and body.get("extract"):
             import os
             from .llm import providers
@@ -274,6 +286,8 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
             response_result = dict(result) if outputs is None else {
                 field: value for field, value in result.items() if field in outputs or field in SOURCE_FIELDS
             }
+            if outputs is not None and "screenshot" in outputs and result.get("screenshot_png_base64"):
+                response_result["screenshot_png_base64"] = result["screenshot_png_base64"]
             pagination = None
             if hosted:
                 response_result, pagination = paginate(response_result, page, max_tokens=max_tokens)
@@ -363,9 +377,47 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
     async def usage(request):
         return await usage_for(request["account"])
 
+    async def list_keys(request):
+        return web.json_response({"keys": billing.list_keys(request["account"])})
+
+    async def create_key(request):
+        if request.content_type != "application/json":
+            return fail(415, "Content-Type must be application/json")
+        body = await request.json()
+        if not isinstance(body, dict) or set(body) - {"label"}:
+            return fail(400, "body must contain only an optional label", code="invalid_request")
+        label = body.get("label", "")
+        if not isinstance(label, str) or len(label.strip()) > 80:
+            return fail(400, "label must be text no longer than 80 characters", code="invalid_request")
+        label = label.strip()
+        account = request["account"]
+        active_keys = billing.db.execute("SELECT COUNT(*) FROM keys WHERE account=? AND revoked=0", (account,)).fetchone()[0]
+        if active_keys >= 25:
+            return fail(409, "This account has reached the 25 active API key limit.", code="key_limit")
+        key = billing.new_key(account, label)
+        row = billing.db.execute("SELECT key_id,created FROM keys WHERE hash=?", (_hash(key),)).fetchone()
+        return web.json_response({"id": row[0], "key": key, "label": label, "created_at": row[1]}, status=201)
+
+    async def revoke_key(request):
+        account = request["account"]
+        ident = request.match_info["key_id"]
+        owns_key = billing.db.execute("SELECT 1 FROM keys WHERE account=? AND key_id=? AND revoked=0",
+                                      (account, ident)).fetchone()
+        if not owns_key:
+            return fail(404, "API key not found or already revoked", code="not_found")
+        active_keys = billing.db.execute("SELECT COUNT(*) FROM keys WHERE account=? AND revoked=0", (account,)).fetchone()[0]
+        if active_keys <= 1:
+            return fail(409, "Create a replacement key before revoking the last active key.", code="last_active_key")
+        if not billing.revoke_key_id(account, ident):
+            return fail(404, "API key not found or already revoked", code="not_found")
+        return web.json_response({"id": ident, "revoked": True})
+
     app = web.Application(middlewares=[guard], client_max_size=50000)
     app.router.add_post("/v1/scrape", scrape)
     app.router.add_get("/v1/usage", usage)
+    app.router.add_get("/v1/keys", list_keys)
+    app.router.add_post("/v1/keys", create_key)
+    app.router.add_delete("/v1/keys/{key_id}", revoke_key)
     app.router.add_post("/v1/batch", batch)
     if hosted:
         from .mcp_http import install
@@ -379,6 +431,14 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         operations.update(hosted_packages.install(hosted, app, package_loader))
         from . import hosted_stores
         operations.update(hosted_stores.install(hosted, app, store_reader))
+        from . import hosted_monitors
+        operations.update(hosted_monitors.install(hosted, app, perform, monitor_sender))
+        from . import hosted_firecrawl_compat
+        compat_operations = ("/scrape", "/map", "/websearch", "/crawl", "/crawl/status", "/crawl/cancel", "/batch")
+        # Lightweight test and embedding hosts may provide only a subset of hosted operations.
+        # Register the compatibility surface only when its complete backing API is present.
+        if all(path in operations for path in compat_operations):
+            hosted_firecrawl_compat.install(app, *(operations[path] for path in compat_operations), hosted)
         install(app, billing, operations, hosted.site)
     return app
 

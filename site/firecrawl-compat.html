@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Firecrawl v2 compatibility subset · Apex Flow Web Scraper</title>
+  <meta name="description" content="Use Apex Flow Web Scraper's documented Firecrawl v2-compatible HTTP routes with an Apex key.">
+  <link rel="canonical" href="https://webscraper.apexflowlabs.com/firecrawl-compat.html">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <nav><a href="/">APEX FLOW WEB SCRAPER</a><a href="/docs.html">Docs →</a></nav>
+  <main>
+    <p class="eyebrow">Migration guide</p>
+    <h1>Keep the API shape. Choose the engine.</h1>
+    <p class="lede">Apex exposes a limited Firecrawl v2-compatible HTTP surface for migration experiments. Configure your client with the Apex API base URL and your Apex bearer key. This is a compatibility subset, not a drop-in implementation of every Firecrawl SDK method.</p>
+    <p><strong>Source status:</strong> these routes are implemented on the current draft branch. They are not live until a reviewed production release.</p>
+
+    <h2>Supported routes</h2>
+    <ul>
+      <li><code>POST /v2/parse</code> and <code>GET /v2/parse/formats</code>: upload and inspect supported PDF, DOCX, HTML, plain text, JSON, and XML documents. Uploads are limited to 12 MiB and cost one credit per document. Outputs include markdown, text, links, HTML where present, PDF pages, and metadata. Only <code>formats</code> and <code>onlyMainContent:true</code> are accepted options.</li>
+      <li><code>GET /v2/team/credit-usage</code> and <code>GET /v2/team/credit-usage/historical</code>: current allowance/period metadata and monthly credit totals. Pass <code>?byApiKey=true</code> for per-key rows with stable opaque IDs and key labels. Usage created before per-key tracking was added is returned as unattributed.</li>
+      <li><code>POST /v2/scrape</code>: <code>markdown</code>, main-content <code>html</code>, full-source <code>rawHtml</code> (capped at 500k characters), <code>links</code>, <code>screenshot</code>, and schema or prompt driven <code>json</code>; <code>maxAge</code>; <code>onlyMainContent:true</code>; bounded click, wait, and scroll actions. Responses include Firecrawl-style <code>success</code>/<code>data</code> with source metadata and an Apex credit extension.</li>
+      <li><code>POST /v2/map</code>: sitemap-based URL discovery, optional text filter, and limit up to the Apex account limit.</li>
+      <li><code>POST /v2/search</code>: web search only when the operator has configured an eligible search provider. It does not search Apex saved pages.</li>
+      <li><code>POST /v2/crawl</code>, <code>GET /v2/crawl/active</code>, <code>GET /v2/crawl/{id}</code>, <code>GET /v2/crawl/{id}/errors</code>, <code>DELETE /v2/crawl/{id}</code>: same-site background crawl, account-scoped active-job listing, durable job status, recorded page failures, and cancellation; supported formats include markdown, html, rawHtml, links, screenshot, and provider-backed JSON. Include/exclude path regular expressions, full-URL matching, and query-parameter deduplication are supported within bounded limits.</li>
+      <li><code>POST /v2/interact</code>, <code>GET /v2/interact</code>, <code>POST /v2/interact/{id}/execute</code>, and <code>DELETE /v2/interact/{id}</code>: short-lived, account-owned browser contexts with explicit public-origin allowlists and click/wait/scroll actions. Each account may hold one session per API process; each process has two concurrent browser slots. Multi-process session affinity is not yet implemented.</li>
+      <li><code>POST /v2/batch/scrape</code>, <code>GET /v2/batch/scrape/{id}</code>, <code>GET /v2/batch/scrape/{id}/errors</code>, and <code>DELETE /v2/batch/scrape/{id}</code>: asynchronous, account-scoped batch jobs with persisted status/results, cancellation and per-URL errors. Job size follows the account's crawl page cap; processing uses Apex account concurrency and native batch slices.</li>
+    </ul>
+
+    <h2>Example</h2>
+    <pre><code>curl https://webscraper.apexflowlabs.com/v2/scrape \
+  -H "Authorization: Bearer $APEX_SCRAPER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","formats":["markdown","links"]}'</code></pre>
+
+    <h2>Reuse the official SDK</h2>
+    <p>The current official Firecrawl Node and Python clients accept a custom API origin. Point an existing client at Apex and use an Apex API key to try the supported routes. The current Node SDK is tested against Apex's documented response shapes. This verifies selected calls; it does not establish full Firecrawl SDK parity.</p>
+    <pre><code>import { Firecrawl } from "firecrawl";
+
+const scraper = new Firecrawl({
+  apiKey: process.env.APEX_SCRAPER_API_KEY,
+  apiUrl: "https://webscraper.apexflowlabs.com",
+});
+
+const page = await scraper.scrape("https://example.com", {
+  formats: ["markdown"],
+});
+console.log(page.markdown);</code></pre>
+    <p>Python uses the same base origin with <code>Firecrawl(api_key=..., api_url="https://webscraper.apexflowlabs.com")</code>. See the official <a href="https://github.com/firecrawl/firecrawl/tree/main/apps/js-sdk/firecrawl">Node SDK</a> and <a href="https://github.com/firecrawl/firecrawl/tree/main/apps/python-sdk">Python SDK</a> documentation.</p>
+
+    <h2>Limits and semantics</h2>
+    <ul>
+      <li>Apex meters requests using Apex credits and rate/concurrency limits. Rendered pages, search, and other options can have different credit costs; read <code>creditsUsed</code> and the Apex usage endpoint.</li>
+      <li>Document parsing charges one credit per uploaded file, including PDFs up to 100 pages; it does not provide image OCR, raw binary output, audio/video extraction, prompt-injection detection, or PII redaction.</li>
+      <li>Apex obeys the target site's <code>robots.txt</code>. Crawl remains same-site and bounded by the account plan. Include/exclude regular expressions are limited to 20 patterns of 200 characters each and use a restricted syntax to prevent pathological matching. The adapter rejects requests to ignore robots rules, follow external links, or enable subdomains.</li>
+      <li>JSON extraction requires an Apex-configured model provider and a paid hosted plan. It costs 150 credits in addition to page retrieval; Apex validates returned JSON against the supplied schema and exposes validation details as <code>jsonValidation</code> when needed. With no schema, supply a prompt; Apex uses a generic object schema. Interactive sessions cost 3 credits to create and 3 per action request, last up to 15 minutes, obey robots.txt, and only fetch GET/HEAD resources from explicitly allowed public origins. They do not expose CDP, live video, arbitrary code execution, form submission, cookie profiles, or authenticated login. Summaries, image OCR, provider indexes, Firecrawl Agent, and persistent profiles remain unsupported. HTML and rawHtml use Apex's bounded main-content and source-document representations, respectively. Batch-specific features such as custom concurrency and webhooks are not implemented. Unsupported formats/options return a clear error where the route is defined.</li>
+      <li>Whole-web search needs an operator-configured provider and may be unavailable. Apex's native <code>/v1/search</code> searches only the account's saved pages.</li>
+      <li>Adapter behavior may differ in defaults, caching, error details, pagination and lifecycle fields. Check each response and test your workload before migrating production traffic.</li>
+    </ul>
+
+    <p>See the <a href="/openapi.json">Apex OpenAPI specification</a>, <a href="/monitoring.html">monitoring guide</a>, and <a href="https://docs.firecrawl.dev/api-reference/endpoint/scrape">Firecrawl's current API reference</a>.</p>
+  </main>
+</body>
+</html>

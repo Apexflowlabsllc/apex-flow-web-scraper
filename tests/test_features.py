@@ -51,6 +51,16 @@ def test_chrome_is_removed_but_page_title_header_kept():
     assert "cookies" not in out and "Home About" not in out and "Copyright" not in out
 
 
+def test_isolated_auth_link_in_generic_header_is_removed_but_content_is_kept():
+    out = md('<body><div class="row header-box"><h1>Quotes to Scrape</h1>'
+             '<p><a href="/login">Login</a></p></div>'
+             '<main><p>Login is required to save your profile.</p><p>Quote content.</p></main></body>',
+             "https://quotes.toscrape.com/page/2/")
+    assert "Quotes to Scrape" in out and "Quote content" in out
+    assert "[Login](https://quotes.toscrape.com/login)" not in out
+    assert "Login is required to save your profile" in out
+
+
 def test_many_articles_listing_uses_whole_page_not_one_card():
     cards = "".join(f"<article><h3>Item {i}</h3><p>${i}</p></article>" for i in range(5))
     out = md(f"<body><div>{cards}</div></body>")
@@ -294,6 +304,98 @@ def test_follow_external_is_a_validated_boolean(settings):
     assert validate_request({"urls": ["https://example.com/"]}, settings)["follow_external"] is False
     with pytest.raises(ValueError):
         validate_request({"urls": ["https://example.com/"], "follow_external": "yes"}, settings)
+
+
+def test_browser_action_contract_is_bounded_and_declarative(settings):
+    url = "https://example.com/"
+    actions = [
+        {"type": "click", "selector": "button.next"},
+        {"type": "wait", "selector": "#results"},
+        {"type": "scroll", "direction": "down", "amount": 2},
+    ]
+    options = validate_request({"urls": [url], "actions": actions}, settings)
+    assert options["actions"] == actions
+    invalid = [
+        [{"type": "fill", "selector": "input", "value": "secret"}],
+        [{"type": "click", "selector": "button", "javascript": "alert(1)"}],
+        [{"type": "wait", "ms": True}],
+        [{"type": "scroll", "direction": []}],
+        [{"type": "click", "selector": ":not("}],
+        [{"type": "scroll", "amount": 10}] * 2,
+        [{"type": "wait", "ms": 5000}] * 3,
+        [{"type": "click", "selector": "button"}] * 9,
+    ]
+    for bad in invalid:
+        with pytest.raises(ValueError):
+            validate_request({"urls": [url], "actions": bad}, settings)
+    with pytest.raises(ValueError, match="require browser rendering"):
+        validate_request({"urls": [url], "render": "never", "actions": actions}, settings)
+    with pytest.raises(ValueError, match="at most 10 viewport heights"):
+        validate_request({"urls": [url], "scrolls": 9, "actions": [actions[2]]}, settings)
+
+
+async def test_engine_runs_actions_before_parsing_dynamic_content(settings, monkeypatch):
+    from rainbo_scrape import engine
+    url = "https://example.com/"
+    actions = [{"type": "click", "selector": "button.next"}, {"type": "wait", "selector": "#results"}]
+    options = validate_request({"urls": [url], "actions": actions}, settings)
+    seen = {}
+
+    class Fetcher:
+        def __init__(self):
+            self.settings = settings
+            self.requested_origins = set()
+        async def get(self, address, **kwargs):
+            return {"status": 200, "body": b"<html><body><main><p>Initial shell</p></main></body></html>",
+                    "url": address, "headers": {"content-type": "text/html"}, "cache": "miss"}
+
+    async def fake_render(fetcher, address, wait_selector=None, scrolls=0, screenshot=False, actions=None):
+        seen.update(url=address, wait_selector=wait_selector, scrolls=scrolls, screenshot=screenshot, actions=actions)
+        return {"body": b"<html><body><main><h1>Page two</h1><p>Dynamic results loaded.</p></main></body></html>",
+                "url": address, "status": 200, "headers": {"content-type": "text/html"}, "cache": "rendered",
+                "screenshot": None, "browser": {"actions": [{"type": a["type"], "status": "completed"} for a in actions]}}
+
+    monkeypatch.setattr(engine, "render", fake_render)
+    result = await engine.scrape(Fetcher(), url, options)
+    assert seen["actions"] == actions and result["rendered"] is True
+    assert "Dynamic results loaded." in result["text"] and result["browser"]["actions"][-1]["status"] == "completed"
+
+
+async def test_browser_action_executor_uses_only_bounded_playwright_calls():
+    from rainbo_scrape.browser import perform_actions
+    calls = []
+
+    class Locator:
+        def __init__(self, selector): self.selector = selector
+        @property
+        def first(self): return self
+        async def evaluate(self, expression): calls.append(("inspect", expression)); return True
+        async def click(self, **kwargs): calls.append(("click", self.selector, kwargs))
+        async def wait_for(self, **kwargs): calls.append(("wait_for", self.selector, kwargs))
+
+    class Page:
+        def locator(self, selector): return Locator(selector)
+        async def evaluate(self, expression): calls.append(("evaluate", expression))
+        async def wait_for_timeout(self, ms): calls.append(("wait", ms))
+
+    actions = [{"type": "click", "selector": "a.next"}, {"type": "wait", "selector": "#content"},
+               {"type": "scroll", "direction": "up", "amount": 2}, {"type": "wait", "ms": 25}]
+    receipt = await perform_actions(Page(), actions)
+    assert [call[0] for call in calls] == ["inspect", "click", "wait_for", "evaluate", "wait", "wait"]
+    assert "new URL(link.href)" in calls[0][1]
+    assert calls[1][2] == {"timeout": 4000} and calls[2][2] == {"state": "attached", "timeout": 4000}
+    assert "window.innerHeight * (-2)" in calls[3][1]
+    assert receipt == [{"type": action["type"], "status": "completed"} for action in actions]
+
+    class UnsafeLocator(Locator):
+        async def evaluate(self, expression): return False
+        async def click(self, **kwargs): raise AssertionError("unsafe click must not execute")
+
+    class UnsafePage(Page):
+        def locator(self, selector): return UnsafeLocator(selector)
+
+    with pytest.raises(ScrapeError, match=r"Browser action 1 \(click\) failed"):
+        await perform_actions(UnsafePage(), [{"type": "click", "selector": "button.submit"}])
 
 async def test_crawl_delay_shared_by_independent_fetchers(site, settings):
     base, _, _ = site

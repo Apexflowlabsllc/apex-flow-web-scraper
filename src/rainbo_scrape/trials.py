@@ -55,8 +55,7 @@ def install(hosted, app):
                 account = hosted.billing.create_account(None, "free")
                 db.execute("INSERT INTO orders(session,account,nonce,plan,status,created,free_ip) VALUES(?,?,?,'free','active',?,?)",
                            (session_id, account, digest, now, ip_digest))
-                db.execute("INSERT INTO keys(hash,account,label) VALUES(?,?,?)",
-                           (_hash(hosted.key_for(session_id, digest)), account, "Browser trial"))
+                hosted.billing.register_key(account, hosted.key_for(session_id, digest), "Browser trial")
                 event(hosted, "activated", "free")
                 db.execute("COMMIT")
             except BaseException:

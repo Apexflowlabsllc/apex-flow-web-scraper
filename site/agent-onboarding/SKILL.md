@@ -1,9 +1,9 @@
 ---
 name: apex-flow-scraper
-description: Use the Apex Flow 3D Scraper API to turn public web pages, PDFs and DOCX files into clean Markdown, map or crawl a site, detect page changes, and fit a page into a token budget. Use when an agent needs web content as Markdown and a Bearer API key is available.
+description: Use the Apex Flow Web Scraper API to turn public web pages, PDFs and DOCX files into clean Markdown, map or crawl a site, detect page changes, and fit a page into a token budget. Use when an agent needs web content as Markdown and a Bearer API key is available.
 ---
 
-# Apex Flow 3D Scraper for agents
+# Apex Flow Web Scraper for agents
 
 Base URL `https://webscraper.apexflowlabs.com/v1`. Auth: `Authorization: Bearer $APEX_SCRAPER_API_KEY`. Machine-readable pricing: https://webscraper.apexflowlabs.com/pricing.md. Docs: https://webscraper.apexflowlabs.com/docs.html. OpenAPI: https://webscraper.apexflowlabs.com/openapi.json.
 
@@ -19,10 +19,12 @@ Codex: `codex mcp add apex-scraper --url https://webscraper.apexflowlabs.com/v1/
 
 ## Core calls
 - Scrape one page to Markdown: `POST /v1/scrape {"url":"https://example.com","render":"never"}`. Use `"render":"auto"` only when the page needs JavaScript (3 credits instead of 1). The Markdown is in `result.markdown`.
+- For public pages with dynamic content, pass `actions` with up to 8 declarative `click`, `wait` or `scroll` steps. Example: `{"url":"https://example.com","actions":[{"type":"click","selector":"button.load-more"},{"type":"wait","selector":"article.result"}]}`. Actions use one rendered request, cost up to 3 credits, and do not retain a signed-in browser session. Do not send passwords or use form submissions.
 - Parallel pages: `POST /v1/batch` with up to 10 URLs.
 - Whole site: `POST /v1/crawl {"url":"https://example.com","limit":50}` then `GET /v1/crawl/{id}?offset=N` until `next_offset` is null.
 - Site map: `POST /v1/map`. Named fields without an AI model: add a CSS recipe to a scrape (free). AI schema extraction: add `extract {schema, prompt}` (150 extra credits, paid plans).
 - Changes: each scrape says whether the page is new, unchanged or changed since your last read; request the diff to receive only the changed lines.
+- Scheduled monitoring requires explicit user consent because successful checks use credits repeatedly. Create a paid-plan monitor with `POST /v1/monitors` and `{url, webhook_url, interval_seconds, confirm_recurring:true}`. Use a public HTTPS webhook on port 443 and a cadence of at least one hour. The first successful read is a baseline; later changes emit HMAC-signed events. Store the returned signing secret securely, verify `X-Apex-Signature` over the timestamp plus exact raw body, and deduplicate by event ID. Scheduled checks obey robots.txt and stop when the plan or credits end. See https://webscraper.apexflowlabs.com/monitoring.html.
 - Long pages come back in parts of 256 KiB: follow `pagination.next_page`.
 
 ## Cost and behaviour you should plan around

@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Apex Flow 3D Scraper",
+    "title": "Apex Flow Web Scraper",
     "version": "0.11.0",
     "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Accounts run 2 (trial), 6 (Pass, Starter), 12 (Growth) or 20 (Scale) page scrapes at once, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
   },
@@ -26,6 +26,91 @@
       }
     },
     "schemas": {
+      "BrowserAction": {
+        "description": "Declarative, one-request browser action. No caller-supplied JavaScript or direct form-fill/submit action; non-GET/HEAD requests are blocked and login state is not retained.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "click"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "type",
+              "selector"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "wait"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "type",
+              "selector"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "wait"
+              },
+              "ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000
+              }
+            },
+            "required": [
+              "type",
+              "ms"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "scroll"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "down",
+                  "up"
+                ],
+                "default": "down"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "default": 1
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
       "Change": {
         "type": "object",
         "description": "Comparison with the copy this account read last.",
@@ -308,10 +393,25 @@
                   "wait_selector": {
                     "type": "string"
                   },
+                  "scrolls": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 0,
+                    "description": "Scroll down this many viewport heights after browser rendering to load lazy content. Requires render auto or always; rendered requests cost up to 3 credits."
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "$ref": "#/components/schemas/BrowserAction"
+                    },
+                    "description": "Up to 8 click, wait or scroll actions after rendering. At most 10 viewport heights and 10 seconds of explicit waits per request. No caller-supplied JavaScript or direct form-fill/submit action; non-GET/HEAD requests are blocked. No browser session or login state is retained."
+                  },
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 8,
+                    "maxItems": 11,
                     "items": {
                       "type": "string",
                       "enum": [
@@ -322,7 +422,10 @@
                         "chunks",
                         "links",
                         "structured_data",
-                        "diff"
+                        "diff",
+                        "html",
+                        "raw_html",
+                        "screenshot"
                       ]
                     },
                     "description": "Return selected content with available source receipt and validation warnings. Selecting chunks defaults to a 1,500-character target. Select diff to receive change.diff, the lines that changed since this account last read the URL."
@@ -513,10 +616,25 @@
                   "wait_selector": {
                     "type": "string"
                   },
+                  "scrolls": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 0,
+                    "description": "Scroll down this many viewport heights after browser rendering to load lazy content. Requires render auto or always; rendered requests cost up to 3 credits."
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "$ref": "#/components/schemas/BrowserAction"
+                    },
+                    "description": "Up to 8 click, wait or scroll actions after rendering. At most 10 viewport heights and 10 seconds of explicit waits per request. No caller-supplied JavaScript or direct form-fill/submit action; non-GET/HEAD requests are blocked. No browser session or login state is retained."
+                  },
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 8,
+                    "maxItems": 11,
                     "items": {
                       "type": "string",
                       "enum": [
@@ -527,7 +645,10 @@
                         "chunks",
                         "links",
                         "structured_data",
-                        "diff"
+                        "diff",
+                        "html",
+                        "raw_html",
+                        "screenshot"
                       ]
                     },
                     "description": "Return selected content with available source receipt and validation warnings. Selecting chunks defaults to a 1,500-character target. Select diff to receive change.diff, the lines that changed since this account last read the URL."
@@ -638,6 +759,109 @@
         }
       }
     },
+    "/websearch": {
+      "post": {
+        "operationId": "searchPublicWeb",
+        "summary": "Search the public web when the operator enables a provider",
+        "description": "Requires one service-level search provider: Brave Search, Tavily Search, or Exa Search. Returns 503 not_configured when none is configured or provider selection is ambiguous. Successful searches cost 130 credits with Brave, 210 with Tavily basic search, or 180 with Exa for up to 10 requested results plus 25 per requested result above 10. Successful empty results are billed; failed provider calls refund the reservation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20,
+                    "default": 10
+                  }
+                },
+                "required": [
+                  "query"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results. Empty result sets use no credits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "results",
+                    "credits_used",
+                    "credits_left",
+                    "note"
+                  ],
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "snippet": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "credits_used": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "credits_left": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Search provider is not configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, insufficient credits, rate limit, or provider failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/search": {
       "post": {
         "operationId": "searchSavedPages",
@@ -717,6 +941,40 @@
         }
       }
     },
+    "/keys": {
+      "get": {
+        "operationId": "listApiKeys",
+        "summary": "List account API keys",
+        "description": "Returns key IDs and labels only. Bearer key values are never returned by this endpoint.",
+        "responses": {"200": {"description": "Account keys", "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "keys": {"type": "array", "items": {"type": "object", "properties": {
+            "id": {"type": "string"}, "label": {"type": "string"}, "created_at": {"type": "number"}, "revoked": {"type": "boolean"}
+          }}}
+        }}}}}
+      },
+      "post": {
+        "operationId": "createApiKey",
+        "summary": "Create a labeled API key",
+        "description": "Returns the new bearer secret once. Store it in a secret manager; list responses never include the secret.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "label": {"type": "string", "maxLength": 80}
+        }, "additionalProperties": false}}}},
+        "responses": {"201": {"description": "Created key, including one-time bearer secret", "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "id": {"type": "string"}, "key": {"type": "string", "writeOnly": true}, "label": {"type": "string"}, "created_at": {"type": "number"}
+        }}}}}, "409": {"description": "Account reached its active key limit"}}
+      }
+    },
+    "/keys/{key_id}": {
+      "delete": {
+        "operationId": "revokeApiKey",
+        "summary": "Revoke an account API key",
+        "parameters": [{"name": "key_id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Revoked", "content": {"application/json": {"schema": {"type": "object", "properties": {
+          "id": {"type": "string"}, "revoked": {"type": "boolean"}
+        }}}}}, "404": {"description": "Key not found, belongs to another account, or already revoked"},
+        "409": {"description": "Create a replacement before revoking the account's last active key"}}
+      }
+    },
     "/usage": {
       "get": {
         "operationId": "creditBalance",
@@ -758,6 +1016,10 @@
                         },
                         "saved_pages": {
                           "type": "integer"
+                        },
+                        "monitors": {
+                          "type": "integer",
+                          "description": "Maximum number of scheduled monitor records, including paused monitors, for this plan."
                         }
                       }
                     },
@@ -784,6 +1046,9 @@
                     "buy_url": {
                       "type": "string",
                       "format": "uri"
+                    },
+                    "active_monitors": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -1545,6 +1810,1560 @@
           }
         }
       }
+    },
+    "/monitors": {
+      "post": {
+        "operationId": "createMonitor",
+        "summary": "Create a scheduled page monitor",
+        "description": "Paid plans only. The first successful read establishes a baseline. Scheduled checks obey robots.txt. The response includes a 30-day credit estimate and one-time signing secret.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url",
+                  "webhook_url",
+                  "confirm_recurring"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "webhook_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "HTTPS only; destination must resolve to public addresses when delivered."
+                  },
+                  "interval_seconds": {
+                    "type": "integer",
+                    "minimum": 3600,
+                    "maximum": 2592000,
+                    "default": 86400
+                  },
+                  "confirm_recurring": {
+                    "type": "boolean",
+                    "const": true,
+                    "description": "Explicit consent to recurring credit use; one credit per successful check."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created; store signing_secret securely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listMonitors",
+        "summary": "List scheduled monitors",
+        "responses": {
+          "200": {
+            "description": "Account monitors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/create": {
+      "post": {
+        "operationId": "createMonitorAlias",
+        "summary": "Create a scheduled page monitor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url",
+                  "webhook_url",
+                  "confirm_recurring"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "webhook_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "HTTPS only; destination must resolve to public addresses when delivered."
+                  },
+                  "interval_seconds": {
+                    "type": "integer",
+                    "minimum": 3600,
+                    "maximum": 2592000,
+                    "default": 86400
+                  },
+                  "confirm_recurring": {
+                    "type": "boolean",
+                    "const": true,
+                    "description": "Explicit consent to recurring credit use; one credit per successful check."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created; store signing_secret securely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/list": {
+      "get": {
+        "operationId": "listMonitorsAlias",
+        "summary": "List scheduled monitors",
+        "responses": {
+          "200": {
+            "description": "Account monitors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/pause": {
+      "post": {
+        "operationId": "pauseMonitor",
+        "summary": "Pause a monitor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pause a monitor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/resume": {
+      "post": {
+        "operationId": "resumeMonitor",
+        "summary": "Resume a monitor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resume a monitor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/delete": {
+      "post": {
+        "operationId": "deleteMonitor",
+        "summary": "Delete a monitor and its event history",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delete a monitor and its event history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/events": {
+      "post": {
+        "operationId": "readMonitorEvents",
+        "summary": "Read recent monitor events",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 20
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Events and delivery states.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{id}": {
+      "delete": {
+        "operationId": "deleteMonitorResource",
+        "summary": "Delete a monitor and its event history",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{id}/events": {
+      "get": {
+        "operationId": "listMonitorEvents",
+        "summary": "Read recent monitor events",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Events and delivery states.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/parse": {
+      "post": {
+        "operationId": "firecrawlCompatParseUpload",
+        "summary": "Parse an uploaded document",
+        "description": "Parses one uploaded PDF, DOCX, HTML, text, JSON, or XML document. Maximum file size is 12 MiB; the operation costs one credit. Supported options are formats and onlyMainContent=true.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {"type": "string", "format": "binary"},
+                  "options": {"type": "string", "description": "Optional JSON object encoded as a multipart field. Supports formats and onlyMainContent=true."}
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Parsed document; costs one credit", "content": {"application/json": {"schema": {"type": "object"}}}},
+          "400": {"description": "Invalid document or unsupported option"},
+          "402": {"description": "Insufficient credits"},
+          "413": {"description": "Upload exceeds 12 MiB"}
+        }
+      }
+    },
+    "/v2/parse/formats": {
+      "get": {
+        "operationId": "firecrawlCompatParseFormats",
+        "summary": "List supported upload formats",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "responses": {"200": {"description": "Supported upload formats; cached privately for one hour", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
+    "/v2/scrape": {
+      "post": {
+        "operationId": "firecrawlCompatScrape",
+        "summary": "Firecrawl-compatible scrape",
+        "description": "Supported formats: markdown, links, screenshot. Unsupported formats/options return an explicit error. Apex credit costs and receipts apply.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Firecrawl-style success/data envelope with Apex credit extension",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or unsupported request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Apex credits or entitlement required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "formats": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "markdown",
+                            "html",
+                            "rawHtml",
+                            "links",
+                            "screenshot"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "markdown",
+                                "html",
+                                "rawHtml",
+                                "links",
+                                "screenshot"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "json"
+                            },
+                            "schema": {
+                              "type": "object",
+                              "description": "JSON Schema Draft 2020-12. Required unless prompt is provided."
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "description": "Extraction instruction; required when schema is omitted."
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "anyOf": [
+                            {
+                              "required": [
+                                "schema"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "prompt"
+                              ]
+                            }
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "onlyMainContent": {
+                    "type": "boolean"
+                  },
+                  "maxAge": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31536000000
+                  },
+                  "screenshot": {
+                    "type": "boolean"
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/team/credit-usage": {
+      "get": {
+        "operationId": "firecrawlCompatCreditUsage",
+        "summary": "Current credit usage",
+        "description": "Returns account allowance and billing period dates. Values are Apex account-scoped.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "responses": {
+          "200": {
+            "description": "Current allowance and period metadata",
+            "content": {"application/json": {"schema": {"type": "object", "properties": {
+              "success": {"type": "boolean"},
+              "data": {"type": "object", "properties": {
+                "remainingCredits": {"type": "integer"},
+                "planCredits": {"type": "integer"},
+                "billingPeriodStart": {"type": ["string", "null"], "format": "date-time"},
+                "billingPeriodEnd": {"type": ["string", "null"], "format": "date-time"}
+              }}
+            }}}}
+          }
+        }
+      }
+    },
+    "/v2/team/credit-usage/historical": {
+      "get": {
+        "operationId": "firecrawlCompatHistoricalCreditUsage",
+        "summary": "Historical credit usage",
+        "description": "Returns monthly account-wide totals by default. Set byApiKey=true for per-key totals. Legacy usage recorded before key-level attribution was added is returned with a null apiKeyId.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "parameters": [{"name": "byApiKey", "in": "query", "schema": {"type": "boolean", "default": false}}],
+        "responses": {
+          "200": {"description": "Monthly account-wide totals", "content": {"application/json": {"schema": {"type": "object", "properties": {
+            "success": {"type": "boolean"},
+            "periods": {"type": "array", "items": {"type": "object", "properties": {
+              "startDate": {"type": "string", "format": "date-time"},
+              "endDate": {"type": "string", "format": "date-time"},
+              "totalCredits": {"type": "integer"},
+              "apiKeyId": {"type": ["string", "null"], "description": "Stable opaque key identifier; null for unattributed legacy usage."},
+              "apiKeyLabel": {"type": ["string", "null"], "description": "User-provided key label, when available."}
+            }}}
+          }}}}},
+          "400": {"description": "Invalid or unsupported option"}
+        }
+      }
+    },
+    "/v2/map": {
+      "post": {
+        "operationId": "firecrawlCompatMap",
+        "summary": "Firecrawl-compatible map",
+        "description": "Sitemap-based URL discovery. Supported inputs are url, optional search, limit, and sitemap='include'. Apex's plan limit applies.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "search": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "sitemap": {
+                    "type": "string",
+                    "enum": [
+                      "include"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/search": {
+      "post": {
+        "operationId": "firecrawlCompatSearch",
+        "summary": "Firecrawl-compatible web search",
+        "description": "Requires an operator-configured web search provider. Supports query, limit, and sources=[{type:web}]. Does not call Apex saved-page search.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Search provider is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "query": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "sources": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "type"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "web"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/interact": {
+      "post": {
+        "operationId": "createApexInteractSession",
+        "summary": "Create a bounded browser session",
+        "description": "Creates a short-lived, account-owned browser session. Every request is restricted to the explicitly allowed public origins and read-only GET/HEAD traffic. Arbitrary code, CDP, and live video are not exposed.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["allowedOrigins"],
+                "properties": {
+                  "allowedOrigins": {"type": "array", "minItems": 1, "maxItems": 10, "items": {"type": "string", "format": "uri"}},
+                  "url": {"type": "string", "format": "uri", "description": "Optional initial page; must match an allowed origin."},
+                  "ttl": {"type": "integer", "minimum": 30, "maximum": 900, "default": 300},
+                  "activityTtl": {"type": "integer", "minimum": 10, "maximum": 300, "default": 120},
+                  "streamWebView": {"type": "boolean", "const": false},
+                  "blockAds": {"type": "boolean", "const": false}
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Session created; costs three credits.", "content": {"application/json": {"schema": {"type": "object", "properties": {"success": {"type": "boolean"}, "id": {"type": "string"}, "expiresAt": {"type": "string", "format": "date-time"}, "actionsUrl": {"type": "string"}, "allowedOrigins": {"type": "array", "items": {"type": "string"}}, "creditCost": {"type": "integer"}}}}}},
+          "402": {"description": "Paid plan or credits required"},
+          "429": {"description": "Interactive session capacity reached"},
+          "503": {"description": "Browser runtime unavailable"}
+        }
+      },
+      "get": {
+        "operationId": "listApexInteractSessions",
+        "summary": "List account browser sessions",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "parameters": [{"name": "status", "in": "query", "required": false, "schema": {"type": "string", "enum": ["active", "destroyed"]}}],
+        "responses": {"200": {"description": "Account-owned active or recently destroyed sessions", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
+    "/v2/interact/{session}/execute": {
+      "post": {
+        "operationId": "executeApexInteractActions",
+        "summary": "Navigate and run bounded browser actions",
+        "description": "Navigates only within the session origin allowlist and runs up to eight declarative click/wait/scroll actions. Does not execute caller-supplied code.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "parameters": [{"name": "session", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {"url": {"type": "string", "format": "uri"}, "actions": {"type": "array", "maxItems": 8, "items": {"$ref": "#/components/schemas/BrowserAction"}}}, "additionalProperties": false}}}},
+        "responses": {
+          "200": {"description": "Current page state; costs three credits.", "content": {"application/json": {"schema": {"type": "object"}}}},
+          "403": {"description": "Destination outside allowed origins"},
+          "404": {"description": "Session is not owned by this account"},
+          "410": {"description": "Session expired"},
+          "402": {"description": "Insufficient credits"}
+        }
+      }
+    },
+    "/v2/interact/{session}": {
+      "delete": {
+        "operationId": "deleteApexInteractSession",
+        "summary": "Destroy a browser session",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "parameters": [{"name": "session", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Session destroyed"}, "404": {"description": "Session is not owned by this account"}}
+      }
+    },
+    "/v2/crawl/active": {
+      "get": {
+        "operationId": "firecrawlCompatListActiveCrawls",
+        "summary": "List active account crawls",
+        "description": "Lists up to 100 running crawl jobs owned by the authenticated account. This endpoint is read-only and does not consume credits.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "responses": {"200": {"description": "Active crawls owned by this API account", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
+    "/v2/crawl": {
+      "post": {
+        "operationId": "firecrawlCompatStartCrawl",
+        "summary": "Firecrawl-compatible crawl",
+        "description": "Starts a durable same-site crawl. Apex obeys robots.txt, enforces account limits, and rejects external-link and subdomain expansion. includePaths/excludePaths accept bounded, safety-checked regular expressions matched against URL paths; regexOnFullURL switches matching to the full URL. ignoreQueryParameters deduplicates discovered URLs without query strings.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Crawl job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or unsupported request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Apex credits or entitlement required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "maxDiscoveryDepth": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10
+                  },
+                  "includePaths": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "excludePaths": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "regexOnFullURL": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "ignoreQueryParameters": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "ignoreRobotsTxt": {
+                    "type": "boolean"
+                  },
+                  "allowExternalLinks": {
+                    "type": "boolean"
+                  },
+                  "allowSubdomains": {
+                    "type": "boolean"
+                  },
+                  "sitemap": {
+                    "type": "string",
+                    "enum": [
+                      "include"
+                    ]
+                  },
+                  "scrapeOptions": {
+                    "type": "object",
+                    "properties": {
+                      "formats": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "markdown",
+                                "html",
+                                "rawHtml",
+                                "links",
+                                "screenshot"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "markdown",
+                                    "html",
+                                    "rawHtml",
+                                    "links",
+                                    "screenshot"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "json"
+                                },
+                                "schema": {
+                                  "type": "object",
+                                  "description": "JSON Schema Draft 2020-12. Required unless prompt is provided."
+                                },
+                                "prompt": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "description": "Extraction instruction; required when schema is omitted."
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "schema"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "prompt"
+                                  ]
+                                }
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "onlyMainContent": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/crawl/{job}": {
+      "get": {
+        "operationId": "firecrawlCompatCrawlStatus",
+        "summary": "Get crawl status",
+        "description": "Reads a crawl job and a page of results. Results are account-scoped.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Crawl status and result page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such crawl for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "firecrawlCompatCancelCrawl",
+        "summary": "Cancel crawl",
+        "description": "Requests cancellation of an active account-owned crawl.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such crawl for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v2/crawl/{job}/errors": {
+      "get": {
+        "operationId": "firecrawlCompatCrawlErrors",
+        "summary": "Get crawl errors",
+        "description": "Returns recorded failed page results and robots-denied URLs for an account-owned crawl.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recorded crawl failures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {"type": "string"},
+                          "timestamp": {"type": "string", "format": "date-time"},
+                          "url": {"type": "string", "format": "uri"},
+                          "error": {"type": "string"},
+                          "code": {"type": "string"}
+                        }
+                      }
+                    },
+                    "robotsBlocked": {
+                      "type": "array",
+                      "items": {"type": "string", "format": "uri"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such crawl for this account",
+            "content": {
+              "application/json": {
+                "schema": {"type": "object"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/batch/scrape": {
+      "post": {
+        "operationId": "firecrawlCompatBatchScrape",
+        "summary": "Start an asynchronous batch scrape",
+        "description": "Creates an account-scoped asynchronous batch job. Supports markdown, links and screenshot formats, maxAge, and bounded read-only browser actions. URL count follows the account plan. Custom concurrency and webhooks are not supported.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or unsupported option",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Batch exceeds the account plan limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "urls"
+                ],
+                "properties": {
+                  "urls": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "formats": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "markdown",
+                            "html",
+                            "rawHtml",
+                            "links",
+                            "screenshot"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "markdown",
+                                "html",
+                                "rawHtml",
+                                "links",
+                                "screenshot"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "json"
+                            },
+                            "schema": {
+                              "type": "object",
+                              "description": "JSON Schema Draft 2020-12. Required unless prompt is provided."
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "maxLength": 2000,
+                              "description": "Extraction instruction; required when schema is omitted."
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "anyOf": [
+                            {
+                              "required": [
+                                "schema"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "prompt"
+                              ]
+                            }
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "onlyMainContent": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "maxAge": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31536000000
+                  },
+                  "screenshot": {
+                    "type": "boolean"
+                  },
+                  "actions": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/batch/scrape/{job}": {
+      "get": {
+        "operationId": "firecrawlCompatBatchStatus",
+        "summary": "Get batch status and results",
+        "description": "Returns account-scoped batch status and a page of completed results. Use next to retrieve subsequent result pages.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch status and results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such batch job for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "firecrawlCompatCancelBatch",
+        "summary": "Cancel batch",
+        "description": "Cancels an active account-owned batch job. Completed page results are retained.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such batch job for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v2/batch/scrape/{job}/errors": {
+      "get": {
+        "operationId": "firecrawlCompatBatchErrors",
+        "summary": "Get batch errors",
+        "description": "Returns per-URL errors for an account-owned batch job.",
+        "servers": [
+          {
+            "url": "https://webscraper.apexflowlabs.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-URL batch errors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such batch job for this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   }
+}
 }

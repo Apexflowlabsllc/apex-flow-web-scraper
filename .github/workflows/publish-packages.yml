@@ -1,0 +1,73 @@
+name: Publish scraper packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_python:
+        description: Publish apex-flow-web-scraper to PyPI
+        type: boolean
+        required: true
+        default: false
+      publish_npm:
+        description: Publish apex-flow-web-scraper to npm
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-python:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dists
+          path: dist/
+          if-no-files-found: error
+
+  publish-python:
+    if: github.ref == 'refs/heads/main' && inputs.publish_python
+    needs: build-python
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/apex-flow-web-scraper/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dists
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-npm:
+    if: github.ref == 'refs/heads/main' && inputs.publish_npm
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/apex-flow-web-scraper
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: npm install --global npm@11.5.1
+      - run: npm publish ./sdk/node --access public

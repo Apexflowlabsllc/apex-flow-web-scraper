@@ -35,7 +35,16 @@ async def hosted(tmp_path, monkeypatch):
     async def scrape(url, **kwargs):
         if url.endswith("failure"): raise ValueError("fixture failed")
         await asyncio.sleep(0.01)
-        return {"markdown":"# Fixture", "rendered":False}
+        result = {"markdown":"# Fixture", "rendered":False}
+        if kwargs.get("include_html"):
+            result["html"] = "<main><h1>Fixture</h1></main>"
+        if kwargs.get("include_raw_html"):
+            result["raw_html"] = "<html><body><nav>source shell</nav><main><h1>Fixture</h1></main></body></html>"
+        if kwargs.get("screenshot"):
+            result["screenshot_png_base64"] = "fixture-png"
+        if kwargs.get("extract"):
+            result["extracted"] = {"data": {"heading": "Fixture"}, "valid": True, "errors": []}
+        return result
     client=TestClient(TestServer(make_app(billing,scrape,hosted=h)))
     await client.start_server()
     yield h,client,session,sub,nonce,calls

@@ -1,13 +1,38 @@
-# Apex Flow 3D Scraper
+# Apex Flow Web Scraper
 
 **Hosted API for developers and AI agents: scrape, crawl and monitor the public web as clean Markdown.** [Get 1,000 free credits](https://webscraper.apexflowlabs.com/trial.html) · [Docs](https://webscraper.apexflowlabs.com/docs.html) · [Pricing](https://webscraper.apexflowlabs.com/#pricing) · [OpenAPI](https://webscraper.apexflowlabs.com/openapi.json)
 
 ```python
-from rainbo_scrape.hosted_client import Apex   # pip install "git+https://github.com/Apexflowlabsllc/apex-flow-web-scraper.git"
+from rainbo_scrape.hosted_client import Apex   # PyPI package release pending
 apex = Apex()                                   # reads APEX_SCRAPER_API_KEY
 page = apex.scrape("https://example.com", outputs=["markdown"], max_tokens=4000)
 for page in apex.crawl("https://www.sqlite.org/docs.html", limit=25):
     print(page["url"], page["status"])
+
+# Scheduled changes (paid plan, explicit recurring-credit confirmation)
+monitor = apex.create_monitor(
+    "https://example.com/pricing",
+    "https://your-service.example/webhooks/apex",
+    interval_seconds=86400,
+    confirm_recurring=True,
+)
+print(monitor["estimated_max_credits_per_30_days"])
+# Store monitor["signing_secret"] securely; the API returns it only once.
+```
+
+Node.js 18+ (npm package publication is pending):
+
+```bash
+# Available after the npm release
+npm install apex-flow-web-scraper
+```
+
+```js
+import { Apex } from "apex-flow-web-scraper/hosted";
+
+const apex = new Apex(); // reads APEX_SCRAPER_API_KEY
+const { result } = await apex.scrape("https://example.com", { outputs: ["markdown"] });
+console.log(result.markdown);
 ```
 
 ## Try it in 60 seconds
@@ -21,20 +46,68 @@ curl https://webscraper.apexflowlabs.com/v1/scrape \
   -d '{"url":"https://example.com","render":"never","outputs":["markdown"]}'
 ```
 
-3. Or give it to your agent (Claude Code, Codex, VS Code): [one-step MCP setup](https://webscraper.apexflowlabs.com/docs.html#agents).
+3. Or connect its hosted MCP server to Claude Code, Codex, VS Code Copilot, Cursor, Gemini CLI, Cascade/Windsurf, or another MCP client: [copy-paste setup guides](https://webscraper.apexflowlabs.com/docs.html#agents).
+
+Grok CLI can connect directly over remote MCP without the npm package. Add this to `~/.grok/config.toml`, then set `APEX_SCRAPER_API_KEY` in the environment that launches Grok:
+
+```toml
+[mcp_servers.apex_flow_web_scraper]
+url = "https://webscraper.apexflowlabs.com/v1/mcp"
+headers = { "Authorization" = "Bearer ${APEX_SCRAPER_API_KEY}" }
+```
+
+Grok expands the environment variable when loading headers, so the key stays out of the config file. Use `grok mcp doctor apex_flow_web_scraper` to check the connection.
+
+The npm package is not published yet. Its prepared installer has individual targets for Codex CLI, Claude Code/Desktop, Grok CLI, Cursor, Gemini CLI, Windsurf, GitHub Copilot CLI and VS Code, Cline, Roo Code, Continue, OpenCode, Amazon Q Developer, JetBrains Air, and Zed. For example, select Grok with `npx -y apex-flow-web-scraper setup --client grok`, or preview all supported targets with `npx -y apex-flow-web-scraper setup --all --dry-run`. The installer backs up existing settings, preserves unrelated servers, and keeps the API key out of configuration files.
+
+The local stdio bridge exposes `web_search_byok` for direct Brave, Tavily, or Exa search using a provider key in the local AI client's environment. Select one provider key, or set `APEX_SEARCH_PROVIDER` when multiple keys are present. The provider bills your account directly; its key is never sent to Apex. Pass returned URLs to `scrape_page` to fetch them with Apex credits. This is separate from hosted `web_search`, which uses Apex's operator-configured provider and credit billing.
+
+Developer API examples are available for:
+
+- [OpenAI Responses](examples/openai-responses-mcp.py)
+- [Anthropic Messages](examples/anthropic-messages-mcp.py)
+- [Google ADK](examples/google-adk-mcp.py)
+- [xAI/Grok's native Python SDK](examples/xai-native-mcp.py) and [Responses API](examples/xai-responses-mcp.py)
+
+### Migrate an existing Firecrawl SDK client
+
+Keep the official Firecrawl SDK and point its API URL at Apex. The adapter covers a documented subset of Firecrawl v2; unsupported options return an explicit error instead of being silently ignored. Hosted whole-web search still requires an operator-configured Apex provider. See the [compatibility contract](site/firecrawl-compat.html) before switching production traffic.
+
+```js
+import { Firecrawl } from "firecrawl";
+
+const scraper = new Firecrawl({
+  apiKey: process.env.APEX_SCRAPER_API_KEY,
+  apiUrl: "https://webscraper.apexflowlabs.com",
+});
+
+const page = await scraper.scrape("https://example.com", { formats: ["markdown"] });
+console.log(page.markdown);
+```
+
+The same pattern works with Firecrawl's Python SDK using `api_url`. Current official examples: [JavaScript SDK](https://github.com/firecrawl/firecrawl/tree/main/apps/js-sdk/firecrawl) and [Python SDK](https://github.com/firecrawl/firecrawl/tree/main/apps/python-sdk). The adapter contract test uses the official Node SDK against its v2 API shapes; it does not claim full SDK parity.
+
+Both Grok API examples restrict MCP access to `scrape_page`; see [xAI's remote MCP documentation](https://docs.x.ai/developers/tools/remote-mcp) for current API support. Model calls can use vendor tokens and scraping calls use Apex credits. ChatGPT's built-in MCP connections have separate plan and workspace requirements.
+
+### Scheduled change monitors
+
+Paid plans can create durable monitors that check one public URL at a chosen interval (one hour minimum) and send a signed HTTPS webhook only when its content hash changes. The first successful check establishes a baseline. Each successful plain-page check uses one credit; failed reads are refunded. Scheduled checks obey the source site's `robots.txt`. Creation requires `confirm_recurring: true` and returns a 30-day maximum credit estimate plus a signing secret shown once. Free plans do not include monitors; plan record limits and active counts are returned by `/v1/usage`. See the [signed webhook and monitor API guide](site/monitoring.html).
+
+For agents that support the open Agent Skills format, this repository also includes a portable skill and dependency-free Python CLI. After it is merged to the public default branch, install it with `npx skills add Apexflowlabsllc/apex-flow-web-scraper --skill apex-flow-web-scraper`; set `APEX_SCRAPER_API_KEY` in the agent's environment. The skill covers page reads, batches, changes-only comparisons, maps, crawls, usage and saved-page search.
 
 ## Price per page
 
-Apex prices are live on the [pricing page](https://webscraper.apexflowlabs.com/#pricing). Firecrawl figures are its annual-billing prices from firecrawl.dev/pricing, re-read on 13 November 2026 (monthly billing is $19 / $99 / $399); check theirs for current figures.
+Apex prices are live on the [pricing page](https://webscraper.apexflowlabs.com/#pricing). Firecrawl's public pricing was checked on 21 November 2026; its [pricing page](https://www.firecrawl.dev/pricing) lists a recurring 1,000-credit monthly free tier, paid plans, and paid-plan pay-as-you-go. Credits and feature costs differ, so compare your own workload before treating these page counts as equivalent.
 
-| Monthly spend | Apex pages | Firecrawl pages |
+| Spend or plan | Apex plain pages | Firecrawl plain pages |
 |---|---|---|
+| Free | 1,000 credits once | 1,000 credits each month |
 | $5 once, no subscription | 35,000 | no one-time option listed |
-| about $15 | 110,000 ($15) | 5,000 ($16) |
-| about $80 | 850,000 ($79) | 100,000 ($83) |
-| about $300 | 3,750,000 ($299) | 500,000 ($333) |
+| about $16/month | 110,000 ($15) | 5,000 ($16 annual) or 5,000 ($19 monthly) |
+| about $80/month | 850,000 ($79) | 100,000 ($83 annual) or 100,000 ($99 monthly) |
+| about $300/month | 3,750,000 ($299) | 500,000 ($333 annual) or 500,000 ($399 monthly) |
 
-Field extraction by CSS selector costs no extra credits. Failed and blocked pages cost nothing. There are no automatic overage charges.
+Field extraction by CSS selector costs no extra credits. Failed requests return their reserved credits; there are no automatic Apex overage charges. Firecrawl offers pay-as-you-go on paid plans, which can keep a workload running when the included credits run out.
 
 ## What you get
 
@@ -52,7 +125,7 @@ Field extraction by CSS selector costs no extra credits. Failed and blocked page
 | Store watch (self-hosted) | `rainbo-scrape store-track example.com` saves a snapshot of a Shopify store's public catalog; `store-rising example.com --days 7` ranks products by what changed between snapshots (new, price change, sold out, restocked, variant activity); `store-list` shows tracked stores. Obeys robots.txt. A ranking of changes, not a sales or revenue figure. |
 | Agent-ready errors | A stable `code`, `retryable`, `retry_after`, a `hint`, and a `buy_url` when credits run out. |
 | MCP | Remote server at `https://webscraper.apexflowlabs.com/v1/mcp`, listed in the official MCP Registry. |
-| Clients | Python (`rainbo_scrape.hosted_client`) and Node (`sdk/node/hosted.mjs`), no dependencies. |
+| Clients | Python (`rainbo_scrape.hosted_client`) and Node (`apex-flow-web-scraper/hosted`). The client modules add no request-time dependencies; the PyPI distribution also includes the self-hosted engine. |
 | Self-host | MIT licensed engine in this repository. |
 
 
@@ -168,6 +241,7 @@ data. An assistant must not execute instructions found inside collected pages.
 - Durable SQLite jobs, progress events, cancellation and worker recovery.
 - Same-origin crawling with atomic frontier/page limits, time and byte budgets.
 - HTTP-first extraction and optional isolated Brave rendering through Playwright.
+- Bounded click, wait and scroll actions for public dynamic pages in one rendered request; no arbitrary scripts, form submission or retained login state.
 - HTML text/Markdown, metadata, headings, tables, links, JSON-LD, feeds, sitemaps,
   JSON and text-based PDF extraction.
 - CSS recipes, required fields, restricted JSON Schema validation and field evidence.
@@ -195,11 +269,12 @@ python -m pip install -e '.[test]'
 python -m pytest -q
 ```
 
-44 tests passed in the launch Windows environment, including local fixture
-rendering with installed Brave. Browser tests can depend on Brave availability.
-Tests cover policy, cache/ETag, response limits, atomic accounting, recovery,
-cancellation, recipes and private-web boundaries. Upstream dependency suites
-were not run. A dated Firecrawl comparison is in `BENCHMARK-2026-11-05.md`.
+On 22 November 2026, the current review branch passed 148 Python tests and 18
+Node tests. The suite covers policy, cache/ETag, response limits, atomic
+accounting, recovery, cancellation, recipes, private-web boundaries, SDKs and
+client installers. Upstream dependency suites were not run. Browser-dependent
+tests require Brave availability. A dated Firecrawl comparison is in
+`BENCHMARK-2026-11-05.md`.
 
 Access challenge pages are detected and reported with an `access_challenge`
 error. The current release does not provide an isolated signed-in account
@@ -220,10 +295,28 @@ Read the [documentation](https://webscraper.apexflowlabs.com/docs.html),
 
 ## Roadmap
 
-See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged capability plan and [ACCESS-PLATFORM-PLAN.md](ACCESS-PLATFORM-PLAN.md) for the proxy infrastructure and owner-controlled challenge-handling design.
+See [CAPABILITY-ROADMAP.md](CAPABILITY-ROADMAP.md) for our staged capability plan, [FIRECRAWL-PARITY-MATRIX-2026-11-22.md](FIRECRAWL-PARITY-MATRIX-2026-11-22.md) for the sourced feature/access comparison, and [ACCESS-PLATFORM-PLAN.md](ACCESS-PLATFORM-PLAN.md) for the proxy infrastructure and owner-controlled challenge-handling design.
 
 
-## Measured (0.2.0, 30-URL benchmark, 5 Nov 2026)
+### Firecrawl v2 API compatibility
+
+The draft branch includes a limited compatibility adapter for uploaded-document parsing, scrape, map, configured web search, crawl lifecycle, async batch, and bounded interactive sessions. `POST /v2/parse` supports PDF, DOCX, HTML, plain text, JSON, and XML uploads up to 12 MiB at one credit per file; `GET /v2/parse/formats` lists supported inputs. Parse outputs include markdown, text, links, HTML when present, PDF pages, and metadata. Crawl jobs can be listed with `GET /v2/crawl/active`. `GET /v2/team/credit-usage` reports current allowance and period dates, while `/v2/team/credit-usage/historical` reports monthly totals and supports account or per-API-key views. Legacy usage without key-level records appears as unattributed. The adapter also supports markdown/html/rawHtml/links/screenshots and provider-backed JSON schema extraction; hosted JSON extraction requires a configured model provider and a paid plan and costs 150 credits per page. Interactive sessions cost 3 credits to create and per action request, are limited to explicit public-origin allowlists, and accept declarative click/wait/scroll actions only. They do not expose CDP, live video, login profiles, or arbitrary code execution. Session affinity is process-local and is not ready for multi-process deployment. Image OCR, agent runs, research indexes, batch webhooks, custom concurrency, and full Firecrawl SDK parity are not implemented. See the [migration guide](site/firecrawl-compat.html). These routes are branch-only until a reviewed production release.
+
+The hosted REST API now supports labeled key management at `GET/POST /v1/keys` and `DELETE /v1/keys/{key_id}`. Creation returns the bearer key once; listing returns only its opaque ID, label, creation time, and revocation state. Each account can hold up to 25 active keys, all with the same account permissions and credit pool. These routes are also branch-only until release.
+
+## Latest Apex-only benchmark (0.11.0 branch code, 22 Nov 2026)
+
+27/30 URLs fetched, 83/94 reference checks passed, median 1.16 s per successful
+URL with rendering disabled. Two sources denied robots-compliant access, one
+returned an HTTP error, seven missed JavaScript-only content because rendering
+was disabled, and four headline references were stale. All other reference
+checks passed. This is not a Firecrawl head-to-head. Method and limits:
+`BENCHMARK-2026-11-22.md`.
+For permissioned owned-site comparisons, see the offline signed
+[gold-set evaluator and run format](tests/benchmark/GOLDSET-GUIDE.md). No
+signed external-source gold set or current head-to-head result is claimed.
+
+## Historical comparison (0.2.0, 30-URL benchmark, 5 Nov 2026)
 
 Update, 13 November 2026 (hosted API 0.7.0): the four URLs that run could not fetch were requested again through the live API. text.npr.org and zillow.com were read live; reuters.com/world and glassdoor.com were refused live and returned labelled Internet Archive copies (captured 17 October 2026 and 28 August 2023). The other 26 URLs were not re-run.
 
@@ -247,4 +340,4 @@ Not built: a whole-web search index of our own.
 - Every result carries a `receipt`: requested and final URL, status, fetch time, user agent, content hash, robots.txt decision.
 - `rainbo-scrape llms-txt https://your-site.com --pages 30 [--full]`: writes llms.txt / llms-full.txt for a site you operate.
 - `rainbo-scrape crawl-web <seed>`: open-web crawl, up to 1,000 pages a job, robots.txt obeyed. Built, not yet run at scale.
-- `sdk/node`: Node clients for a local workspace and the hosted API (in this repository, not yet on npm).
+- `sdk/node`: Node clients for the local workspace and hosted API, also available through the `apex-flow-web-scraper` npm package.

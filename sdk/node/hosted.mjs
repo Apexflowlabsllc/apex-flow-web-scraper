@@ -1,4 +1,4 @@
-// Client for the hosted Apex Flow 3D Scraper API. No dependencies; Node 18+.
+// Client for the hosted Apex Flow Web Scraper API. No dependencies; Node 18+.
 //   import { Apex } from "./hosted.mjs";
 //   const apex = new Apex();                       // reads APEX_SCRAPER_API_KEY
 //   const { result } = await apex.scrape("https://example.com", { outputs: ["markdown"] });
@@ -24,7 +24,7 @@ export class Apex {
     for (let attempt = 0; ; attempt++) {
       const res = await this.fetch(this.base + path, {
         method,
-        headers: { Authorization: "Bearer " + this.key, "Content-Type": "application/json", "User-Agent": "apex-scraper-node/0.9.0" },
+        headers: { Authorization: "Bearer " + this.key, "Content-Type": "application/json", "User-Agent": "apex-scraper-node/0.11.0" },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
@@ -39,7 +39,7 @@ export class Apex {
     }
   }
 
-  // One page. Options: render, outputs, recipe, chunks, max_tokens, page, fallback: "archive", max_age, extract.
+  // One page. Options: render, outputs, recipe, chunks, max_tokens, page, fallback: "archive", max_age, extract, wait_selector, scrolls (0–10), actions (up to 8 click/wait/scroll steps; single request, no retained login state).
   scrape(url, options = {}) { return this.#call("POST", "/scrape", { url, ...options }); }
 
   // Every part of a long page, joined. Follows pagination for you.
@@ -58,6 +58,14 @@ export class Apex {
   batch(urls, options = {}) { return this.#call("POST", "/batch", { urls, ...options }); }
   // What changed since this account last read each URL, without page bodies.
   changes(urls, render = "never") { return this.batch(urls, { render, outputs: ["diff"] }); }
+  createMonitor(url, webhookUrl, intervalSeconds = 86400, confirmRecurring = false) {
+    return this.#call("POST", "/monitors/create", { url, webhook_url: webhookUrl, interval_seconds: intervalSeconds, confirm_recurring: confirmRecurring });
+  }
+  monitors() { return this.#call("GET", "/monitors/list"); }
+  pauseMonitor(id) { return this.#call("POST", "/monitors/pause", { id }); }
+  resumeMonitor(id) { return this.#call("POST", "/monitors/resume", { id }); }
+  deleteMonitor(id) { return this.#call("POST", "/monitors/delete", { id }); }
+  monitorEvents(id, limit = 20) { return this.#call("POST", "/monitors/events", { id, limit }); }
   map(url, limit = 1000, search) { return this.#call("POST", "/map", search ? { url, limit, search } : { url, limit }); }
   search(query, limit = 10) { return this.#call("POST", "/search", { query, limit }); }
   webSearch(query, limit = 10) { return this.#call("POST", "/websearch", { query, limit }); }

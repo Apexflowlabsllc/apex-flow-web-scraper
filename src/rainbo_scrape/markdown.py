@@ -25,6 +25,7 @@ CHROME_CLASSES = {"sidebar", "side-bar", "breadcrumb", "breadcrumbs", "advertise
                   "page-footer", "masthead", "navbar", "topbar", "top-bar", "pagination", "related-posts"}
 CHROME_PREFIXES = ("onetrust", "ot-sdk", "didomi", "truste", "osano", "qc-cmp", "sp_message", "usercentrics",
                    "cmplz", "cookieconsent", "cookie-law", "gdpr")
+AUTH_LINK_TEXT = {"login", "log in", "sign in", "sign up", "register"}
 PERMALINK = re.compile(r"^[#¶§🔗\s]*$")
 
 
@@ -59,6 +60,17 @@ def strip_chrome(root):
         node.decompose()
     for node in root.find_all(string=lambda s: isinstance(s, Comment)):
         node.extract()
+    # Some sites place a bare authentication link in a paragraph inside a
+    # generic header row instead of using <nav> or a recognizable class.
+    # Drop only that isolated control outside article/main content; retain
+    # substantive paragraphs that happen to mention login or registration.
+    for link in list(root.select("a[href]")):
+        label = link.get_text(" ", strip=True).casefold()
+        parent = link.parent
+        if (label in AUTH_LINK_TEXT and parent and parent.name == "p"
+                and parent.find_all(True) == [link]
+                and not parent.find_parent(("article", "main"))):
+            parent.decompose()
     for node in list(root.find_all(True)):
         if node.decomposed:
             continue

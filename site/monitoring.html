@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Scheduled change monitors · Apex Flow Web Scraper</title>
+  <meta name="description" content="Create scheduled public-page monitors with explicit credit consent and signed HTTPS change notifications.">
+  <link rel="canonical" href="https://webscraper.apexflowlabs.com/monitoring.html">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <nav><a href="/">APEX FLOW WEB SCRAPER</a><a href="/docs.html">API docs →</a></nav>
+  <main>
+    <p class="eyebrow">Scheduled monitoring</p>
+    <h1>Watch a public page for changes.</h1>
+    <p class="lede">Create a monitor on an active paid plan. Apex checks the page on your chosen schedule and sends a signed HTTPS event when its content changes.</p>
+    <h2>Create a monitor</h2>
+    <p>POST <code>/v1/monitors</code> with your bearer key. The minimum interval is one hour and the maximum is 30 days. Monitors obey the source site's robots.txt rules. The first successful check establishes a baseline and does not send an event.</p>
+    <pre><code>{
+  "url": "https://example.com/pricing",
+  "webhook_url": "https://your-service.example/webhooks/apex",
+  "interval_seconds": 86400,
+  "confirm_recurring": true
+}</code></pre>
+    <p>Each successful plain-page check uses one credit; failed checks are refunded. The response shows the maximum expected credits over 30 days. There are no automatic overages: a monitor pauses if credits run out. The plan monitor limit and active monitor count are included in <code>GET /v1/usage</code>.</p>
+    <p>Each change event includes a stable event ID, monitor ID, source URL, previous and current content hashes, page title when available, and a bounded text diff. The webhook receiver can deduplicate retries by event ID.</p>
+    <h2>Verify notifications</h2>
+    <p>The create response includes a monitor-specific <code>signing_secret</code> once. Store it securely. Notifications include <code>X-Apex-Event-Id</code> and <code>X-Apex-Signature: t=&lt;unix-seconds&gt;,v1=&lt;hex&gt;</code>. Verify the HMAC-SHA256 using the signing secret as the key and <code>timestamp + "." + exact raw request body</code> as the message. Reject stale timestamps and deduplicate by event ID. Apex retries failed deliveries with bounded backoff and never follows redirects.</p>
+    <pre><code>import hmac, hashlib
+expected = hmac.new(secret.encode(), timestamp.encode() + b"." + raw_body,
+                    hashlib.sha256).hexdigest()
+valid = hmac.compare_digest(expected, received_signature)</code></pre>
+    <h2>Manage monitors</h2>
+    <ul>
+      <li><code>GET /v1/monitors</code> lists this account's monitors.</li>
+      <li><code>POST /v1/monitors/pause</code> or <code>/resume</code> with <code>{"id":"…"}</code> changes a monitor's state.</li>
+      <li><code>GET /v1/monitors/{id}/events</code> shows recent events and delivery attempts.</li>
+      <li><code>DELETE /v1/monitors/{id}</code> deletes the monitor and its event history.</li>
+    </ul>
+    <p>Monitor operations are also available over the hosted MCP server. A monitor reads only public URLs, uses no browser login state, and does not bypass access challenges or robots exclusions.</p>
+  </main>
+</body>
+</html>

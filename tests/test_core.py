@@ -76,6 +76,8 @@ async def site():
             return web.Response(text="User-agent: *\nDisallow: /private\n")
         if path == "/redirect":
             raise web.HTTPFound("/article")
+        if path == "/external-redirect":
+            raise web.HTTPFound("https://example.org/article")
         if path == "/etag":
             if request.headers.get("If-None-Match") == '"v1"':
                 return web.Response(status=304)
@@ -164,6 +166,16 @@ async def test_fetch_robots_redirect_cache_retry_and_etag(settings, site):
         settings.cache_ttl = -1
         assert (await f.get(base+"/etag"))["cache"] == "revalidated"
         assert counts["/etag"] == 2
+
+
+async def test_fetch_redirect_obeys_explicit_origin_allowlist(settings, site):
+    base, counts = site
+    origin = Fetcher._origin(base)
+    async with Fetcher(settings) as fetcher:
+        with pytest.raises(ScrapeError, match="Redirect target is outside"):
+            await fetcher.get(base + "/external-redirect", allowed_origins={origin})
+    assert counts["/external-redirect"] == 1
+    assert counts.get("/article", 0) == 0
 
 
 async def test_decoded_gzip_budget(settings, site):

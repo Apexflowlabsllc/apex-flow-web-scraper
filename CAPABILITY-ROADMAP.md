@@ -1,6 +1,6 @@
 # Apex Flow Web Scraper: capability plan
 
-**Decision record, 8 October 2026 · Public engine 0.1.0**
+**Decision record, 8 October 2026 · updated 22 November 2026 · repository package 0.11.0**
 
 The aim is broad, dependable capability under customer control. “Beat every
 competitor” is a direction, not a measured result. We do not describe a feature
@@ -10,20 +10,31 @@ be recovered.
 
 ## What users can do today
 
-The 0.1.0 engine supports public HTTP/HTTPS pages, same-origin crawl jobs, an
-optional isolated Brave render, CSS extraction recipes, required-field
-validation, source evidence, durable status and cancellation, JSON/CSV exports,
-local corpus search and nine MCP tools. The worker and local website are
-single-installation tools; the workspace is not a public multi-user service.
+This roadmap covers both the self-hosted engine and the hosted service. The
+repository's API source, `site/openapi.json`, and `site/docs.html` describe a
+hosted product with authenticated page and batch scraping, JavaScript
+rendering, sitemap discovery, crawl jobs, change diffs, CSS recipes, paid JSON
+Schema extraction, account-scoped saved-page search, PDF/DOCX parsing, Shopify
+catalog change signals, and remote MCP access. A source-tree description does
+not prove that the latest branch is deployed; verify the release before
+promising a hosted feature or limit.
 
-It does not yet support customer login profiles, CAPTCHA solving or
-user-assisted challenge continuation, managed proxy pools, visual workflow
-recording, OCR, shared cloud accounts, global datasets, or a contractual
-extraction SLA. An operator may configure one customer-controlled HTTP proxy
-with `RAINBO_SCRAPE_PROXY_URL`; the engine validates destinations
-against public-address policy before forwarding and exposes only a boolean
-health indicator. This is proxy routing, not a proxy network or geographic
-coverage promise. The 44 current tests and one successful server smoke scrape
+The self-hosted engine supports public HTTP/HTTPS pages, same-origin crawl
+jobs, an optional isolated Brave render, CSS extraction recipes, required-field
+validation, source evidence, durable status and cancellation, JSON/CSV exports,
+local corpus search, and MCP tools for health, fetch, maps, crawls, recipes,
+search, jobs and change comparisons. It can also use a separate local browser
+profile that the account owner signs into; that profile remains on the owner's
+machine and is not sent to the hosted service. The worker and local website
+are single-installation tools, not a public multi-user service.
+
+Neither edition provides CAPTCHA solving, bot-wall evasion, managed proxy
+pools, visual workflow recording, OCR, shared cloud accounts, global datasets,
+or a contractual extraction SLA. An operator may configure one
+customer-controlled HTTP proxy with `RAINBO_SCRAPE_PROXY_URL`; the engine
+validates destinations against public-address policy before forwarding and
+exposes only a boolean health indicator. This is proxy routing, not a proxy
+network or geographic coverage promise. Existing unit tests and smoke scrapes
 are not comparative accuracy, coverage or uptime evidence.
 
 ## Capability map
@@ -49,17 +60,17 @@ Sources: [Firecrawl Enhanced Mode](https://docs.firecrawl.dev/features/enhanced-
 
 | Capability customers compare | Current Apex position | Build path | Proof required before marketing it as ready |
 |---|---|---|---|
-| Durable crawling and job control | Implemented locally; one worker | Add scheduled runs, retry policy editor, queue fairness, capacity controls and retention tools | Fault-injection and load run with stated hardware, job mix and recovery measurements |
+| Durable crawling and job control | Implemented locally; hosted source now includes paid, opt-in scheduled monitors with persisted schedule/event state, signed HTTPS notifications, bounded retries, pause/resume/delete and plan quotas | Harden cross-process claiming, idempotent delivery under restart, delivery observability, queue fairness, retention tools and capacity controls | Fault-injection and load run with stated hardware, job mix and recovery measurements; monitor tests cover billing/refunds, restart, duplicate delivery, SSRF/DNS rebinding, tenant isolation and exhausted-credit pause |
 | Extraction breadth | HTML, Markdown, JSON-LD, tables, feeds, sitemaps, JSON, text and text-based PDFs | Add reviewed product/article/job schemas, pagination patterns, iframe policy, image OCR and language-aware parsing | Human-labeled gold set; per-field precision, recall, coverage and source attribution |
 | Recipe authoring | CSS recipes and required fields | Visual selector picker, page preview, multi-page recipe tests, suggested fields with source highlights | Recipe success and maintenance study across unseen layouts; user can inspect and edit every rule |
 | Layout change detection | Compare saved results | Detect selector drift, unexpected empty fields, types and page-template changes; generate repair proposals for review | Versioned-change benchmark; show detection and false-alarm rates, keep human approval before replacing a recipe |
-| JavaScript sites | Isolated local Brave render | Bounded actions, explicit waits, pagination and screenshots; configurable resource policy | Repeatable same-page HTTP/browser comparison and memory/latency limits |
+| JavaScript sites | Source now supports isolated Brave rendering plus bounded one-request click, wait and scroll actions (8 actions, 10 total viewport heights, 10 seconds explicit waits); no retained browser or login session | Persistent browser sessions and reusable profiles with domain limits, expiration, and audit evidence; configurable resource policy | Fixture proves a click reveals dynamic content and is returned through REST/MCP; verify metering, failure refunds, SSRF guards, resource budgets, and session isolation before marketing persistent sessions |
 | Signed-in customer accounts | Not supported | A local, isolated browser profile that the account owner signs into directly; domain-limited reusable sessions; explicit expiration and revocation | Security review, profile isolation tests, no password capture, no main-browser cookie import, no credentials in jobs/logs/repository |
 | CAPTCHA and access challenges | Challenge pages are detected with a dedicated access-challenge error and stopped as failures; no bypass or human-resume flow | Add a visible challenge pause for an isolated, owner-authorized profile. Let the account owner complete a permitted step themselves, then resume only if the site allows it; preserve event evidence and revoke state on demand | Demonstrate owner-directed completion, challenge detection and safe resume without automation impersonating a human or selling CAPTCHA bypass |
 | Proxy and geographic access | Optional operator-configured customer-owned HTTP proxy; destination DNS is separately checked against the public-address policy; no managed pool or geography claim | Build an Apex-operated outbound proxy fleet on infrastructure owned or contracted directly by Apex, then add per-tenant egress policy, explicit region selection, pinned sessions, health checks, quotas, spend caps, source/ownership records, and abuse response. Residential egress is out of scope unless every endpoint has documented, informed opt-in and revocation | Network ownership and sourcing evidence, per-region availability, spend cap and independent route tests; no proxy-rotation or ban-evasion guarantee |
 | Multiple customers and teams | Single trusted installation | Add separate accounts, encrypted tenant storage, project roles, quotas, audit log, deletion and backup/restore | Tenant-isolation tests, external security assessment, recovery exercise and published operational ownership |
 | Hosted managed service | Not implemented | Only after the multi-tenant security model: account isolation, durable regional workers, public API, queues, billing, observability and support operations | Production load test, independent security review, incident runbook, tested backups and an honestly scoped service commitment |
-| API and assistant access | Nine MCP tools in source | Finish connection in each client; then versioned REST API, OpenAPI contract, SDK examples and webhook events | Per-client integration test and public API uptime/error measurements |
+| API and assistant access | 11 self-hosted MCP tools; hosted source now exposes 19 tools plus optional whole-web search; REST OpenAPI, Python/Node clients, 15 installer targets and direct API examples for OpenAI, Anthropic, Google ADK, and xAI/Grok's native and Responses APIs in this branch | Validate each client schema and supported version; publish packages only through the reviewed release gate; use integration success and retention—not installer count—as adoption measures | Per-client integration tests, stable OpenAPI contract, clean registry installs, signed notification checks and measured API uptime/error rates |
 | Data quality commitment | No numeric guarantee | Offer a scoped acceptance commitment for specified sources, fields, sample size, region, frequency and freshness window | Signed gold set, independent scoring, minimum denominator, error remedy and explicit exclusions for source outages/access blocks |
 | Cost advantage | No required scraping vendor key | Measure CPU, storage, bandwidth, operator time and customer infrastructure for each run; show predicted and actual use before scaling | Reproducible cost-per-correct-field results alongside equivalent managed-service comparisons |
 
@@ -184,15 +195,30 @@ search-first volume. [Google guidance for generative search](https://developers.
 
 ## Immediate next three builds
 
-1. Create the signed, permissioned, multi-layout gold-set evaluator and surface
-   coverage, per-field accuracy, confidence intervals and failure causes in the
-   workspace.
-2. Replace the current one-shot render with a local visible session workflow:
-   owner login, MFA, explicit human challenge handling, encrypted site-bound
-   session, expiry, scope and revocation. Keep all sessions off the server and
-   out of chat.
-3. Add recipe drift detection and a reviewed repair proposal. Do not silently
-   change a schema or mark a blocked page as an extraction success.
+1. **Evaluator implemented in branch:** `tests/benchmark/goldset_evaluator.py`
+   verifies signed permission-scoped manifests and reports reach, field
+   coverage, field accuracy, Wilson confidence intervals, failures, latency,
+   and reported cost. Its format and limitations are in
+   `tests/benchmark/GOLDSET-GUIDE.md`. Still required: owner-authorized,
+   multi-layout gold data and an identical-condition cross-vendor run.
+2. **Migration adapter started in branch:** Firecrawl-shaped `/v2/scrape`,
+   `/v2/map`, `/v2/search`, and crawl create/status/cancel routes now translate
+   to Apex's existing metered features and reject unsupported options. The
+   async batch now stores account-scoped job status and per-URL results/errors,
+   supports cancellation, and bounds job size to plan limits. The worker reuses
+   the metered native batch path. Still required: restart resume, queue claiming
+   across processes, callbacks, same-client compatibility tests, broader
+   response-schema coverage, and a reviewed production release before customers
+   can use it live.
+3. **Build safe persistent local sessions:** owner login, MFA, explicit human
+   challenge handling, encrypted site-bound state, expiry, scope and
+   revocation. Keep sessions off the hosted service and out of chat.
+
+The current public feature-surface comparison is tracked in
+`FIRECRAWL-PARITY-MATRIX-2026-11-22.md`. Its top gaps remain general web search,
+durable browser sessions, autonomous research, large-scale data providers,
+async batch throughput, keyless team access and measured service capacity.
+Do not treat the matrix as proof of feature equivalence or production release.
 
 Only after these gates should we scope customer-owned proxies, first-party
 network infrastructure, OCR, teams and managed hosting. This sequence delivers

@@ -11,11 +11,58 @@ from .network import Fetcher
 from .policy import ScrapeError, canonical_url, check_url
 
 
+def validate_actions(actions):
+    """Accept a small, declarative browser action list; never accept executable page code."""
+    if actions is None:
+        return []
+    if not isinstance(actions, list) or len(actions) > 8:
+        raise ValueError("actions must be a list of at most 8 browser actions")
+    validated = []
+    total_scrolls = 0
+    total_wait_ms = 0
+    for index, action in enumerate(actions, 1):
+        if not isinstance(action, dict) or not isinstance(action.get("type"), str):
+            raise ValueError(f"actions[{index - 1}] must be an object with a type")
+        kind = action["type"]
+        if kind == "click":
+            if set(action) != {"type", "selector"}:
+                raise ValueError(f"actions[{index - 1}] click accepts only type and selector")
+            validate_recipe({"fields": {"action": {"selector": action.get("selector")}}})
+        elif kind == "wait":
+            if set(action) == {"type", "selector"}:
+                validate_recipe({"fields": {"action": {"selector": action["selector"]}}})
+            elif set(action) == {"type", "ms"}:
+                ms = action["ms"]
+                if isinstance(ms, bool) or not isinstance(ms, int) or not 0 <= ms <= 5000:
+                    raise ValueError(f"actions[{index - 1}] wait ms must be an integer from 0 to 5000")
+                total_wait_ms += ms
+            else:
+                raise ValueError(f"actions[{index - 1}] wait requires exactly one selector or ms")
+        elif kind == "scroll":
+            if set(action) - {"type", "direction", "amount"}:
+                raise ValueError(f"actions[{index - 1}] scroll accepts type, direction and amount only")
+            direction, amount = action.get("direction", "down"), action.get("amount", 1)
+            if not isinstance(direction, str) or direction not in {"down", "up"}:
+                raise ValueError(f"actions[{index - 1}] scroll direction must be down or up")
+            if isinstance(amount, bool) or not isinstance(amount, int) or not 1 <= amount <= 10:
+                raise ValueError(f"actions[{index - 1}] scroll amount must be an integer from 1 to 10")
+            total_scrolls += amount
+            action = {"type": "scroll", "direction": direction, "amount": amount}
+        else:
+            raise ValueError(f"actions[{index - 1}] type must be click, wait or scroll")
+        validated.append(dict(action))
+    if total_scrolls > 10:
+        raise ValueError("actions may scroll at most 10 viewport heights in total")
+    if total_wait_ms > 10000:
+        raise ValueError("actions may request at most 10000 ms of explicit waiting")
+    return validated
+
+
 def validate_request(request, settings):
     if not isinstance(request, dict):
         raise ValueError("Job must be a JSON object")
     allowed = {"urls", "max_pages", "max_depth", "max_seconds", "max_bytes", "concurrency",
-               "render", "recipe", "wait_selector", "scrolls", "include_paths", "exclude_paths", "cache",
+               "render", "recipe", "wait_selector", "scrolls", "actions", "include_paths", "exclude_paths", "cache",
                "max_age", "screenshot", "extract", "change_tracking", "follow_external", "chunks", "robots"}
     if set(request)-allowed:
         raise ValueError("Unknown job options: "+", ".join(set(request)-allowed))
@@ -36,6 +83,13 @@ def validate_request(request, settings):
     result.setdefault("render", "auto")
     if result["render"] not in {"auto", "never", "always"}:
         raise ValueError("render must be auto, never or always")
+    if result["scrolls"] and result["render"] == "never":
+        raise ValueError("scrolls requires browser rendering; set render to auto or always")
+    result["actions"] = validate_actions(result.get("actions"))
+    if result["scrolls"] + sum(a.get("amount", 0) for a in result["actions"] if a["type"] == "scroll") > 10:
+        raise ValueError("scrolls and scroll actions may total at most 10 viewport heights")
+    if result["actions"] and result["render"] == "never":
+        raise ValueError("actions require browser rendering; set render to auto or always")
     if result.setdefault("robots", "obey") not in {"obey", "requested"}:
         raise ValueError("robots must be obey or requested")
     result.setdefault("cache", True)
@@ -75,15 +129,19 @@ async def scrape(fetcher, url, options):
     if response["status"] >= 400:
         raise ScrapeError("http_error", f"Site returned HTTP {response['status']}")
     result = await parse(response["body"], response["url"],
-                                    response["headers"].get("content-type", "text/html"), options.get("recipe"))
+                         response["headers"].get("content-type", "text/html"), options.get("recipe"),
+                         include_html=options.get("include_html", False),
+                         include_raw_html=options.get("include_raw_html", False))
     mode = options.get("render", "auto")
     rendered = False
     shot = None
-    if result["kind"] == "html" and (mode == "always" or options.get("screenshot") or (mode == "auto" and result.get("quality", {}).get("needs_render"))):
+    if result["kind"] == "html" and (mode == "always" or options.get("screenshot") or options.get("scrolls") or options.get("actions") or (mode == "auto" and result.get("quality", {}).get("needs_render"))):
         response = await render(fetcher, response["url"], options.get("wait_selector"), options.get("scrolls", 0),
-                                screenshot=bool(options.get("screenshot")))
+                                screenshot=bool(options.get("screenshot")), actions=options.get("actions"))
         shot = response.pop("screenshot", None)
-        result = await parse(response["body"], response["url"], "text/html", options.get("recipe"))
+        result = await parse(response["body"], response["url"], "text/html", options.get("recipe"),
+                             include_html=options.get("include_html", False),
+                             include_raw_html=options.get("include_raw_html", False))
         result["browser"] = response["browser"]
         rendered = True
     result.update(url=response["url"], status=response["status"], cache=response["cache"], rendered=rendered,

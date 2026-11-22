@@ -3,10 +3,24 @@ requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rainbo-scrape"
+name = "apex-flow-web-scraper"
 version = "0.11.0"
-description = "Apex Flow 3D Scraper: web pages, PDFs and DOCX to clean Markdown; hosted API client, MCP server and self-hosted engine"
+description = "Apex Flow Web Scraper: web pages, PDFs and DOCX to clean Markdown; hosted API client, MCP server and self-hosted engine"
+readme = "README.md"
 requires-python = ">=3.11"
+keywords = ["web scraping", "web crawler", "markdown", "MCP", "AI agents", "data extraction"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: WWW/HTTP :: Browsers",
+  "Topic :: Text Processing :: Markup :: HTML",
+]
 dependencies = ["aiohttp>=3.12,<4", "beautifulsoup4>=4.13,<5", "lxml>=5,<7", "markdownify>=1,<2", "pypdf>=6,<7", "playwright>=1.55,<2", "mcp>=1.20,<2", "jsonschema>=4.23,<5", "defusedxml>=0.7,<1", "certifi>=2024.1.1"]
 
 [project.optional-dependencies]
@@ -15,6 +29,12 @@ test = ["pytest>=8,<10", "pytest-asyncio>=1,<2"]
 [project.scripts]
 rainbo-scrape = "rainbo_scrape.cli:main"
 apex-scraper-mcp = "rainbo_scrape.hosted_mcp:main"
+
+[project.urls]
+Homepage = "https://webscraper.apexflowlabs.com/"
+Documentation = "https://webscraper.apexflowlabs.com/docs.html"
+Repository = "https://github.com/Apexflowlabsllc/apex-flow-web-scraper"
+Issues = "https://github.com/Apexflowlabsllc/apex-flow-web-scraper/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
