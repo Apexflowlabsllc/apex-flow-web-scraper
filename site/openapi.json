@@ -2428,6 +2428,48 @@
         }
       }
     },
+    "/v2/team/credit-usage": {
+      "get": {
+        "operationId": "firecrawlCompatCreditUsage",
+        "summary": "Current credit usage",
+        "description": "Returns account allowance and billing period dates. Values are Apex account-scoped.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "responses": {
+          "200": {
+            "description": "Current allowance and period metadata",
+            "content": {"application/json": {"schema": {"type": "object", "properties": {
+              "success": {"type": "boolean"},
+              "data": {"type": "object", "properties": {
+                "remainingCredits": {"type": "integer"},
+                "planCredits": {"type": "integer"},
+                "billingPeriodStart": {"type": ["string", "null"], "format": "date-time"},
+                "billingPeriodEnd": {"type": ["string", "null"], "format": "date-time"}
+              }}
+            }}}}
+          }
+        }
+      }
+    },
+    "/v2/team/credit-usage/historical": {
+      "get": {
+        "operationId": "firecrawlCompatHistoricalCreditUsage",
+        "summary": "Historical credit usage",
+        "description": "Returns monthly account-wide totals. byApiKey=true is not supported because this service does not retain per-key attribution.",
+        "servers": [{"url": "https://webscraper.apexflowlabs.com"}],
+        "parameters": [{"name": "byApiKey", "in": "query", "schema": {"type": "boolean", "default": false}}],
+        "responses": {
+          "200": {"description": "Monthly account-wide totals", "content": {"application/json": {"schema": {"type": "object", "properties": {
+            "success": {"type": "boolean"},
+            "periods": {"type": "array", "items": {"type": "object", "properties": {
+              "startDate": {"type": "string", "format": "date-time"},
+              "endDate": {"type": "string", "format": "date-time"},
+              "totalCredits": {"type": "integer"}
+            }}}
+          }}}}},
+          "400": {"description": "Invalid or unsupported option"}
+        }
+      }
+    },
     "/v2/map": {
       "post": {
         "operationId": "firecrawlCompatMap",

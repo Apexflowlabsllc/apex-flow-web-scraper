@@ -10,7 +10,7 @@ import logging
 import os
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
 from .policy import ScrapeError
@@ -375,6 +375,40 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
 
     async def parse_format_list(request):
         return web.json_response({"success": True, "data": {"formats": parse_formats}})
+
+    async def credit_usage(request):
+        account = request["account"]
+        plan = hosted.billing.limits(account)
+        row = hosted.db.execute("SELECT period_start FROM accounts WHERE id=?", (account,)).fetchone()
+        order = hosted.db.execute("SELECT period_end FROM orders WHERE account=?", (account,)).fetchone()
+        to_iso = lambda stamp: datetime.fromtimestamp(stamp, timezone.utc).isoformat().replace("+00:00", "Z") if stamp else None
+        return web.json_response({"success": True, "data": {
+            "remainingCredits": hosted.billing.remaining(account),
+            "planCredits": plan["credits"],
+            "billingPeriodStart": to_iso(row[0] if row else None),
+            "billingPeriodEnd": to_iso(order[0] if order else None)}})
+
+    async def historical_credit_usage(request):
+        by_api_key = request.query.get("byApiKey", "false")
+        if by_api_key not in {"true", "false"}:
+            return error("byApiKey must be true or false", "invalid_request")
+        if by_api_key == "true":
+            return error("Historical usage is account-scoped; per-key attribution is not available yet.",
+                         "unsupported_option")
+        rows = hosted.db.execute(
+            "SELECT strftime('%Y-%m',ts,'unixepoch'),SUM(credits) FROM usage WHERE account=? "
+            "GROUP BY 1 ORDER BY 1", (request["account"],)).fetchall()
+        periods = []
+        for month, credits in rows:
+            if not month:
+                continue
+            start = datetime.strptime(month, "%Y-%m").replace(tzinfo=timezone.utc)
+            end = (start.replace(year=start.year + 1, month=1) if start.month == 12
+                   else start.replace(month=start.month + 1)) - timedelta(seconds=1)
+            periods.append({"startDate": start.isoformat().replace("+00:00", "Z"),
+                            "endDate": end.isoformat().replace("+00:00", "Z"),
+                            "totalCredits": max(0, credits or 0)})
+        return web.json_response({"success": True, "periods": periods})
 
     async def map_route(request):
         body = await request.json()
@@ -824,6 +858,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
     app.router.add_post("/v2/scrape", wrap(scrape))
     app.router.add_post("/v2/parse", wrap(parse_document))
     app.router.add_get("/v2/parse/formats", wrap(parse_format_list))
+    app.router.add_get("/v2/team/credit-usage", wrap(credit_usage))
+    app.router.add_get("/v2/team/credit-usage/historical", wrap(historical_credit_usage))
     app.router.add_post("/v2/map", wrap(map_route))
     app.router.add_post("/v2/search", wrap(search))
     app.router.add_post("/v2/crawl", wrap(crawl))

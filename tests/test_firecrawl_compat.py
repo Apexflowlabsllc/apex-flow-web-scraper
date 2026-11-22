@@ -150,6 +150,32 @@ async def test_v2_active_crawls_lists_only_current_accounts_running_jobs(hosted)
         {"type": "markdown"}, {"type": "rawHtml"}]
 
 
+async def test_v2_credit_usage_and_historical_usage_are_account_scoped(hosted):
+    h, client, headers = await _auth(hosted)
+    account = h.billing.account_for(headers["Authorization"][7:])
+    h.billing.charge(account, "page", 7)
+    current = await client.get("/v2/team/credit-usage", headers=headers)
+    payload = await current.json()
+    assert current.status == 200
+    assert payload["success"] is True
+    assert payload["data"]["remainingCredits"] == 109993
+    assert payload["data"]["planCredits"] == 110000
+    assert payload["data"]["billingPeriodStart"].endswith("Z")
+    assert payload["data"]["billingPeriodEnd"] is not None
+
+    h.db.execute("INSERT INTO usage(ts,account,kind,credits) VALUES(?,?,?,?)",
+                 (time.time(), account, "fixture", 12))
+    history = await client.get("/v2/team/credit-usage/historical", headers=headers)
+    history_payload = await history.json()
+    assert history.status == 200
+    assert history_payload["success"] is True
+    assert history_payload["periods"][-1]["totalCredits"] >= 12
+
+    by_key = await client.get("/v2/team/credit-usage/historical?byApiKey=true", headers=headers)
+    assert by_key.status == 400
+    assert (await by_key.json())["code"] == "unsupported_option"
+
+
 async def test_v2_json_format_maps_schema_prompt_and_paid_metering(hosted, monkeypatch):
     import rainbo_scrape.llm as llm
 
