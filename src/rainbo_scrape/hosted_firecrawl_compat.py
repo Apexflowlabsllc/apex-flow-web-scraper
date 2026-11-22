@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 import aiohttp
 from aiohttp import web
 from .billing import public_usage_key_id
+from .extract import validate_attribute_selectors
 from .policy import PublicResolver, ScrapeError, check_url
 
 INTERACT_SERVICE_KEY = web.AppKey("interact_service", object)
@@ -224,6 +225,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                               for link in result["links"] if isinstance(link, (str, dict))]
         if isinstance(result.get("images"), list):
             data["images"] = [image for image in result["images"] if isinstance(image, str)]
+        if isinstance(result.get("attributes"), list):
+            data["attributes"] = result["attributes"]
         if screenshot and result.get("screenshot_png_base64"):
             data["screenshot"] = "data:image/png;base64," + result["screenshot_png_base64"]
         if result.get("warning"):
@@ -336,7 +339,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         formats = body.get("formats", ["markdown"])
         if not isinstance(formats, list) or not formats:
             return error("formats must be a non-empty list")
-        parsed, extract_spec = [], None
+        parsed, extract_spec, attribute_selectors = [], None, None
         for item in formats:
             kind = item if isinstance(item, str) else item.get("type") if isinstance(item, dict) else None
             if kind == "json":
@@ -347,6 +350,15 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 except ValueError as exc:
                     return error(str(exc))
                 parsed.append("json")
+                continue
+            if kind == "attributes":
+                if attribute_selectors is not None or not isinstance(item, dict) or set(item) != {"type", "selectors"}:
+                    return error("Attributes output needs one object format with selectors")
+                try:
+                    attribute_selectors = validate_attribute_selectors(item["selectors"])
+                except ValueError as exc:
+                    return error(str(exc))
+                parsed.append("attributes")
                 continue
             if isinstance(item, dict) and set(item) - {"type"}:
                 return error("Format-specific options are not supported by this compatibility subset")
@@ -379,9 +391,11 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 # upper age bound when maxAge is not explicitly supplied.
                 apex_body["cache_max_age_ms"] = 63_072_000_000
         apex_outputs = {"raw_html" if field == "raw_html" else field for field in parsed
-                        if field in {"markdown", "html", "raw_html", "links", "images", "screenshot"}}
+                        if field in {"markdown", "html", "raw_html", "links", "images", "attributes", "screenshot"}}
         if apex_outputs:
             apex_body["outputs"] = sorted(apex_outputs)
+        if attribute_selectors is not None:
+            apex_body["attribute_selectors"] = attribute_selectors
         if extract_spec:
             apex_body["extract"] = extract_spec
         if "maxAge" in body:
@@ -431,6 +445,8 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
             selected["links"] = data["links"]
         if "images" in parsed and "images" in data:
             selected["images"] = data["images"]
+        if "attributes" in parsed and "attributes" in data:
+            selected["attributes"] = data["attributes"]
         selected["metadata"] = data["metadata"]
         if want_screenshot and "screenshot" in data:
             selected["screenshot"] = data["screenshot"]
@@ -698,7 +714,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         formats = scrape_options.get("formats", [{"type": "markdown"}])
         if not isinstance(formats, list) or not formats:
             return error("Crawl formats must be a non-empty list")
-        crawl_formats, extract_spec = [], None
+        crawl_formats, extract_spec, attribute_selectors = [], None, None
         for item in formats:
             kind = item if isinstance(item, str) else item.get("type") if isinstance(item, dict) else None
             if kind == "json":
@@ -710,15 +726,26 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                     return error(str(exc))
                 crawl_formats.append("json")
                 continue
+            if kind == "attributes":
+                if attribute_selectors is not None or not isinstance(item, dict) or set(item) != {"type", "selectors"}:
+                    return error("Attributes output needs one object format with selectors")
+                try:
+                    attribute_selectors = validate_attribute_selectors(item["selectors"])
+                except ValueError as exc:
+                    return error(str(exc))
+                crawl_formats.append("attributes")
+                continue
             if isinstance(item, dict) and set(item) - {"type"}:
                 return error("Format-specific options are not supported by this compatibility subset")
             if kind not in {"markdown", "html", "rawHtml", "links", "images", "screenshot"}:
                 return error(f"Crawl format {kind!r} is not supported; supported formats are markdown, html, rawHtml, links, images, screenshot")
             crawl_formats.append(kind)
         outputs = sorted({"raw_html" if item == "rawHtml" else item for item in crawl_formats
-                          if item in {"markdown", "html", "rawHtml", "links", "images", "screenshot"}})
+                          if item in {"markdown", "html", "rawHtml", "links", "images", "attributes", "screenshot"}})
         start_body = {"url": body.get("url"), "limit": body.get("limit", 25), "render": "auto",
                       "outputs": outputs, "max_depth": body.get("maxDiscoveryDepth", 3)}
+        if attribute_selectors is not None:
+            start_body["attribute_selectors"] = attribute_selectors
         if crawl_actions:
             start_body["actions"] = crawl_actions
         for source, target in (("includePaths", "include_paths"), ("excludePaths", "exclude_paths"),
@@ -877,7 +904,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                                    or "screenshot" in options.get("_compat_formats", []))
                 if options.get("_compat_warning"):
                     result["warning"] = "; ".join(filter(None, [result.get("warning"), options["_compat_warning"]]))
-                for field in ("markdown", "html", "rawHtml", "links", "images", "screenshot", "json"):
+                for field in ("markdown", "html", "rawHtml", "links", "images", "attributes", "screenshot", "json"):
                     if field not in options.get("_compat_formats", []) and not (
                             field == "screenshot" and options.get("screenshot", False)):
                         result.pop(field, None)
@@ -1152,7 +1179,7 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         formats = body.get("formats", ["markdown"])
         if not isinstance(formats, list) or not formats:
             return error("formats must be a non-empty list")
-        selected, extract_spec = [], None
+        selected, extract_spec, attribute_selectors = [], None, None
         for item in formats:
             kind = item if isinstance(item, str) else item.get("type") if isinstance(item, dict) else None
             if kind == "json":
@@ -1163,6 +1190,15 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
                 except ValueError as exc:
                     return error(str(exc))
                 selected.append("json")
+                continue
+            if kind == "attributes":
+                if attribute_selectors is not None or not isinstance(item, dict) or set(item) != {"type", "selectors"}:
+                    return error("Attributes output needs one object format with selectors")
+                try:
+                    attribute_selectors = validate_attribute_selectors(item["selectors"])
+                except ValueError as exc:
+                    return error(str(exc))
+                selected.append("attributes")
                 continue
             if isinstance(item, dict) and set(item) - {"type"}:
                 return error("Format-specific options are not supported by this compatibility subset")
@@ -1175,10 +1211,12 @@ def install(app, perform, map_for, websearch_for, crawl_start_for, crawl_status_
         if "screenshot" in body and not isinstance(body["screenshot"], bool):
             return error("screenshot must be a boolean")
         outputs = {"raw_html" if item == "rawHtml" else item for item in selected
-                   if item in {"markdown", "html", "rawHtml", "links", "images", "screenshot"}}
+                   if item in {"markdown", "html", "rawHtml", "links", "images", "attributes", "screenshot"}}
         if "screenshot" in selected or body.get("screenshot", False):
             outputs.add("screenshot")
         apex_options = {"render": "auto"}
+        if attribute_selectors is not None:
+            apex_options["attribute_selectors"] = attribute_selectors
         if outputs:
             apex_options["outputs"] = sorted(outputs)
         if extract_spec:

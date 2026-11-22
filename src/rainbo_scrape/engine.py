@@ -5,7 +5,7 @@ import re
 import time
 from urllib.parse import urlsplit
 from .browser import render
-from .extract import extract, validate_recipe
+from .extract import extract, validate_attribute_selectors, validate_recipe
 from .parser import parse
 from .network import Fetcher
 from .policy import ScrapeError, canonical_url, check_url
@@ -64,7 +64,7 @@ def validate_request(request, settings):
     allowed = {"urls", "max_pages", "max_depth", "max_seconds", "max_bytes", "concurrency",
                "render", "recipe", "wait_selector", "scrolls", "actions", "include_paths", "exclude_paths", "cache",
                "max_age", "screenshot", "extract", "change_tracking", "follow_external", "chunks", "robots",
-               "cache_only", "min_age_ms", "cache_max_age_ms"}
+               "cache_only", "min_age_ms", "cache_max_age_ms", "attribute_selectors"}
     if set(request)-allowed:
         raise ValueError("Unknown job options: "+", ".join(set(request)-allowed))
     urls = request.get("urls")
@@ -122,6 +122,8 @@ def validate_request(request, settings):
         validate_extract_spec(result["extract"])
     if result.get("recipe"):
         validate_recipe(result["recipe"])
+    if "attribute_selectors" in result:
+        validate_attribute_selectors(result["attribute_selectors"])
     selector = result.get("wait_selector")
     if selector:
         validate_recipe({"fields": {"wait": {"selector": selector}}})
@@ -145,7 +147,8 @@ async def scrape(fetcher, url, options):
     result = await parse(response["body"], response["url"],
                          response["headers"].get("content-type", "text/html"), options.get("recipe"),
                          include_html=options.get("include_html", False),
-                         include_raw_html=options.get("include_raw_html", False))
+                         include_raw_html=options.get("include_raw_html", False),
+                         attribute_selectors=options.get("attribute_selectors"))
     mode = "never" if options.get("cache_only") else options.get("render", "auto")
     rendered = False
     shot = None
@@ -155,7 +158,8 @@ async def scrape(fetcher, url, options):
         shot = response.pop("screenshot", None)
         result = await parse(response["body"], response["url"], "text/html", options.get("recipe"),
                              include_html=options.get("include_html", False),
-                             include_raw_html=options.get("include_raw_html", False))
+                             include_raw_html=options.get("include_raw_html", False),
+                             attribute_selectors=options.get("attribute_selectors"))
         result["browser"] = response["browser"]
         rendered = True
     result.update(url=response["url"], status=response["status"], cache=response["cache"], rendered=rendered,

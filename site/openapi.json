@@ -383,6 +383,21 @@
                       "fields"
                     ]
                   },
+                  "attribute_selectors": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "items": {
+                      "type": "object",
+                      "required": ["selector", "attribute"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "selector": {"type": "string", "minLength": 1, "maxLength": 500},
+                        "attribute": {"type": "string", "pattern": "^[a-zA-Z0-9_:-]{1,64}$"}
+                      }
+                    },
+                    "description": "Extract selected HTML attributes using CSS selectors. Each selector returns at most 200 values; oversized output is truncated with a warning."
+                  },
                   "max_age": {
                     "type": "integer",
                     "minimum": 0
@@ -411,7 +426,7 @@
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 12,
+                    "maxItems": 13,
                     "items": {
                       "type": "string",
                       "enum": [
@@ -422,6 +437,7 @@
                         "chunks",
                         "links",
                         "images",
+                        "attributes",
                         "structured_data",
                         "diff",
                         "html",
@@ -607,6 +623,21 @@
                       "fields"
                     ]
                   },
+                  "attribute_selectors": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "items": {
+                      "type": "object",
+                      "required": ["selector", "attribute"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "selector": {"type": "string", "minLength": 1, "maxLength": 500},
+                        "attribute": {"type": "string", "pattern": "^[a-zA-Z0-9_:-]{1,64}$"}
+                      }
+                    },
+                    "description": "Extract selected HTML attributes using CSS selectors. Each selector returns at most 200 values; oversized output is truncated with a warning."
+                  },
                   "max_age": {
                     "type": "integer",
                     "minimum": 0
@@ -635,7 +666,7 @@
                   "outputs": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 12,
+                    "maxItems": 13,
                     "items": {
                       "type": "string",
                       "enum": [
@@ -646,6 +677,7 @@
                         "chunks",
                         "links",
                         "images",
+                        "attributes",
                         "structured_data",
                         "diff",
                         "html",
@@ -2405,8 +2437,23 @@
                                 "rawHtml",
                                 "links",
                                 "images",
-                                "screenshot"
+                                "screenshot",
+                                "attributes"
                               ]
+                            },
+                            "selectors": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 50,
+                              "items": {
+                                "type": "object",
+                                "required": ["selector", "attribute"],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "selector": {"type": "string", "minLength": 1, "maxLength": 500},
+                                  "attribute": {"type": "string", "pattern": "^[a-zA-Z0-9_:-]{1,64}$"}
+                                }
+                              }
                             }
                           },
                           "required": [
@@ -2881,8 +2928,23 @@
                                     "rawHtml",
                                     "links",
                                     "images",
-                                    "screenshot"
+                                    "screenshot",
+                                    "attributes"
                                   ]
+                                },
+                                "selectors": {
+                                  "type": "array",
+                                  "minItems": 1,
+                                  "maxItems": 50,
+                                  "items": {
+                                    "type": "object",
+                                    "required": ["selector", "attribute"],
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "selector": {"type": "string", "minLength": 1, "maxLength": 500},
+                                      "attribute": {"type": "string", "pattern": "^[a-zA-Z0-9_:-]{1,64}$"}
+                                    }
+                                  }
                                 }
                               },
                               "required": [
@@ -3219,8 +3281,23 @@
                                 "rawHtml",
                                 "links",
                                 "images",
-                                "screenshot"
+                                "screenshot",
+                                "attributes"
                               ]
+                            },
+                            "selectors": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 50,
+                              "items": {
+                                "type": "object",
+                                "required": ["selector", "attribute"],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "selector": {"type": "string", "minLength": 1, "maxLength": 500},
+                                  "attribute": {"type": "string", "pattern": "^[a-zA-Z0-9_:-]{1,64}$"}
+                                }
+                              }
                             }
                           },
                           "required": [

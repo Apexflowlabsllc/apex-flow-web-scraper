@@ -7,14 +7,16 @@ import sys
 from .policy import ScrapeError
 
 
-async def parse(body, url, content_type, recipe=None, include_html=False, include_raw_html=False):
+async def parse(body, url, content_type, recipe=None, include_html=False, include_raw_html=False,
+                attribute_selectors=None):
     flags = {"creationflags": 0x08000000} if os.name == "nt" else {}
     process = await asyncio.create_subprocess_exec(
         sys.executable, "-m", "rainbo_scrape.parser", stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, **flags)
     payload = json.dumps({"body": base64.b64encode(body).decode(), "url": url,
                           "content_type": content_type, "recipe": recipe,
-                          "include_html": include_html, "include_raw_html": include_raw_html}).encode()
+                          "include_html": include_html, "include_raw_html": include_raw_html,
+                          "attribute_selectors": attribute_selectors}).encode()
     try:
         async with asyncio.timeout(15):
             output, _ = await process.communicate(payload)
@@ -42,7 +44,8 @@ def main():
         data = json.loads(sys.stdin.buffer.read(20*1024*1024))
         result = extract(base64.b64decode(data["body"]), data["url"], data["content_type"], data["recipe"],
                          include_html=data.get("include_html", False),
-                         include_raw_html=data.get("include_raw_html", False))
+                         include_raw_html=data.get("include_raw_html", False),
+                         attribute_selectors=data.get("attribute_selectors"))
         encoded = json.dumps(result, ensure_ascii=False)
         if len(encoded.encode()) > 12*1024*1024:
             raise ScrapeError("parser_output_limit", "Extracted document exceeds the result size limit")

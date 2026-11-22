@@ -107,7 +107,7 @@ def install(h, app, perform, map_urls=None):
                   exclude_patterns, regex_on_full_url, ignore_query_parameters):
         host = _site(start)
         queue, seen, seq, active = [(start, 0)], {_crawl_identity(start, ignore_query_parameters)}, 0, 0
-        scrape_options = {k: options[k] for k in ("render", "fallback", "recipe", "extract", "actions") if k in options}
+        scrape_options = {k: options[k] for k in ("render", "fallback", "recipe", "extract", "actions", "attribute_selectors") if k in options}
         wanted = options.get("outputs") or ["markdown"]
         note = None
 
@@ -201,7 +201,7 @@ def install(h, app, perform, map_urls=None):
 
     async def start_for(account, body):
         allowed = {"url", "limit", "render", "outputs", "actions", "include", "include_paths", "exclude_paths", "regex_on_full_url",
-                   "ignore_query_parameters", "max_depth", "fallback", "recipe", "extract"}
+                   "ignore_query_parameters", "max_depth", "fallback", "recipe", "extract", "attribute_selectors"}
         if not isinstance(body, dict) or set(body) - allowed:
             raise ValueError("Use url with optional " + ", ".join(sorted(allowed - {"url"})))
         try:
@@ -235,7 +235,7 @@ def install(h, app, perform, map_urls=None):
             return web.json_response({"error": "Not enough credits", "code": "insufficient_credits", "retryable": False,
                                       "credits_left": 0, "buy_url": h.site + "/#pricing"}, status=402)
         options = {"render": body.get("render", "never"),
-                   **{k: body[k] for k in ("outputs", "fallback", "recipe", "extract", "actions") if k in body},
+                   **{k: body[k] for k in ("outputs", "fallback", "recipe", "extract", "actions", "attribute_selectors") if k in body},
                    "include_paths": body.get("include_paths", []),
                    "exclude_paths": body.get("exclude_paths", []),
                    "regex_on_full_url": regex_on_full_url,

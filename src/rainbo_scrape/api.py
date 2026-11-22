@@ -11,9 +11,9 @@ from .billing import Billing, QuotaExceeded, cost_of, reset_usage_key_hash, set_
 from .client import ascrape
 from .policy import ScrapeError
 
-ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "scrolls", "actions", "recipe", "outputs", "page", "fallback", "max_tokens", "cache_only", "min_age_ms", "cache_max_age_ms"}
+ALLOWED = {"url", "render", "chunks", "extract", "max_age", "screenshot", "wait_selector", "scrolls", "actions", "recipe", "outputs", "page", "fallback", "max_tokens", "cache_only", "min_age_ms", "cache_max_age_ms", "attribute_selectors"}
 LIMIT = 262144  # hosted response budget in bytes
-OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "images", "structured_data", "diff", "html", "raw_html", "screenshot"}
+OUTPUTS = {"markdown", "text", "data", "evidence", "chunks", "links", "images", "attributes", "structured_data", "diff", "html", "raw_html", "screenshot"}
 SOURCE_FIELDS = {"url", "title", "receipt", "warnings", "untrusted_source", "validation_errors", "archive", "extracted", "browser"}
 # Failures where the live site refused or could not serve us; a public archive copy may still exist.
 ARCHIVABLE = {"access_challenge", "http_error", "upstream_error", "rate_limited", "fetch_failed", "dns_failed",
@@ -224,6 +224,8 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
                 body["include_raw_html"] = True
             if "screenshot" in outputs:
                 body["screenshot"] = True
+            if "attributes" in outputs and not body.get("attribute_selectors"):
+                raise ValueError("outputs containing attributes requires attribute_selectors")
         if hosted and body.get("extract"):
             import os
             from .llm import providers

@@ -157,6 +157,51 @@ async def test_v2_images_format_works_for_scrape_batch_and_crawl(hosted):
     assert status_payload["data"][0]["images"] == expected
 
 
+async def test_v2_attributes_format_works_for_scrape_batch_and_crawl(hosted):
+    _, client, headers = await _auth(hosted)
+    selectors = [{"selector": "meta[name=description]", "attribute": "content"}]
+    expected = [{**selectors[0], "values": ["fixture description"]}]
+    formats = [{"type": "attributes", "selectors": selectors}]
+
+    response = await client.post("/v2/scrape", headers=headers, json={
+        "url": "https://example.com/attributes", "formats": formats,
+    })
+    payload = await response.json()
+    assert response.status == 200 and payload["data"]["attributes"] == expected
+
+    response = await client.post("/v2/scrape", headers=headers, json={
+        "url": "https://example.com/attributes-invalid",
+        "formats": [{"type": "attributes", "selectors": [{"selector": "a[", "attribute": "href"}]}],
+    })
+    assert response.status == 400
+
+    response = await client.post("/v2/batch/scrape", headers=headers, json={
+        "urls": ["https://example.com/attributes-batch"], "formats": formats,
+    })
+    job = (await response.json())["id"]
+    for _ in range(30):
+        status = await client.get(f"/v2/batch/scrape/{job}", headers=headers)
+        status_payload = await status.json()
+        if status_payload["status"] != "scraping":
+            break
+        await asyncio.sleep(0.01)
+    assert status_payload["status"] == "completed"
+    assert status_payload["data"][0]["attributes"] == expected
+
+    response = await client.post("/v2/crawl", headers=headers, json={
+        "url": "https://example.com/attributes-crawl", "limit": 1, "maxDiscoveryDepth": 0,
+        "scrapeOptions": {"formats": formats},
+    })
+    job = (await response.json())["id"]
+    for _ in range(30):
+        status = await client.get(f"/v2/crawl/{job}", headers=headers)
+        status_payload = await status.json()
+        if status_payload["status"] != "scraping":
+            break
+        await asyncio.sleep(0.01)
+    assert status_payload["status"] == "completed"
+    assert status_payload["data"][0]["attributes"] == expected
+
 async def test_v2_scrape_min_age_and_lockdown_select_cache_only(hosted):
     h, client, headers = await _auth(hosted)
     response = await client.post("/v2/scrape", headers=headers, json={

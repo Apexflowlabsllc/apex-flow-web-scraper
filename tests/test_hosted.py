@@ -48,6 +48,9 @@ async def hosted(tmp_path, monkeypatch):
             result["screenshot_png_base64"] = "fixture-png"
         if kwargs.get("extract"):
             result["extracted"] = {"data": {"heading": "Fixture"}, "valid": True, "errors": []}
+        if kwargs.get("attribute_selectors"):
+            result["attributes"] = [{**selector, "values": ["fixture description"]}
+                                     for selector in kwargs["attribute_selectors"]]
         return result
     h.scrape_calls = scrape_calls
     client=TestClient(TestServer(make_app(billing,scrape,hosted=h)))

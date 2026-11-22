@@ -10,7 +10,7 @@ import pytest
 from aiohttp import web, ClientSession
 from rainbo_scrape.settings import Settings, brave_path
 from rainbo_scrape.policy import ScrapeError, canonical_url, check_url, check_address, PublicResolver
-from rainbo_scrape.extract import extract, validate_recipe
+from rainbo_scrape.extract import extract, validate_attribute_selectors, validate_recipe
 from rainbo_scrape.network import Fetcher
 from rainbo_scrape.store import Store
 from rainbo_scrape.engine import validate_request, run_job
@@ -160,6 +160,26 @@ def test_html_image_urls_resolve_base_and_lazy_sources_without_inline_data():
         "https://example.com/assets/small.avif",
         "https://example.com/assets/large.avif",
     ]
+
+
+def test_html_attribute_format_extracts_bounded_selector_values():
+    page = b'''<html><head><base href="/catalog/"></head><body>
+      <a class="product" href="chair">First</a>
+      <a class="product" href="/item/2">Second</a>
+    </body></html>'''
+    selectors = [{"selector": "a.product", "attribute": "href"}]
+    result = extract(page, "https://example.com/shop", "text/html", attribute_selectors=selectors)
+    assert result["attributes"] == [{
+        "selector": "a.product", "attribute": "href",
+        "values": ["https://example.com/catalog/chair", "https://example.com/item/2"],
+    }]
+
+
+def test_attribute_selectors_reject_invalid_css_and_unbounded_shapes():
+    with pytest.raises(ValueError, match="CSS selector"):
+        validate_attribute_selectors([{"selector": "a[", "attribute": "href"}])
+    with pytest.raises(ValueError, match="1–50"):
+        validate_attribute_selectors([])
 
 
 def test_access_challenge_not_success():

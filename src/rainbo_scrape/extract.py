@@ -49,6 +49,24 @@ def validate_recipe(recipe):
     return recipe
 
 
+def validate_attribute_selectors(selectors):
+    if not isinstance(selectors, list) or not 1 <= len(selectors) <= 50:
+        raise ValueError("attributes selectors must contain 1–50 selector objects")
+    for spec in selectors:
+        if not isinstance(spec, dict) or set(spec) != {"selector", "attribute"}:
+            raise ValueError("Each attributes selector needs exactly selector and attribute")
+        selector, attribute = spec["selector"], spec["attribute"]
+        if not isinstance(selector, str) or not 1 <= len(selector) <= 500:
+            raise ValueError("Each attributes selector needs a CSS selector up to 500 characters")
+        try:
+            soupsieve.compile(selector)
+        except Exception as exc:
+            raise ValueError("Invalid attributes CSS selector") from exc
+        if not isinstance(attribute, str) or not re.fullmatch(r"[a-zA-Z0-9_:-]{1,64}", attribute):
+            raise ValueError("Invalid HTML attribute name")
+    return selectors
+
+
 def _text(node):
     return node.get_text(" ", strip=True) if node else ""
 
@@ -99,6 +117,47 @@ def _images(soup, url, limit=2000):
     return output, False
 
 
+def _attributes(soup, selectors, url, max_values=200, max_value_chars=2000):
+    output, truncated = [], False
+    budget = 100_000
+    used = 0
+    base = soup.find("base", href=True)
+    base_url = urljoin(url, base["href"]) if base else url
+    for spec in selectors:
+        if used >= budget:
+            truncated = True
+            output.append({"selector": spec["selector"], "attribute": spec["attribute"], "values": []})
+            continue
+        values = []
+        nodes = soup.select(spec["selector"], limit=max_values + 1)
+        if len(nodes) > max_values:
+            truncated = True
+        for node in nodes[:max_values]:
+            value = node.get(spec["attribute"])
+            if isinstance(value, list):
+                value = " ".join(str(item) for item in value)
+            if value is None:
+                continue
+            value = str(value)
+            if spec["attribute"] in {"href", "src"}:
+                value = urljoin(base_url, value)
+            if len(value) > max_value_chars:
+                value = value[:max_value_chars]
+                truncated = True
+            remaining = budget - used
+            if remaining <= 0:
+                truncated = True
+                break
+            encoded = value.encode("utf-8")
+            if len(encoded) > remaining:
+                value = encoded[:remaining].decode("utf-8", errors="ignore")
+                truncated = True
+            used += len(value.encode("utf-8"))
+            values.append(value)
+        output.append({"selector": spec["selector"], "attribute": spec["attribute"], "values": values})
+    return output, truncated
+
+
 def _recipe(soup, recipe, url):
     data, evidence, errors = {}, {}, []
     for name, spec in recipe.get("fields", {}).items():
@@ -122,9 +181,12 @@ def _recipe(soup, recipe, url):
     return data, evidence, errors
 
 
-def extract(body, url, content_type="text/html", recipe=None, include_html=False, include_raw_html=False):
+def extract(body, url, content_type="text/html", recipe=None, include_html=False, include_raw_html=False,
+            attribute_selectors=None):
     if recipe:
         validate_recipe(recipe)
+    if attribute_selectors is not None:
+        validate_attribute_selectors(attribute_selectors)
     sha = hashlib.sha256(body).hexdigest()
     common = {"source_url": url, "fetched_at": datetime.now(timezone.utc).isoformat(),
               "source_sha256": sha, "bytes": len(body), "warnings": [], "untrusted_source": True}
@@ -143,15 +205,18 @@ def extract(body, url, content_type="text/html", recipe=None, include_html=False
         text = "\n\n".join(p["text"] for p in pages)[:500000]
         return {**common, "kind": "pdf", "title": str((reader.metadata or {}).get("/Title", "")),
                 "text": text, "markdown": text, "pages": pages, "links": [], "data": {}, "evidence": {},
+                **({"attributes": []} if attribute_selectors is not None else {}),
                 "quality": {"text_chars": len(text), "needs_ocr": not bool(text.strip())}}
     if is_docx(body, content_type, url):
         doc = docx_to_markdown(body)
         return {**common, "kind": "docx", **doc, "links": [], "data": {}, "evidence": {"method": "docx"},
+                **({"attributes": []} if attribute_selectors is not None else {}),
                 "quality": {"text_chars": len(doc["text"])}}
     decoded = body.decode("utf-8", errors="replace")
     if "json" in content_type:
         data = json.loads(decoded)
         return {**common, "kind": "json", "title": "", "text": decoded[:500000], "markdown": "",
+                **({"attributes": []} if attribute_selectors is not None else {}),
                 "data": data, "links": [], "evidence": {"method": "native-json", "source_url": url}}
     if "xml" in content_type or decoded.lstrip().startswith(("<?xml", "<rss", "<urlset", "<sitemapindex")):
         root = ElementTree.fromstring(body)
@@ -168,10 +233,12 @@ def extract(body, url, content_type="text/html", recipe=None, include_html=False
                     pass
         text = "\n".join(" ".join(e.values()) for e in entries)[:500000]
         return {**common, "kind": "feed" if entries else "sitemap", "title": "", "text": text,
-                "markdown": text, "data": entries[:5000], "links": links[:5000], "evidence": {"method": "xml"}}
+                "markdown": text, "data": entries[:5000], "links": links[:5000], "evidence": {"method": "xml"},
+                **({"attributes": []} if attribute_selectors is not None else {})}
     if content_type.startswith("text/plain"):
         return {**common, "kind": "text", "title": "", "text": decoded[:500000], "markdown": decoded[:500000],
-                "data": {}, "links": [], "evidence": {"method": "plain-text"}}
+                "data": {}, "links": [], "evidence": {"method": "plain-text"},
+                **({"attributes": []} if attribute_selectors is not None else {})}
     if not ("html" in content_type or decoded.lstrip().startswith(("<!DOCTYPE", "<!doctype", "<html"))):
         raise ScrapeError("unsupported_content", "Supported: HTML, JSON, XML/RSS, text and text-based PDF")
     soup = BeautifulSoup(body, "lxml")
@@ -179,6 +246,9 @@ def extract(body, url, content_type="text/html", recipe=None, include_html=False
     images, images_truncated = _images(soup, url)
     if images_truncated:
         common["warnings"].append("Image list truncated at 2000 URLs")
+    attributes, attributes_truncated = _attributes(soup, attribute_selectors, url) if attribute_selectors is not None else (None, False)
+    if attributes_truncated:
+        common["warnings"].append("Attribute extraction truncated at its configured response budget")
     metadata = {m.get("property") or m.get("name"): m.get("content") for m in soup.select("meta[content]")
                 if m.get("property") or m.get("name")}
     data, evidence, errors = _recipe(soup, recipe or {}, url)
@@ -231,6 +301,7 @@ def extract(body, url, content_type="text/html", recipe=None, include_html=False
             **({"html": retained_html} if include_html else {}),
             **({"raw_html": raw_html} if include_raw_html else {}),
             "metadata": metadata, "links": links, "images": images, "headings": headings, "tables": tables,
+            **({"attributes": attributes} if attributes is not None else {}),
             "structured_data": structured, "data": data, "evidence": evidence, "validation_errors": errors,
             "quality": {"text_chars": len(text), "field_count": len(data), "validation_passed": not errors,
                         "needs_render": needs_render}}
