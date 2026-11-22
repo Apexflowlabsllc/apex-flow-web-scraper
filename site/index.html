@@ -277,10 +277,6 @@ rainbo-scrape index https://example.com/ &amp;&amp; rainbo-scrape search <span c
     raf=requestAnimationFrame(tick)}
   size();tick();addEventListener('resize',function(){size()});
   document.addEventListener('visibilitychange',function(){cancelAnimationFrame(raf);if(!document.hidden)tick()});
-  /* headline scramble, once */
-  var em=document.querySelector('h1 em'),word=em.textContent,glyphs='<>/{}[]#|=_01',t0=performance.now();
-  em.setAttribute('aria-label',word);
-  (function sc(now){var k=Math.min(1,(now-t0)/900),out='';for(var i=0;i<word.length;i++)out+=(i/word.length<k||word[i]==='.')?word[i]:glyphs[Math.random()*glyphs.length|0];em.textContent=out;if(k<1)requestAnimationFrame(sc);else em.textContent=word})(t0);
   /* count-up stats */
   var cn=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;cn.unobserve(e.target);var el=e.target,to=+el.dataset.to,dec=+el.dataset.dec,s=performance.now();
     (function up(n){var k=Math.min(1,(n-s)/1300),v=to*(1-Math.pow(1-k,3));el.textContent=v.toFixed(dec)+(el.dataset.suf||'');if(k<1)requestAnimationFrame(up)})(s)})},{threshold:.6});
