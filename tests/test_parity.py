@@ -8,6 +8,7 @@ from rainbo_scrape.api import make_app
 from rainbo_scrape.billing import Billing, PLANS
 from rainbo_scrape.hosted import Hosted, SITE
 from rainbo_scrape.policy import ScrapeError
+from rainbo_scrape import hosted_search
 from test_advantages import account
 
 SITE_PAGES = {f"https://docs.example/p{i}": [f"https://docs.example/p{j}" for j in (i + 1, i + 2, i * 2)] for i in range(0, 60)}
@@ -15,8 +16,8 @@ SITE_PAGES = {f"https://docs.example/p{i}": [f"https://docs.example/p{j}" for j 
 
 @pytest.fixture
 async def svc(tmp_path, monkeypatch):
-    monkeypatch.delenv("SCRAPER_GATEWAY_SECRET", raising=False)
-    monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
+    for key in ("SCRAPER_GATEWAY_SECRET", "BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "APEX_SEARCH_PROVIDER"):
+        monkeypatch.delenv(key, raising=False)
     billing = Billing(tmp_path / "billing.db")
     h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
     seen = []
@@ -132,7 +133,7 @@ async def test_web_search_charges_above_cost_and_nothing_for_no_results(svc):
 
 
 async def test_web_search_and_model_extraction_stay_off_without_operator_keys(tmp_path, monkeypatch):
-    for name in ("SCRAPER_GATEWAY_SECRET", "BRAVE_SEARCH_API_KEY", "DEEPSEEK_API_KEY", "OPENROUTER_API_KEY"):
+    for name in ("SCRAPER_GATEWAY_SECRET", "BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "APEX_SEARCH_PROVIDER", "DEEPSEEK_API_KEY", "OPENROUTER_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     billing = Billing(tmp_path / "billing.db")
     h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
@@ -147,6 +148,15 @@ async def test_web_search_and_model_extraction_stay_off_without_operator_keys(tm
     async with TestClient(TestServer(make_app(billing, scrape, hosted=h))) as client:
         r = await client.post("/v1/websearch", json={"query": "x"}, headers=auth)
         assert r.status == 503 and (await r.json())["code"] == "not_configured"
+        monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "fixture-brave")
+        monkeypatch.setenv("TAVILY_API_KEY", "fixture-tavily")
+        tool_list = await (await client.post("/v1/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, headers=auth)).json()
+        assert "web_search" not in {tool["name"] for tool in tool_list["result"]["tools"]}
+        r = await client.post("/v1/websearch", json={"query": "x"}, headers=auth)
+        assert r.status == 503 and (await r.json())["code"] == "not_configured"
+        monkeypatch.setenv("APEX_SEARCH_PROVIDER", "tavily")
+        tool_list = await (await client.post("/v1/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, headers=auth)).json()
+        assert "web_search" in {tool["name"] for tool in tool_list["result"]["tools"]}
         r = await client.post("/v1/scrape", json={"url": "https://example.com", "render": "never", "extract": spec}, headers=auth)
         assert r.status == 400 and (await r.json())["code"] == "not_available_hosted" and calls == []
         monkeypatch.setenv("DEEPSEEK_API_KEY", "fixture")
@@ -162,6 +172,88 @@ async def test_web_search_and_model_extraction_stay_off_without_operator_keys(tm
         r = await client.post("/v1/scrape", json={"url": "https://example.com", "render": "never", "extract": spec}, headers=auth)
         assert r.status == 429 and (await r.json())["code"] == "extract_daily_limit" and len(calls) == 1 and billing.remaining(acct) == 110000 - 151
     billing.db.close()
+
+
+def test_search_provider_selection_requires_one_unambiguous_configured_provider(monkeypatch):
+    for key in ("BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "APEX_SEARCH_PROVIDER"):
+        monkeypatch.delenv(key, raising=False)
+    assert hosted_search.provider_name() is None and not hosted_search.configured()
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "fixture")
+    assert hosted_search.provider_name() == "brave" and hosted_search.configured()
+    monkeypatch.setenv("EXA_API_KEY", "fixture")
+    assert hosted_search.provider_name() is None and not hosted_search.configured()
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "exa")
+    assert hosted_search.provider_name() == "exa" and hosted_search.configured()
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", "unknown")
+    assert hosted_search.provider_name() is None and not hosted_search.configured()
+
+
+@pytest.mark.parametrize("name,key,payload,expected", [
+    ("brave", "BRAVE_SEARCH_API_KEY", {"web": {"results": [
+        {"url": "https://one.example", "title": "One", "description": "First"},
+        {"url": "javascript:alert(1)", "title": "Bad", "description": "Skip"},
+    ]}}, [{"url": "https://one.example", "title": "One", "snippet": "First"}]),
+    ("tavily", "TAVILY_API_KEY", {"results": [
+        {"url": "https://one.example", "title": "One", "content": "First"},
+        {"url": "//bad.example", "title": "Bad", "content": "Skip"},
+    ]}, [{"url": "https://one.example", "title": "One", "snippet": "First"}]),
+    ("exa", "EXA_API_KEY", {"results": [
+        {"url": "https://one.example", "title": "One", "highlights": ["First", "detail"]},
+        {"url": "https://two.example", "title": "Two", "text": "Second"},
+    ]}, [{"url": "https://one.example", "title": "One", "snippet": "First detail"},
+         {"url": "https://two.example", "title": "Two", "snippet": "Second"}]),
+])
+async def test_search_adapters_use_vendor_contract_and_normalize_results(monkeypatch, name, key, payload, expected):
+    for provider_key in ("BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY"):
+        monkeypatch.delenv(provider_key, raising=False)
+    monkeypatch.setenv(key, "fixture-secret")
+    monkeypatch.setenv("APEX_SEARCH_PROVIDER", name)
+    calls = []
+
+    class Response:
+        status = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def json(self):
+            return payload
+
+    class Session:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def get(self, *args, **kwargs):
+            calls.append(("get", args, kwargs))
+            return Response()
+
+        def post(self, *args, **kwargs):
+            calls.append(("post", args, kwargs))
+            return Response()
+
+    monkeypatch.setattr(hosted_search.aiohttp, "ClientSession", Session)
+    assert await hosted_search.search("query", 3) == expected
+    method, args, kwargs = calls[0]
+    if name == "brave":
+        assert method == "get" and args[0] == "https://api.search.brave.com/res/v1/web/search"
+        assert kwargs["headers"]["X-Subscription-Token"] == "fixture-secret"
+    elif name == "tavily":
+        assert method == "post" and args[0] == "https://api.tavily.com/search"
+        assert kwargs["headers"]["Authorization"] == "Bearer fixture-secret"
+        assert kwargs["json"]["search_depth"] == "basic" and kwargs["json"]["max_results"] == 3
+    else:
+        assert method == "post" and args[0] == "https://api.exa.ai/search"
+        assert kwargs["headers"]["x-api-key"] == "fixture-secret"
+        assert kwargs["json"]["numResults"] == 3
 
 
 def test_bigger_plans_get_more_pages_at_once():
