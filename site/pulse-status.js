@@ -48,6 +48,21 @@
     return null;
   };
 
+  // Visitors only see good news: the badge shows once a channel is connected. "No channels yet", "need attention" and
+  // "unavailable" are internal states, kept in data-apex-pulse-state; a box that holds only the badge hides with it.
+  const pulseBox = (node) => {
+    const box = node.closest('[aria-label="Apex Flow Pulse status"]');
+    if (box) return box;
+    const parent = node.parentElement;
+    return parent && parent !== document.body && parent.children.length === 1 && parent.textContent.trim() === node.textContent.trim() ? parent : null;
+  };
+  const hidePulseNode = (node) => {
+    for (const el of [node, pulseBox(node)]) if (el) { el.hidden = true; el.style.display = 'none'; }
+  };
+  const showPulseNode = (node) => {
+    for (const el of [node, pulseBox(node)]) if (el) { el.hidden = false; el.style.display = ''; }
+  };
+
   async function hydrate(node) {
     const requested = node.dataset.apexPulseAccount;
     const account = requested === 'auto' ? routeAccount() : requested;
@@ -68,9 +83,12 @@
           ? `Apex Flow Pulse · ${connected} verified channel${connected === 1 ? '' : 's'} connected`
           : 'Apex Flow Pulse · no authorized channels yet';
       node.dataset.apexPulseState = reconnect ? 'attention' : connected ? 'connected' : 'pending';
+      if (!connected || reconnect) hidePulseNode(node);
+      else showPulseNode(node);
     } catch {
       node.textContent = 'Apex Flow Pulse · status unavailable';
       node.dataset.apexPulseState = 'unavailable';
+      hidePulseNode(node);
     }
   }
 
