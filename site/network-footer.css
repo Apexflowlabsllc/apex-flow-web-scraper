@@ -1,0 +1,136 @@
+/* Shared Apex Flow Labs network footer. Neutral graphite with one local brand accent. */
+.afl-network-footer {
+  --afl-footer-accent: #dedbd3;
+  box-sizing: border-box;
+  isolation: isolate;
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: clamp(36px, 5vw, 68px) clamp(20px, 5vw, 72px) 30px;
+  padding-bottom: max(30px, env(safe-area-inset-bottom));
+  border: 0;
+  border-top: 1px solid #4a4a4a;
+  background: radial-gradient(ellipse at 14% 0%, #373737 0%, transparent 52%), linear-gradient(155deg, #2b2b2b, #1a1a1a);
+  color: #f5f4f1;
+  text-align: left;
+  text-transform: none;
+  font: 400 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: normal;
+}
+
+.afl-network-footer *,
+.afl-network-footer *::before,
+.afl-network-footer *::after { box-sizing: border-box; }
+
+.afl-network-footer [data-afl-part="inner"] { max-width: 1220px; margin: 0 auto; }
+.afl-network-footer [data-afl-part="intro"] {
+  border-left: 2px solid var(--afl-footer-accent);
+  padding-inline-start: clamp(14px, 2vw, 24px);
+  margin: 0 0 30px;
+}
+.afl-network-footer [data-afl-part="intro"] h2 {
+  color: #f5f4f1;
+  font: 650 clamp(1.75rem, 3.6vw, 2.75rem)/1.1 system-ui, sans-serif;
+  letter-spacing: -.04em;
+  text-transform: none;
+  margin: 0;
+}
+.afl-network-footer [data-afl-part="intro"] p {
+  color: #d3d1cb;
+  font: inherit;
+  margin: 9px 0 0;
+}
+.afl-network-footer [data-afl-part="directory"] {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px clamp(12px, 2.4vw, 30px);
+  position: static;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+.afl-network-footer [data-afl-part="group"] {
+  min-width: 0;
+  padding-top: 14px;
+  border-top: 1px solid #535353;
+}
+.afl-network-footer [data-afl-part="group"] h3 {
+  margin: 0 0 7px;
+  color: #d3d1cb;
+  font: 650 .8125rem/1.4 system-ui, sans-serif;
+  letter-spacing: .015em;
+  text-transform: none;
+}
+.afl-network-footer [data-afl-part="group"] ul,
+.afl-network-footer [data-afl-part="group"] li {
+  display: block;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  max-width: none;
+  background: transparent;
+}
+.afl-network-footer a {
+  width: fit-content;
+  max-width: 100%;
+  color: #f5f4f1;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 5px 5px 0;
+  border: 0;
+  background: transparent;
+  font: 530 .9375rem/1.4 system-ui, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.afl-network-footer a:hover { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
+.afl-network-footer a:focus-visible { outline: 2px solid #fff; outline-offset: 3px; border-radius: 2px; }
+.afl-network-footer a[aria-current="true"] { text-decoration: underline; text-decoration-color: var(--afl-footer-accent); text-underline-offset: 5px; }
+.afl-network-footer [data-afl-part="resources"] {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px clamp(14px, 3vw, 32px);
+  border-top: 1px solid #535353;
+  margin: 24px 0 0;
+  padding: 13px 0 0;
+  position: static;
+}
+.afl-network-footer [data-afl-part="resources"] a { font-size: .875rem; color: #dfddd7; }
+
+.afl-network-footer[data-afl-site="ai"] { --afl-footer-accent: #c8ccd5; }
+.afl-network-footer[data-afl-site="3d"] { --afl-footer-accent: #a5e7d3; }
+.afl-network-footer[data-afl-site="shield"] { --afl-footer-accent: #8edaf7; }
+.afl-network-footer[data-afl-site="digital"] { --afl-footer-accent: #f4ca80; }
+.afl-network-footer[data-afl-site="rainbo"] { --afl-footer-accent: #ffab72; }
+.afl-network-footer[data-afl-site="publishing"] { --afl-footer-accent: #e2b884; }
+.afl-network-footer[data-afl-site="beauty"] { --afl-footer-accent: #f0b7c9; }
+.afl-network-footer[data-afl-site="health"] { --afl-footer-accent: #b4dba6; }
+.afl-network-footer[data-afl-site="pets"] { --afl-footer-accent: #e5ba86; }
+.afl-network-footer[data-afl-site="academy"] { --afl-footer-accent: #f4cc77; }
+.afl-network-footer[data-afl-site="gear"] { --afl-footer-accent: #d2d7de; }
+.afl-network-footer[data-afl-site="kids"] { --afl-footer-accent: #f7d870; }
+.afl-network-footer[data-afl-site="media"] { --afl-footer-accent: #d5c3ed; }
+.afl-network-footer[data-afl-site="affiliates"] { --afl-footer-accent: #acd7a6; }
+.afl-network-footer[data-afl-site="press"] { --afl-footer-accent: #d0ac76; }
+.afl-network-footer[data-afl-site="partner-cloud"] { --afl-footer-accent: #a4d8e3; }
+.afl-network-footer[data-afl-site="revenue"] { --afl-footer-accent: #edc080; }
+.afl-network-footer[data-afl-site="pulse"] { --afl-footer-accent: #81d8af; }
+.afl-network-footer[data-afl-site="scheduler"] { --afl-footer-accent: #eab774; }
+.afl-network-footer[data-afl-site="webscraper"] { --afl-footer-accent: #7bdce9; }
+.afl-network-footer[data-afl-site="audio"] { --afl-footer-accent: #ef9c98; }
+.afl-network-footer[data-afl-site="bug-out"] { --afl-footer-accent: #b9d58b; }
+
+@media (max-width: 760px) {
+  .afl-network-footer [data-afl-part="directory"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .afl-network-footer a { min-height: 44px; }
+}
+@media (max-width: 340px) {
+  .afl-network-footer [data-afl-part="directory"] { grid-template-columns: minmax(0, 1fr); }
+}
