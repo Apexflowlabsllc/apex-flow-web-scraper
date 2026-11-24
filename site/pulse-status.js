@@ -96,3 +96,12 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, { once: true });
   else run();
 })();
+
+// Apex Flow Pulse showcase: live activity section (only renders real data).
+(() => {
+  if (document.querySelector('script[src*="pulse-showcase.js"]')) return;
+  const s = document.createElement('script');
+  s.src = 'https://www.apexflowlabs.com/pulse-showcase.js';
+  s.defer = true;
+  document.head.appendChild(s);
+})();
