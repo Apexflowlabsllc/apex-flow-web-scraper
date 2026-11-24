@@ -133,7 +133,8 @@ def credits_for(body, rendered):
     return total
 
 
-def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot, search_provider=None, package_loader=None, store_reader=None):
+def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot, search_provider=None, package_loader=None, store_reader=None,
+             link_options=None):
     active = defaultdict(int)
     recent = defaultdict(deque)
     api_recent = defaultdict(deque)
@@ -379,6 +380,12 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         operations.update(hosted_packages.install(hosted, app, package_loader))
         from . import hosted_stores
         operations.update(hosted_stores.install(hosted, app, store_reader))
+        from . import hosted_links, hosted_seo
+        hosted_links.prepare(hosted)
+        mapper = hosted_crawl.sitemap_urls if real_engine else None
+        operations.update(hosted_links.install(hosted, app, perform, hosted_links.site_urls if real_engine else None,
+                                               **{"snapshot": snapshot_fn, **(link_options or {})}))
+        operations.update(hosted_seo.install(hosted, app, perform, mapper))
         install(app, billing, operations, hosted.site)
     return app
 

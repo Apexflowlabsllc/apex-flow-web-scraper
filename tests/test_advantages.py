@@ -157,7 +157,8 @@ async def test_mcp_check_changes_returns_only_what_moved(svc):
                                                 "params": {"name": "check_changes", "arguments": {"urls": urls}}}, headers=auth)
     tools = (await (await client.post("/v1/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, headers=auth)).json())["result"]["tools"]
     assert {t["name"] for t in tools} == {"scrape_page", "scrape_batch", "check_changes", "map_site", "search_saved", "credit_balance", "crawl_site", "crawl_status", "house_prices", "npr_news", "home_report", "rent_prices", "job_pay", "mortgage_rates", "company_jobs",
-                                        "track_store", "rising_products", "tracked_stores"}
+                                        "track_store", "rising_products", "tracked_stores", "domain_authority", "referring_domains", "backlink_gap", "find_competitors",
+                                        "dead_page_hunt", "find_backlinks", "seo_page_check", "seo_site_audit", "link_job"}
     first = json.loads((await (await call()).json())["result"]["content"][0]["text"])
     assert [p["change"]["status"] for p in first["pages"]] == ["new", "new"] and first["changed"] == []
     state["pages"][urls[1]] = "Line one\nLine two\nPrice: $99"
