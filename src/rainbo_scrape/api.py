@@ -384,8 +384,10 @@ def make_app(billing, scrape_fn=ascrape, hosted=None, snapshot_fn=find_snapshot,
         hosted_links.prepare(hosted)
         mapper = hosted_crawl.sitemap_urls if real_engine else None
         operations.update(hosted_links.install(hosted, app, perform, hosted_links.site_urls if real_engine else None,
-                                               **{"snapshot": snapshot_fn, **(link_options or {})}))
+                                               **{"snapshot": snapshot_fn, **{k: v for k, v in (link_options or {}).items() if k != "prev"}}))
         operations.update(hosted_seo.install(hosted, app, perform, mapper))
+        from . import hosted_outreach
+        operations.update(hosted_outreach.install(hosted, app, perform, **{k: v for k, v in (link_options or {}).items() if k in ("graph", "prev")}))
         install(app, billing, operations, hosted.site)
     return app
 

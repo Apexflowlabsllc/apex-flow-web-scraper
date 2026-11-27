@@ -257,3 +257,87 @@ def test_dead_hunt_skips_addresses_that_were_never_pages():
         assert JUNK.search(junk)
     assert DOMAINISH.match("news.ycombinator.com") and not DOMAINISH.match("guide.html") and not DOMAINISH.match("best-crm-tools")
     assert not JUNK.search("https://a.com/blog/best-python-web-scraping-libraries")
+
+
+def test_changes_between_releases(tmp_path):
+    from rainbo_scrape.hosted_outreach import changes
+    old = write_graph(tmp_path / "old", RANKED, EDGES + [("smalldir.co.uk", "rival1.com")])
+    new = write_graph(tmp_path / "new", RANKED, [e for e in EDGES if e != ("techblog.io", "rival1.com")] + [("other.com", "rival1.com")])
+    c = changes(new, old, "rival1.com")
+    assert [x["domain"] for x in c["lost_domains"]] == ["techblog.io", "smalldir.co.uk"]
+    assert [x["domain"] for x in c["new"]] == ["other.com"] and c["gained"] == 1 and c["lost"] == 2
+
+
+def test_contacts_pick_site_emails_pages_and_social():
+    from rainbo_scrape.hosted_outreach import contacts_from
+    pages = [("https://blog.io/", {"markdown": "Write to hello@blog.io or icon@2x.png", "links": [
+                {"url": "mailto:editor@blog.io?subject=Hi"}, {"url": "https://blog.io/write-for-us", "text": "Write for us"},
+                {"url": "https://twitter.com/blogio"}, {"url": "https://twitter.com/"}, {"url": "https://other.com/contact"}]}),
+             ("https://blog.io/contact", {"markdown": "Agency: pr@agency.com", "links": []})]
+    c = contacts_from(pages, "blog.io")
+    assert [e["email"] for e in c["emails"]] == ["editor@blog.io", "hello@blog.io", "pr@agency.com"]
+    assert c["emails"][0]["on_site_domain"] and not c["emails"][2]["on_site_domain"]
+    assert [p["url"] for p in c["contact_pages"]] == ["https://blog.io/write-for-us"] and c["social"] == {"x": "https://twitter.com/blogio"}
+
+
+async def test_changes_and_contacts_endpoints(tmp_path, monkeypatch, graph):
+    monkeypatch.delenv("SCRAPER_GATEWAY_SECRET", raising=False)
+    billing = Billing(tmp_path / "billing.db")
+    h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
+    acct, auth = account(h, "starter", "cs_test_links5")
+    old = write_graph(tmp_path / "old", RANKED, EDGES + [("smalldir.co.uk", "rival1.com")])
+
+    async def scrape(url, **kwargs):
+        if url.endswith("/contact"):
+            return {"url": url, "title": "c", "markdown": "Email team@techblog.io", "text": "x", "links": [], "rendered": False}
+        return {"url": url, "title": "t", "markdown": "home", "text": "x", "links": [{"url": "https://techblog.io/contact", "text": "Contact"}], "rendered": False}
+
+    start = billing.remaining(acct)
+    app = make_app(billing, scrape, hosted=h, link_options={"graph": lambda: graph, "prev": lambda: old})
+    async with TestClient(TestServer(app)) as client:
+        r = await client.post("/v1/links/changes", json={"domain": "rival1.com"}, headers=auth)
+        body = await r.json()
+        assert r.status == 200 and body["credits_used"] == 3 and body["result"]["lost_domains"][0]["domain"] == "smalldir.co.uk"
+        r = await client.post("/v1/links/contacts", json={"site": "techblog.io", "max_pages": 2}, headers=auth)
+        body = await r.json()
+        assert r.status == 200 and body["result"]["emails"][0]["email"] == "team@techblog.io" and body["credits_used"] == 2
+        assert billing.remaining(acct) == start - 5
+
+
+def test_history_reads_each_release(graph):
+    from array import array
+    from rainbo_scrape.hosted_outreach import history
+    hist = graph.path / "history"
+    hist.mkdir()
+    n = graph.count
+    row = graph.find("rival1.com")[1]
+    refs, auth = array("I", [0] * n), array("H", [0] * n)
+    refs[row], auth[row] = 2, 150
+    (hist / "cc-main-2019-aug-sep-oct.refs").write_bytes(refs.tobytes())
+    (hist / "cc-main-2019-aug-sep-oct.auth").write_bytes(auth.tobytes())
+    (hist / "cc-main-2017-aug-sep-oct.refs").write_bytes(array("I", [0] * n).tobytes())
+    (hist / "cc-main-2017-aug-sep-oct.auth").write_bytes(array("H", [0] * n).tobytes())
+    (hist / "index.json").write_text(json.dumps({"releases": [{"release": "cc-main-2017-aug-sep-oct"}, {"release": "cc-main-2019-aug-sep-oct"}]}))
+    h = history(graph, "rival1.com")
+    assert [p["referring_domains"] for p in h["points"]] == [0, 2, 5]
+    assert h["first_seen_linked"] == "2019 aug-sep-oct" and h["change"]["referring_domains"] == 3
+
+
+async def test_free_checker_needs_no_key_and_is_rate_limited(tmp_path, monkeypatch, graph):
+    monkeypatch.delenv("SCRAPER_GATEWAY_SECRET", raising=False)
+    billing = Billing(tmp_path / "billing.db")
+    h = Hosted(billing, "fixture", "fixture-webhook", "fixture-delivery")
+
+    async def scrape(url, **kwargs):
+        return {"url": url, "text": "x", "rendered": False}
+
+    site = {"Origin": "https://webscraper.apexflowlabs.com"}
+    async with TestClient(TestServer(make_app(billing, scrape, hosted=h, link_options={"graph": lambda: graph}))) as client:
+        assert (await client.post("/api/free-links", json={"domain": "rival1.com"})).status == 403
+        r = await client.post("/api/free-links", json={"domain": "rival1.com"}, headers=site)
+        body = await r.json()
+        assert r.status == 200 and body["result"]["found"] and len(body["result"]["top_referring_domains"]) == 4
+        assert (await client.post("/api/free-links", json={"domain": "x"}, headers=site)).status == 400
+        for _ in range(19):
+            await client.post("/api/free-links", json={"domain": "rival1.com"}, headers=site)
+        assert (await client.post("/api/free-links", json={"domain": "rival1.com"}, headers=site)).status == 429

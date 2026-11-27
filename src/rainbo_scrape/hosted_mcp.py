@@ -246,6 +246,24 @@ async def seo_site_audit(url: str, limit: int = 50):
 
 
 @mcp.tool()
+async def link_history(domain: str):
+    """A domain's referring-domain count and authority in every Common Crawl web graph release since 2017, so you can see when it started earning links and whether it is growing. 2 credits."""
+    return await request("/links/history", {"domain": domain})
+
+
+@mcp.tool()
+async def link_changes(domain: str, limit: int = 100):
+    """Strong sites that started or stopped linking to a domain between the last two link-index releases. Lost links are the easiest to win back: check them with find_backlinks. 3 credits."""
+    return await request("/links/changes", {"domain": domain, "limit": limit})
+
+
+@mcp.tool()
+async def outreach_contacts(site: str, max_pages: int = 5):
+    """How to reach a site you want a link from: the public contact emails, contact and "write for us" pages and social profiles it publishes, read live from its own pages. 1 credit per page read (up to max_pages)."""
+    return await request("/links/contacts", {"site": site, "max_pages": max_pages})
+
+
+@mcp.tool()
 async def link_job(id: str):
     """Status, progress and results of a dead_page_hunt, find_backlinks or seo_site_audit job. Uses no credits."""
     return await request("/links/job", {"id": id})

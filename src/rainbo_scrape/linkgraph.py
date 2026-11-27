@@ -82,6 +82,7 @@ def _leb(buf, start, count):
 class LinkGraph:
     def __init__(self, path):
         path = Path(path)
+        self.path = path
         self.meta = json.loads((path / "meta.json").read_text())
         self._files = []
         self.keys = self._map(path / "keys.u64").cast("Q")
