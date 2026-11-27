@@ -247,7 +247,7 @@ async def seo_site_audit(url: str, limit: int = 50):
 
 @mcp.tool()
 async def link_history(domain: str):
-    """A domain's referring-domain count and authority in every Common Crawl web graph release since 2017, so you can see when it started earning links and whether it is growing. 2 credits."""
+    """A domain's referring-domain count and authority in every Common Crawl web graph release since 2018, so you can see when it started earning links and whether it is growing. 2 credits."""
     return await request("/links/history", {"domain": domain})
 
 

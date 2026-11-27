@@ -13,7 +13,7 @@ e = lambda t: html.escape(str(t), quote=True)
 OURS = {"price": "$0 to start (1,000 credits), then $5 once or $15 a month", "gap": "10 credits (about $0.0014 on Starter)",
         "api": "Yes, on every plan including the free trial", "mcp": "Yes, 12 link and SEO tools on every plan",
         "dead": "Yes: dead pages, what they used to say (archive), and who links to the site", "contacts": "Yes: public emails, contact and write-for-us pages",
-        "history": "Referring domains and authority per quarter since 2017, 2 credits", "verify": "Yes: the link finder reads the linking page live",
+        "history": "Referring domains and authority per quarter since 2018, 2 credits", "verify": "Yes: the link finder reads the linking page live",
         "index": "Own index: 135M domains, 1.8B domain-to-domain links (Common Crawl web graph); page-level links read live"}
 RIVALS = [
     dict(slug="ahrefs-alternative", name="Ahrefs", price="From $129 a month (Lite), $249 and $449 plans", gap="Included in the plan (Site Explorer link intersect)",

@@ -42,7 +42,7 @@ PRICES = [("Domain authority", "/v1/links/authority", 1, "$0.15 (backlink profil
           ("Find the exact linking page, per page read", "/v1/links/find", 1, "not offered"),
           ("SEO check of one page", "/v1/seo/page", 1, "part of a site audit"),
           ("SEO site audit, per page", "/v1/seo/audit", 1, "$0.09 per audit (9 credits)"),
-          ("Link history since 2017", "/v1/links/history", 2, "not offered"),
+          ("Link history since 2018", "/v1/links/history", 2, "not offered"),
           ("New and lost referring domains", "/v1/links/changes", 3, "not offered"),
           ("Outreach contacts, per page read", "/v1/links/contacts", 1, "not offered")]
 
@@ -111,7 +111,7 @@ def build():
 <h2 id="authority">Authority and referring domains</h2><p>Instant answers from the index. Subdomains roll up to the registered domain. Referring domains come back strongest first, up to 1,000 per domain.</p>
 {curl("/links/authority", {"domain": "firecrawl.dev"})}{code(AUTH)}
 <h2 id="competitors">Competitors from shared links</h2><p>The sites that the same niche blogs, directories and review pages link to are your real competitors. Giants that everyone links to are scored down, so you get rivals, not search engines.</p>{code(COMP)}
-<h2 id="outreach">After the gap: contacts, lost links and history</h2><p><code>/v1/links/contacts</code> reads a linking site's own pages and returns the public contact emails, contact and "write for us" pages and social profiles it publishes. <code>/v1/links/changes</code> lists the strong sites that started or stopped linking to a domain between the last two quarterly releases: lost links are the easiest to win back. <code>/v1/links/history</code> shows a domain's referring domains and authority every quarter since 2017.</p>
+<h2 id="outreach">After the gap: contacts, lost links and history</h2><p><code>/v1/links/contacts</code> reads a linking site's own pages and returns the public contact emails, contact and "write for us" pages and social profiles it publishes. <code>/v1/links/changes</code> lists the strong sites that started or stopped linking to a domain between the last two quarterly releases: lost links are the easiest to win back. <code>/v1/links/history</code> shows a domain's referring domains and authority every quarter since 2018.</p>
 <p>Compare: <a href="/ahrefs-alternative.html">Ahrefs</a> · <a href="/semrush-backlink-alternative.html">Semrush</a> · <a href="/moz-link-explorer-alternative.html">Moz</a> · <a href="/majestic-alternative.html">Majestic</a> · <a href="/openrush-alternative.html">OpenRush</a></p>
 <h2 id="seo">SEO checks</h2><p><code>/v1/seo/page</code> checks one page: title and description length, headings, canonical, robots, language, viewport, image alt text, structured data, social preview tags and links, each issue ranked error, warning or notice. <code>/v1/seo/audit</code> crawls a site, runs the same checks on every page and adds broken internal links (with the pages linking to them) and duplicate titles and descriptions. Our own home page, checked:</p>{code(SEO)}
 <h2>Prices</h2><p>Same credits as scraping. Dollar figures use the $15 Starter plan (110,000 credits). OpenRush figures are its own credit costs from openrush.com/pricing and its tool list, read on 23 November 2026 ($0.01 a credit); Ahrefs plans start at $129 a month (ahrefs.com/pricing, same day).</p>

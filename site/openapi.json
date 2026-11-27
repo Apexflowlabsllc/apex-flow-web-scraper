@@ -2320,7 +2320,7 @@
     "/links/history": {
       "post": {
         "operationId": "linkHistory",
-        "summary": "Referring domains and authority per quarterly release since 2017 (2 credits)",
+        "summary": "Referring domains and authority per quarterly release since 2018 (2 credits)",
         "requestBody": {
           "required": true,
           "content": {
