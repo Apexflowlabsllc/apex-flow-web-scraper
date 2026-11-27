@@ -134,3 +134,9 @@
 @media (max-width: 340px) {
   .afl-network-footer [data-afl-part="directory"] { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Apex Flow Shield badge: the turning skull marks the link to the network's security site. */
+.afl-network-footer a[href="https://shield.apexflowlabs.com"]{display:inline-flex;align-items:center;gap:8px}
+.afl-network-footer a[href="https://shield.apexflowlabs.com"]::before{content:"";flex:none;width:36px;height:36px;background:url("https://shield.apexflowlabs.com/api/badge?host=webscraper.apexflowlabs.com") 0 0/auto 100% no-repeat;animation:afl-shield-skull 2.4s steps(24) infinite}
+@keyframes afl-shield-skull{to{background-position:-864px 0}}
+@media (prefers-reduced-motion:reduce){.afl-network-footer a[href="https://shield.apexflowlabs.com"]::before{animation:none}}
