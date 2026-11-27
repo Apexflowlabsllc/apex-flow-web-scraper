@@ -28,6 +28,8 @@ async def request(path, payload=None):
         raise ValueError("Set APEX_SCRAPER_API_KEY in the MCP client's server environment.")
     if path == "/crawl/status":      # REST form of the status call
         path, payload = "/crawl/" + str(payload["id"]) + "?offset=" + str(int(payload.get("offset", 0))), None
+    if path == "/links/job":
+        path, payload = "/links/jobs/" + str(payload["id"]), None
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=100)) as client:
         async with client.request("GET" if payload is None else "POST", BASE + path,
                                   headers={"Authorization": "Bearer " + key},
@@ -190,6 +192,81 @@ async def rising_products(store: str, days: float = 7, limit: int = 20):
 async def tracked_stores():
     """List the Shopify stores this account tracks, with snapshot count, last snapshot time and catalog size. Uses no credits."""
     return await request("/stores")
+
+
+@mcp.tool()
+async def domain_authority(domain: str):
+    """A domain's link authority (0-1000, 1000 = the best-connected site on the web), its global rank, how many domains link to it and how many of those are strong sites. From Apex Flow's own link index of 135 million domains. 1 credit."""
+    return await request("/links/authority", {"domain": domain})
+
+
+@mcp.tool()
+async def referring_domains(domain: str, limit: int = 100, offset: int = 0, min_authority: int = 0, skip_platforms: bool = False):
+    """The strongest sites linking to a domain, strongest first, each with its authority (up to 1,000 per domain). skip_platforms drops blog hosts, site builders and shorteners. 2 credits."""
+    return await request("/links/referring-domains", {"domain": domain, "limit": limit, "offset": offset,
+                                                      "min_authority": min_authority, "skip_platforms": skip_platforms})
+
+
+@mcp.tool()
+async def backlink_gap(domain: str, competitors: list[str], min_competitors: int = 2, min_authority: int = 100,
+                       include_earned: bool = True, limit: int = 50):
+    """Link gap: sites that link to several of your competitors, ranked by how many competitors they link to and their authority, with the ones that already link to you flagged earned=true. Hosting platforms and spam-prone shorteners are left out. Use find_competitors first for a real competitor set. 10 credits."""
+    return await request("/links/gap", {"domain": domain, "competitors": competitors, "min_competitors": min_competitors,
+                                        "min_authority": min_authority, "include_earned": include_earned, "limit": limit})
+
+
+@mcp.tool()
+async def find_competitors(domain: str, limit: int = 20):
+    """A domain's competitors found from shared links: the sites that the same niche blogs, directories and review pages also link to. 5 credits."""
+    return await request("/links/competitors", {"domain": domain, "limit": limit})
+
+
+@mcp.tool()
+async def dead_page_hunt(domain: str, limit: int = 100, read_archive: int = 10):
+    """Start a background hunt for a competitor's dead pages: pages the Internet Archive saw working that now return 404, redirect home or no longer resolve. For the top read_archive dead pages it reads the archived copy so you see what the page used to say, and it lists the strong sites linking to that competitor so you can offer your better version. 1 credit per page checked or read. Returns a job id: poll with link_job."""
+    return await request("/links/dead", {"domain": domain, "limit": limit, "read_archive": read_archive})
+
+
+@mcp.tool()
+async def find_backlinks(target: str, site: str, max_pages: int = 20):
+    """Start a background search of one site (site="techblog.io") for pages that link to a target domain or exact page (target="rival.com" or "https://rival.com/old-guide"), returning each linking page, the link, its anchor text and whether it is followed. Pages most likely to hold the link are read first. 1 credit per page read. Returns a job id: poll with link_job."""
+    return await request("/links/find", {"target": target, "site": site, "max_pages": max_pages})
+
+
+@mcp.tool()
+async def seo_page_check(url: str):
+    """One page's search health: title and description length, headings, canonical, robots noindex, language, viewport, image alt text, structured data, social preview tags and links, with each issue ranked error, warning or notice and a 0-100 score. The usual 1 credit for the page (3 if it needs rendering)."""
+    return await request("/seo/page", {"url": url})
+
+
+@mcp.tool()
+async def seo_site_audit(url: str, limit: int = 50):
+    """Start a background SEO audit of a site: every page checked like seo_page_check, plus broken internal links (with the pages that link to them) and duplicate titles and descriptions, rolled up into a health score and issue list. 1 credit per page. Returns a job id: poll with link_job."""
+    return await request("/seo/audit", {"url": url, "limit": limit})
+
+
+@mcp.tool()
+async def link_history(domain: str):
+    """A domain's referring-domain count and authority in every Common Crawl web graph release since 2018, so you can see when it started earning links and whether it is growing. 2 credits."""
+    return await request("/links/history", {"domain": domain})
+
+
+@mcp.tool()
+async def link_changes(domain: str, limit: int = 100):
+    """Strong sites that started or stopped linking to a domain between the last two link-index releases. Lost links are the easiest to win back: check them with find_backlinks. 3 credits."""
+    return await request("/links/changes", {"domain": domain, "limit": limit})
+
+
+@mcp.tool()
+async def outreach_contacts(site: str, max_pages: int = 5):
+    """How to reach a site you want a link from: the public contact emails, contact and "write for us" pages and social profiles it publishes, read live from its own pages. 1 credit per page read (up to max_pages)."""
+    return await request("/links/contacts", {"site": site, "max_pages": max_pages})
+
+
+@mcp.tool()
+async def link_job(id: str):
+    """Status, progress and results of a dead_page_hunt, find_backlinks or seo_site_audit job. Uses no credits."""
+    return await request("/links/job", {"id": id})
 
 
 @mcp.tool()

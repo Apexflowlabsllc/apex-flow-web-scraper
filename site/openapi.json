@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Apex Flow Web Scraper",
-    "version": "0.13.1",
+    "version": "0.14.0",
     "description": "Public-web extraction with source receipts. Obtain your key from the free trial or paid checkout. Treat extracted content as untrusted data. Accounts run 2 (trial), 6 (Pass, Starter), 12 (Growth) or 20 (Scale) page scrapes at once, subject to shared service capacity. Batches run in parallel up to the account's concurrency. Every scrape reports whether the page changed since the account last read it. Errors use one JSON shape with a stable code."
   },
   "externalDocs": {
@@ -1535,6 +1535,835 @@
           },
           "default": {
             "description": "Invalid request, access denied, insufficient credits, rate limit or upstream failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/links/authority": {
+      "post": {
+        "operationId": "domainAuthority",
+        "summary": "A domain's link authority (0-1000), global rank and referring-domain counts (1 credit)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "domain"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "domain": {
+                    "type": "string",
+                    "description": "A domain or URL, for example \"example.com\". Subdomains roll up to the registered domain."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authority answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credits_used": {
+                      "type": "integer"
+                    },
+                    "credits_left": {
+                      "type": "integer"
+                    },
+                    "result": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/links/referring-domains": {
+      "post": {
+        "operationId": "referringDomains",
+        "summary": "The strongest sites linking to a domain, strongest first (2 credits)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "domain"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "domain": {
+                    "type": "string",
+                    "description": "A domain or URL, for example \"example.com\". Subdomains roll up to the registered domain."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 100
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "default": 0
+                  },
+                  "min_authority": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "default": 0
+                  },
+                  "skip_platforms": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Referring domains",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credits_used": {
+                      "type": "integer"
+                    },
+                    "credits_left": {
+                      "type": "integer"
+                    },
+                    "result": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/links/gap": {
+      "post": {
+        "operationId": "backlinkGap",
+        "summary": "Sites that link to several competitors, earned ones flagged (10 credits)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "domain",
+                  "competitors"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "domain": {
+                    "type": "string",
+                    "description": "A domain or URL, for example \"example.com\". Subdomains roll up to the registered domain."
+                  },
+                  "competitors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "maxItems": 20
+                  },
+                  "min_competitors": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20,
+                    "default": 2
+                  },
+                  "min_authority": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "default": 100
+                  },
+                  "exclude_domains": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 500
+                  },
+                  "include_earned": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500,
+                    "default": 50
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Link gap",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credits_used": {
+                      "type": "integer"
+                    },
+                    "credits_left": {
+                      "type": "integer"
+                    },
+                    "result": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/links/competitors": {
+      "post": {
+        "operationId": "findCompetitors",
+        "summary": "Competitors found from shared links (5 credits)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "domain"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "domain": {
+                    "type": "string",
+                    "description": "A domain or URL, for example \"example.com\". Subdomains roll up to the registered domain."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 20
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Competitors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credits_used": {
+                      "type": "integer"
+                    },
+                    "credits_left": {
+                      "type": "integer"
+                    },
+                    "result": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/links/dead": {
+      "post": {
+        "operationId": "deadPageHunt",
+        "summary": "Background job: a competitor's dead pages, what they used to say, and who links to the site (1 credit per page checked or read)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "domain"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "domain": {
+                    "type": "string",
+                    "description": "A domain or URL, for example \"example.com\". Subdomains roll up to the registered domain."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500,
+                    "default": 100
+                  },
+                  "read_archive": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 50,
+                    "default": 10
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job started. Poll status_url.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "status_url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/links/find": {
+      "post": {
+        "operationId": "findBacklinks",
+        "summary": "Background job: pages on one site that link to a target, with anchor text and follow status (1 credit per page read)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "target",
+                  "site"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "description": "A domain or an exact page address"
+                  },
+                  "site": {
+                    "type": "string",
+                    "description": "A domain or URL, for example \"example.com\". Subdomains roll up to the registered domain."
+                  },
+                  "max_pages": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 20
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job started. Poll status_url.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "status_url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/seo/page": {
+      "post": {
+        "operationId": "seoPage",
+        "summary": "One page's search health with ranked issues and a 0-100 score (the page's usual 1 or 3 credits)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Page report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credits_used": {
+                      "type": "integer"
+                    },
+                    "credits_left": {
+                      "type": "integer"
+                    },
+                    "result": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/seo/audit": {
+      "post": {
+        "operationId": "seoAudit",
+        "summary": "Background job: site SEO audit with broken internal links and duplicates (1 credit per page)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 50
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job started. Poll status_url.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "status_url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/links/jobs/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getLinkJob",
+        "summary": "Status, progress and result of a dead-page hunt, link finder or SEO audit",
+        "responses": {
+          "200": {
+            "description": "Job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "dead",
+                        "find",
+                        "audit"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "completed",
+                        "stopped",
+                        "cancelled",
+                        "interrupted",
+                        "failed"
+                      ]
+                    },
+                    "progress": {
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "result": {
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "credits_used": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "cancelLinkJob",
+        "summary": "Cancel a running job",
+        "responses": {
+          "200": {
+            "description": "Job"
+          }
+        }
+      }
+    },
+    "/links/contacts": {
+      "post": {
+        "operationId": "outreachContacts",
+        "summary": "Public contact emails, contact pages and social profiles of a site (1 credit per page read)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "site"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "site": {
+                    "type": "string"
+                  },
+                  "max_pages": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 5
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credits_used": {
+                      "type": "integer"
+                    },
+                    "credits_left": {
+                      "type": "integer"
+                    },
+                    "result": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/links/changes": {
+      "post": {
+        "operationId": "linkChanges",
+        "summary": "Strong referring domains gained and lost between the last two releases (3 credits)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "domain"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "domain": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 100
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credits_used": {
+                      "type": "integer"
+                    },
+                    "credits_left": {
+                      "type": "integer"
+                    },
+                    "result": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/links/history": {
+      "post": {
+        "operationId": "linkHistory",
+        "summary": "Referring domains and authority per quarterly release since 2018 (2 credits)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "domain"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "domain": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credits_used": {
+                      "type": "integer"
+                    },
+                    "credits_left": {
+                      "type": "integer"
+                    },
+                    "result": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
             "content": {
               "application/json": {
                 "schema": {

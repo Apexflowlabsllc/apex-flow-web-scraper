@@ -68,6 +68,24 @@ def _links(soup, url):
     return output
 
 
+def _seo(soup, url):
+    """Search facts that live outside the visible text: canonical, language, alternates, robots, image alt text."""
+    def href(node):
+        try:
+            return canonical_url(urljoin(url, node["href"])) if node and node.get("href") else None
+        except ScrapeError:
+            return None
+    images = soup.find_all("img")[:2000]
+    robots = soup.find("meta", attrs={"name": re.compile("^robots$", re.I)})
+    return {"canonical": href(soup.find("link", rel="canonical")),
+            "lang": (soup.html.get("lang") if soup.html else None) or None,
+            "hreflang": [{"lang": n.get("hreflang"), "url": href(n)} for n in soup.select("link[rel~=alternate][hreflang]")[:200]],
+            "robots": robots.get("content") if robots else None,
+            "viewport": bool(soup.find("meta", attrs={"name": "viewport"})),
+            "h1_count": len(soup.find_all("h1")),
+            "images": len(images), "images_missing_alt": sum(1 for i in images if not (i.get("alt") or "").strip())}
+
+
 def _recipe(soup, recipe, url):
     data, evidence, errors = {}, {}, []
     for name, spec in recipe.get("fields", {}).items():
@@ -148,6 +166,7 @@ def extract(body, url, content_type="text/html", recipe=None):
     metadata = {m.get("property") or m.get("name"): m.get("content") for m in soup.select("meta[content]")
                 if m.get("property") or m.get("name")}
     data, evidence, errors = _recipe(soup, recipe or {}, url)
+    seo = _seo(soup, url)
     structured = []
     for node in soup.select('script[type="application/ld+json"]')[:100]:
         try:
@@ -187,7 +206,7 @@ def extract(body, url, content_type="text/html", recipe=None):
     if errors:
         common["warnings"].append("Extraction did not satisfy all requested fields")
     return {**common, "kind": "html", "title": title, "text": text, "markdown": markdown,
-            "metadata": metadata, "links": links, "headings": headings, "tables": tables,
+            "metadata": metadata, "seo": seo, "links": links, "headings": headings, "tables": tables,
             "structured_data": structured, "data": data, "evidence": evidence, "validation_errors": errors,
             "quality": {"text_chars": len(text), "field_count": len(data), "validation_passed": not errors,
                         "needs_render": needs_render}}
